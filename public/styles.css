@@ -1,0 +1,159 @@
+:root {
+    --bg: #181818;
+    --sidebar-collapsed: 64px;
+    --sidebar-expanded: 320px;
+    --sidebar-bg: #202020;
+    --item-hover: #2a2a2a;
+    --text: #eaeaea;
+    --muted: #bdbdbd;
+    --border: #2a2a2a;
+    --shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+
+    /* Layout metrics */
+    --sidebar-border-w: 1px;
+    --sidebar-scrollbar-w: 8px;  /* set to 0 on overlay-scrollbar systems */
+    --item-pad-x: 10px;
+    --icon-size: 36px;
+
+    /* Manual nudge you can tweak.
+       +ve moves icon left, -ve moves icon right, in pixels */
+    --collapsed-center-offset: -3px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; }
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+main#content { min-height: 100vh; }
+
+/* Sidebar */
+.sidebar {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100vh;
+    width: var(--sidebar-collapsed);
+    background: var(--sidebar-bg);
+    border-left: var(--sidebar-border-w) solid var(--border);
+    box-shadow: var(--shadow);
+    transition: width 200ms ease;
+    overflow: hidden;
+    z-index: 1000;
+}
+
+.sidebar:hover,
+.sidebar:focus-within {
+    width: var(--sidebar-expanded);
+}
+
+.sidebar-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 8px;
+    height: 100%;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #555 transparent;
+}
+
+.sidebar-inner::-webkit-scrollbar { width: var(--sidebar-scrollbar-w); }
+.sidebar-inner::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+
+/* Items */
+.sidebar-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 8px var(--item-pad-x);
+    border-radius: 8px;
+    color: var(--text);
+    text-decoration: none;
+    outline: none;
+    transition: background-color 140ms ease;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+
+    /* Compute truly visible collapsed frame */
+    --visible-frame: calc(
+        var(--sidebar-collapsed)
+        - var(--sidebar-border-w)
+        - var(--sidebar-scrollbar-w)
+        - (2 * var(--item-pad-x))
+    );
+}
+
+.sidebar-item:hover,
+.sidebar-item:focus-visible { background: var(--item-hover); }
+
+.sidebar-item__icon {
+    width: var(--icon-size);
+    height: var(--icon-size);
+    flex: 0 0 var(--icon-size);
+    border-radius: 6px;
+    object-fit: cover;
+    background: #303030;
+}
+.sidebar-item__icon.fallback {
+    object-fit: contain;
+    padding: 4px;
+    background: #2a2a2a;
+}
+
+.sidebar-item__text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 14px;
+}
+
+/* Collapsed: center icon in the sliver + manual nudge */
+.sidebar:not(:hover):not(:focus-within) .sidebar-item__icon {
+    margin-left: calc(
+        (var(--visible-frame) - var(--icon-size)) / 2
+        + var(--collapsed-center-offset)
+    );
+    margin-right: 0;
+}
+
+/* Hide text influence while collapsed */
+.sidebar:not(:hover):not(:focus-within) .sidebar-item__text {
+    visibility: hidden;
+    width: 0;
+}
+
+/* Expanded: normal layout */
+.sidebar:hover .sidebar-item__icon,
+.sidebar:focus-within .sidebar-item__icon {
+    margin-left: 0;
+}
+.sidebar:hover .sidebar-item__text,
+.sidebar:focus-within .sidebar-item__text {
+    visibility: visible;
+    width: auto;
+}
+
+/* Legacy status node */
+#sidebarStatus { display: none !important; }
+
+/* Touch adjustments */
+@media (hover: none) {
+    .sidebar { touch-action: manipulation; }
+    /* On overlay scrollbars, don’t subtract the gutter */
+    .sidebar-item { --sidebar-scrollbar-w: 0px; }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .sidebar { transition: none; }
+}
