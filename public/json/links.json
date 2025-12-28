@@ -1,0 +1,22 @@
+[
+    {
+        "text": "Discord",
+        "link": "https://discord.com/users/1233960205843173407",
+        "image": "/media/sidebar/discord.png"
+    },
+    {
+        "text": "YT Channel",
+        "link": "https://www.youtube.com/channel/UCYksIjmba_d3jtll1a8zKgA",
+        "image": "/media/sidebar/yt.png"
+    },
+    {
+        "text": "GitHub",
+        "link": "https://github.com/CanaanJC",
+        "image": "/media/sidebar/git.png"
+    },
+    {
+        "text": "CrafTech Map",
+        "link": "https://map.craftech.gibb.website/",
+        "image": "/media/sidebar/server-icon.png"
+    }
+]

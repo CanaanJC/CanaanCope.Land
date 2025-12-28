@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Craftech</title>
+        <meta name="robots" content="noindex" />
+        <style>
+            :root { --bg: #181818; --text: #eaeaea; --muted: #9a9a9a; }
+
+            html, body { height: 100%; }
+            body {
+                margin: 0;
+                background: var(--bg);
+                color: var(--text);
+                font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+            }
+
+            .page {
+                min-height: 100vh;
+                display: grid;
+                grid-template-rows: auto 1fr;
+            }
+
+            .placeholder {
+                padding: 24px 20px 12px 20px;
+                color: var(--muted);
+                font-size: 16px;
+                letter-spacing: 0.2px;
+                line-height: 1.4;
+                text-align: center; /* center horizontally */
+            }
+
+            .video-wrap {
+                display: grid;
+                place-items: center;
+                padding: 16px 0 32px 0;
+            }
+
+            .video {
+                width: min(80vw, 1280px);
+                max-width: 100%;
+                height: auto;
+                outline: none;
+                border: none;
+                border-radius: 8px;
+                background: #101010;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+            }
+
+            @media (max-width: 480px) {
+                .placeholder { padding: 16px 14px 8px 14px; font-size: 15px; }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="page">
+            <div class="placeholder">Craftech page placeholder</div>
+
+            <div class="video-wrap">
+                <video
+                    class="video"
+                    src="/media/CrafTech/craftech.mp4"
+                    controls
+                    playsinline
+                    preload="metadata"
+                ></video>
+            </div>
+        </div>
+    </body>
+</html>

@@ -1,7 +1,7 @@
 :root {
     --bg: #181818;
     --sidebar-collapsed: 64px;
-    --sidebar-expanded: 320px;
+    --sidebar-expanded: 320px; /* JS syncs this at runtime */
     --sidebar-bg: #202020;
     --item-hover: #2a2a2a;
     --text: #eaeaea;
@@ -9,15 +9,14 @@
     --border: #2a2a2a;
     --shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 
-    /* Layout metrics */
+    /* Metrics for centering math */
     --sidebar-border-w: 1px;
-    --sidebar-scrollbar-w: 8px;  /* set to 0 on overlay-scrollbar systems */
+    --sidebar-scrollbar-w: 8px;   /* set to 0 on overlay scrollbars via media query below */
     --item-pad-x: 10px;
     --icon-size: 36px;
 
-    /* Manual nudge you can tweak.
-       +ve moves icon left, -ve moves icon right, in pixels */
-    --collapsed-center-offset: -3px;
+    /* Manual nudge control for collapsed centering (+left, -right) */
+    --collapsed-center-offset: 0px;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -32,7 +31,74 @@ body {
 
 main#content { min-height: 100vh; }
 
-/* Sidebar */
+/* ---------- Topbar ---------- */
+.topbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0; /* always full width */
+    height: 56px;
+    background: var(--sidebar-bg);
+    border-bottom: var(--sidebar-border-w) solid var(--border);
+    box-shadow: var(--shadow);
+    z-index: 900; /* below sidebar */
+    display: flex;
+    align-items: center;
+}
+
+.topbar-inner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    height: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.topbar-inner::-webkit-scrollbar { display: none; }
+
+.topbar-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    height: 36px;
+    padding: 0 12px;
+    border-radius: 8px;
+    color: var(--text);
+    text-decoration: none;
+    background: transparent;
+    transition: background-color 140ms ease;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    outline: none;
+    white-space: nowrap;
+    font-size: 14px;
+}
+.topbar-item:hover,
+.topbar-item:focus-visible {
+    background: var(--item-hover);
+}
+
+.topbar-item__icon {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 24px;
+    border-radius: 6px;
+    object-fit: cover;
+    background: #303030;
+}
+.topbar-item__icon.fallback {
+    object-fit: contain;
+    padding: 2px;
+    background: #2a2a2a;
+}
+
+/* Reserve space so content below isn't hidden */
+body.has-topbar main#content {
+    padding-top: 56px;
+}
+
+/* ---------- Sidebar shell ---------- */
 .sidebar {
     position: fixed;
     top: 0;
@@ -44,15 +110,27 @@ main#content { min-height: 100vh; }
     box-shadow: var(--shadow);
     transition: width 200ms ease;
     overflow: hidden;
-    z-index: 1000;
+    z-index: 1000; /* above topbar */
 }
 
+/* Hover/focus expands on desktop.
+   On mobile, JS adds .is-open to keep it open until tapped again. */
 .sidebar:hover,
-.sidebar:focus-within {
+.sidebar:focus-within,
+.sidebar.is-open {
     width: var(--sidebar-expanded);
 }
 
+/* Toggle capture layer sits behind links to catch taps on empty chrome */
+.sidebar-toggle-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+}
+
 .sidebar-inner {
+    position: relative; /* place above toggle layer */
+    z-index: 1;
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -66,7 +144,7 @@ main#content { min-height: 100vh; }
 .sidebar-inner::-webkit-scrollbar { width: var(--sidebar-scrollbar-w); }
 .sidebar-inner::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
 
-/* Items */
+/* Sidebar items */
 .sidebar-item {
     position: relative;
     display: flex;
@@ -82,7 +160,7 @@ main#content { min-height: 100vh; }
     -webkit-tap-highlight-color: transparent;
     user-select: none;
 
-    /* Compute truly visible collapsed frame */
+    /* Visible frame for perfect centering math */
     --visible-frame: calc(
         var(--sidebar-collapsed)
         - var(--sidebar-border-w)
@@ -102,6 +180,7 @@ main#content { min-height: 100vh; }
     object-fit: cover;
     background: #303030;
 }
+
 .sidebar-item__icon.fallback {
     object-fit: contain;
     padding: 4px;
@@ -117,33 +196,35 @@ main#content { min-height: 100vh; }
     font-size: 14px;
 }
 
-/* Collapsed: center icon in the sliver + manual nudge */
-.sidebar:not(:hover):not(:focus-within) .sidebar-item__icon {
+/* Collapsed state:
+   - Center icon in exposed sliver with manual offset
+   - Hide text influence so centering is not affected */
+.sidebar:not(:hover):not(.is-open):not(:focus-within) .sidebar-item__icon {
     margin-left: calc(
-        (var(--visible-frame) - var(--icon-size)) / 2
-        + var(--collapsed-center-offset)
+        (var(--visible-frame) - var(--icon-size)) / 2 + var(--collapsed-center-offset)
     );
     margin-right: 0;
 }
-
-/* Hide text influence while collapsed */
-.sidebar:not(:hover):not(:focus-within) .sidebar-item__text {
+.sidebar:not(:hover):not(.is-open):not(:focus-within) .sidebar-item__text {
     visibility: hidden;
     width: 0;
 }
 
-/* Expanded: normal layout */
+/* Expanded (hover/focus or mobile .is-open):
+   - Normal alignment and show text */
 .sidebar:hover .sidebar-item__icon,
+.sidebar.is-open .sidebar-item__icon,
 .sidebar:focus-within .sidebar-item__icon {
     margin-left: 0;
 }
 .sidebar:hover .sidebar-item__text,
+.sidebar.is-open .sidebar-item__text,
 .sidebar:focus-within .sidebar-item__text {
     visibility: visible;
     width: auto;
 }
 
-/* Legacy status node */
+/* Hide any legacy status node */
 #sidebarStatus { display: none !important; }
 
 /* Touch adjustments */

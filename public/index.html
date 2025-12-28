@@ -4,27 +4,20 @@
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Canaan Copeland</title>
-        <link rel="stylesheet" href="./styles.css?v=dev4" />
+        <link rel="stylesheet" href="./styles.css?v=dev6" />
     </head>
-    <body>
-        <!-- <div class="video-wrap">
-            <video
-                class="video"
-                src="/video.mov"
-                controls
-                playsinline
-                preload="metadata"
-            ></video>
-        </div> -->
+    <body class="has-topbar">
+        <header class="topbar" aria-label="Top navigation">
+            <nav class="topbar-inner" id="topbarList" aria-label="Topbar list"></nav>
+        </header>
+
         <main id="content" aria-label="Main content"></main>
 
-        <aside class="sidebar" aria-label="Quick links">
+        <aside class="sidebar" aria-label="Quick links" aria-expanded="false">
             <nav class="sidebar-inner" id="sidebarList" aria-label="Sidebar list"></nav>
         </aside>
 
-        
-
-        <!-- Versioned script include recommended to defeat caches -->
-        <script src="./script.js?v=dev4" defer></script>
+        <!-- Single versioned script include -->
+        <script src="./script.js?v=dev6" defer></script>
     </body>
 </html>

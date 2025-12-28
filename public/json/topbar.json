@@ -1,0 +1,5 @@
+[
+    { "text": "What is Craftech", "image": "/media/CrafTech/icon.png", "link": "craftech" },
+    { "text": "Projects", "link": "projects" },
+    { "text": "About Me", "link": "about-me" }
+]

@@ -1,7 +1,8 @@
 /**
- * Simple static file server using Node's http and fs modules.
- * Serves files from the ./public directory (e.g., ./public/index.html).
- * MIME types are inferred by extension. Includes basic 404 and security headers.
+ * Static file server with subpage routing and explicit 404.
+ * Root: serves from ./public
+ * Subpages: /:slug -> ./public/sub-page/:slug/index.html (if exists)
+ * Missing routes: returns a plain white 404 page.
  */
 
 const http = require("http");
@@ -37,7 +38,6 @@ const MIME_TYPES = {
 };
 
 function sanitizeUrl(urlPath) {
-    // Remove query/hash, normalize, prevent directory traversal
     const cleanPath = urlPath.split("?")[0].split("#")[0];
     const decoded = decodeURIComponent(cleanPath);
     const normalized = path.posix.normalize(decoded);
@@ -45,94 +45,102 @@ function sanitizeUrl(urlPath) {
     return normalized;
 }
 
-function resolveFile(filePath) {
-    // If path is directory, serve index.html
-    try {
-        const stat = fs.statSync(filePath);
-        if (stat.isDirectory()) {
-            const indexPath = path.join(filePath, "index.html");
-            if (fs.existsSync(indexPath)) return indexPath;
-        }
-    } catch {
-        // ignore
-    }
-    return filePath;
-}
-
 function getMimeType(filePath) {
     const ext = path.extname(filePath).toLowerCase();
     return MIME_TYPES[ext] || "application/octet-stream";
 }
 
-function sendResponse(res, status, headers, streamOrBody) {
+function sendResponse(res, status, headers, bodyOrStream) {
     res.writeHead(status, headers);
-    if (streamOrBody instanceof fs.ReadStream) {
-        streamOrBody.pipe(res);
-    } else if (Buffer.isBuffer(streamOrBody) || typeof streamOrBody === "string") {
-        res.end(streamOrBody);
+    if (bodyOrStream instanceof fs.ReadStream) {
+        bodyOrStream.pipe(res);
+    } else if (Buffer.isBuffer(bodyOrStream) || typeof bodyOrStream === "string") {
+        res.end(bodyOrStream);
     } else {
         res.end();
     }
 }
 
+function fileExists(filePath) {
+    try {
+        const st = fs.statSync(filePath);
+        return st.isFile();
+    } catch {
+        return false;
+    }
+}
+
+function notFound(res, baseHeaders) {
+    const html = "<!doctype html><html><head><meta charset=\"utf-8\"><title>404</title></head><body style=\"margin:0;background:#fff;color:#000;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial\"><div style=\"display:flex;align-items:center;justify-content:center;height:100vh;font-size:20px;\">404 page not present</div></body></html>";
+    return sendResponse(res, 404, { ...baseHeaders, "Content-Type": "text/html; charset=utf-8" }, html);
+}
+
 const server = http.createServer((req, res) => {
-    // Security and caching headers
     const baseHeaders = {
         "X-Content-Type-Options": "nosniff",
         "X-Frame-Options": "SAMEORIGIN",
         "X-XSS-Protection": "0",
         "Referrer-Policy": "no-referrer-when-downgrade",
-        "Cross-Origin-Opener-Policy": "same-origin",
-        "Cross-Origin-Resource-Policy": "same-site",
+        // For LAN dev, you can omit COOP/CORP to avoid warnings:
+        // "Cross-Origin-Opener-Policy": "same-origin",
+        // "Cross-Origin-Resource-Policy": "same-site",
         "Cache-Control": "public, max-age=300",
     };
 
-    // Only allow GET/HEAD
     if (!["GET", "HEAD"].includes(req.method || "")) {
         return sendResponse(res, 405, { ...baseHeaders, "Content-Type": "text/plain; charset=utf-8", "Allow": "GET, HEAD" }, "Method Not Allowed");
     }
 
     const safePath = sanitizeUrl(req.url || "/");
-    let filePath = path.join(PUBLIC_DIR, safePath);
-    filePath = resolveFile(filePath);
+    const ext = path.extname(safePath);
 
-    // Ensure file is within PUBLIC_DIR
-    const relative = path.relative(PUBLIC_DIR, filePath);
-    if (relative.startsWith("..") || path.isAbsolute(relative)) {
-        return sendResponse(res, 403, { ...baseHeaders, "Content-Type": "text/plain; charset=utf-8" }, "Forbidden");
+    // 1) Try direct static file in PUBLIC_DIR
+    let fsPath = path.join(PUBLIC_DIR, safePath);
+    try {
+        const st = fs.statSync(fsPath);
+        if (st.isDirectory()) {
+            const indexPath = path.join(fsPath, "index.html");
+            if (fileExists(indexPath)) {
+                const headers = { ...baseHeaders, "Content-Type": getMimeType(indexPath), "Last-Modified": st.mtime.toUTCString() };
+                return sendResponse(res, 200, headers, req.method === "HEAD" ? "" : fs.createReadStream(indexPath));
+            }
+            // If directory without index.html, treat as missing
+        } else if (st.isFile()) {
+            const headers = { ...baseHeaders, "Content-Type": getMimeType(fsPath), "Last-Modified": st.mtime.toUTCString() };
+            return sendResponse(res, 200, headers, req.method === "HEAD" ? "" : fs.createReadStream(fsPath));
+        }
+    } catch {
+        // proceed to subpage / fallback
     }
 
-    fs.stat(filePath, (err, stats) => {
-        if (err || !stats.isFile()) {
-            // Fallback to index.html for SPA-style routing if it exists
-            const spaIndex = path.join(PUBLIC_DIR, "index.html");
-            if (fs.existsSync(spaIndex)) {
-                const mime = getMimeType(spaIndex);
-                const stream = fs.createReadStream(spaIndex);
-                return sendResponse(res, 200, { ...baseHeaders, "Content-Type": mime }, req.method === "HEAD" ? "" : stream);
-            }
-            return sendResponse(res, 404, { ...baseHeaders, "Content-Type": "text/plain; charset=utf-8" }, "Not Found");
+    // 2) If request looks like a static asset (.json, .css, .js, images...) and not found → 404
+    if (ext) {
+        return notFound(res, baseHeaders);
+    }
+
+    // 3) Subpage routing: /slug -> /sub-page/slug/index.html
+    const parts = safePath.replace(/^\/+/, "").split("/");
+    const slug = parts[0] || "";
+    if (slug) {
+        const subIndex = path.join(PUBLIC_DIR, "sub-page", slug, "index.html");
+        if (fileExists(subIndex)) {
+            const st = fs.statSync(subIndex);
+            const headers = { ...baseHeaders, "Content-Type": "text/html; charset=utf-8", "Last-Modified": st.mtime.toUTCString() };
+            return sendResponse(res, 200, headers, req.method === "HEAD" ? "" : fs.createReadStream(subIndex));
         }
+        // Missing subpage -> 404
+        return notFound(res, baseHeaders);
+    }
 
-        // Conditional GET handling
-        const lastModified = stats.mtime.toUTCString();
-        if (req.headers["if-modified-since"] && new Date(req.headers["if-modified-since"]) >= stats.mtime) {
-            return sendResponse(res, 304, { ...baseHeaders, "Last-Modified": lastModified }, "");
-        }
+    // 4) Root route: serve public/index.html or 404 if missing
+    const rootIndex = path.join(PUBLIC_DIR, "index.html");
+    if (fileExists(rootIndex)) {
+        const st = fs.statSync(rootIndex);
+        const headers = { ...baseHeaders, "Content-Type": "text/html; charset=utf-8", "Last-Modified": st.mtime.toUTCString() };
+        return sendResponse(res, 200, headers, req.method === "HEAD" ? "" : fs.createReadStream(rootIndex));
+    }
 
-        const mime = getMimeType(filePath);
-        const headers = { ...baseHeaders, "Content-Type": mime, "Last-Modified": lastModified };
-
-        if (req.method === "HEAD") {
-            return sendResponse(res, 200, headers, "");
-        }
-
-        const stream = fs.createReadStream(filePath);
-        stream.on("error", () => {
-            sendResponse(res, 500, { ...baseHeaders, "Content-Type": "text/plain; charset=utf-8" }, "Internal Server Error");
-        });
-        sendResponse(res, 200, headers, stream);
-    });
+    return notFound(res, baseHeaders);
 });
 
 server.listen(PORT, HOST, () => {
