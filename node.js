@@ -1,43 +1,47 @@
-/**
- * Static file server with subpage routing and explicit 404.
- * Root: serves from ./public
- * Subpages: /:slug -> ./public/sub-page/:slug/index.html (if exists)
- * Missing routes: returns a plain white 404 page.
- */
-
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
 
 const HOST = "0.0.0.0";
-const PORT = process.env.PORT ? Number(process.env.PORT) : 2138;
+const PORT = 2138;
 const PUBLIC_DIR = path.join(__dirname, "public");
 
-// Minimal MIME type map
 const MIME_TYPES = {
     ".html": "text/html; charset=utf-8",
-    ".htm": "text/html; charset=utf-8",
-    ".css": "text/css; charset=utf-8",
-    ".js": "application/javascript; charset=utf-8",
-    ".mjs": "application/javascript; charset=utf-8",
+    ".htm":  "text/html; charset=utf-8",
+    ".css":  "text/css; charset=utf-8",
+    ".js":   "application/javascript; charset=utf-8",
+    ".mjs":  "application/javascript; charset=utf-8",
     ".json": "application/json; charset=utf-8",
-    ".svg": "image/svg+xml",
-    ".png": "image/png",
-    ".jpg": "image/jpeg",
+    ".svg":  "image/svg+xml",
+    ".png":  "image/png",
+    ".jpg":  "image/jpeg",
     ".jpeg": "image/jpeg",
-    ".gif": "image/gif",
+    ".gif":  "image/gif",
     ".webp": "image/webp",
-    ".ico": "image/x-icon",
-    ".txt": "text/plain; charset=utf-8",
-    ".wav": "audio/wav",
-    ".mp3": "audio/mpeg",
-    ".mp4": "video/mp4",
+    ".ico":  "image/x-icon",
+    ".txt":  "text/plain; charset=utf-8",
+    ".md":   "text/plain; charset=utf-8",
+    ".wav":  "audio/wav",
+    ".mp3":  "audio/mpeg",
+    ".mp4":  "video/mp4",
     ".webm": "video/webm",
-    ".pdf": "application/pdf",
+    ".pdf":  "application/pdf",
     ".wasm": "application/wasm",
+    ".woff": "font/woff",
+    ".woff2":"font/woff2",
+    ".ttf":  "font/ttf",
+    ".otf":  "font/otf",
 };
 
-function sanitizeUrl(urlPath) {
+const VALID_SECTIONS = new Set(["projects", "small-projects"]);
+
+function getMimeType(filePath) {
+    const ext = path.extname(filePath).toLowerCase();
+    return MIME_TYPES[ext] || "application/octet-stream";
+}
+
+function sanitizePath(urlPath) {
     const cleanPath = urlPath.split("?")[0].split("#")[0];
     const decoded = decodeURIComponent(cleanPath);
     const normalized = path.posix.normalize(decoded);
@@ -45,106 +49,266 @@ function sanitizeUrl(urlPath) {
     return normalized;
 }
 
-function getMimeType(filePath) {
-    const ext = path.extname(filePath).toLowerCase();
-    return MIME_TYPES[ext] || "application/octet-stream";
+function naturalSort(a, b) {
+    return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
 }
 
-function sendResponse(res, status, headers, bodyOrStream) {
-    res.writeHead(status, headers);
-    if (bodyOrStream instanceof fs.ReadStream) {
-        bodyOrStream.pipe(res);
-    } else if (Buffer.isBuffer(bodyOrStream) || typeof bodyOrStream === "string") {
-        res.end(bodyOrStream);
-    } else {
-        res.end();
+function getProjectManifest(section, includeBlocked = false) {
+    const sectionDir = path.join(PUBLIC_DIR, section);
+    if (!fs.existsSync(sectionDir)) return [];
+
+    return fs.readdirSync(sectionDir)
+        .filter(entry => {
+            const entryPath = path.join(sectionDir, entry);
+            if (!fs.statSync(entryPath).isDirectory()) return false;
+            const configPath = path.join(entryPath, "config.json");
+            return fs.existsSync(configPath);
+        })
+        .map(slug => {
+            const configPath = path.join(sectionDir, slug, "config.json");
+            try {
+                const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+                return {
+                    slug,
+                    name:        config.name        || slug,
+                    date:        config.date        || null,
+                    description: config.description || "",
+                    featured:    config.featured    || false,
+                    block:       config.block       || false,
+                };
+            } catch {
+                return { slug, name: slug, date: null, description: "", featured: false, block: false };
+            }
+        })
+        .filter(p => includeBlocked ? true : !p.block);
+}
+
+function escape(str) {
+    return String(str)
+        .replace(/&/g,  "&amp;")
+        .replace(/"/g,  "&quot;")
+        .replace(/</g,  "&lt;")
+        .replace(/>/g,  "&gt;");
+}
+
+function buildProjectEmbedHtml(slug, config, origin, section) {
+    const title       = escape(config.name        || slug);
+    const description = escape(config.description || "");
+    const url         = `${origin}/${section}/${slug}`;
+
+    const mediaDir = path.join(PUBLIC_DIR, section, slug, "media");
+    let imageTag = "";
+
+    if (fs.existsSync(mediaDir)) {
+        const thumbPng = path.join(mediaDir, "thumb.png");
+        const thumbMp4 = path.join(mediaDir, "thumb.mp4");
+
+        if (fs.existsSync(thumbPng)) {
+            const imgUrl = `${origin}/${section}/${slug}/media/thumb.png`;
+            imageTag = `
+    <meta property="og:image" content="${escape(imgUrl)}" />
+    <meta name="twitter:image" content="${escape(imgUrl)}" />
+    <meta name="twitter:card" content="summary_large_image" />`;
+
+        } else if (fs.existsSync(thumbMp4)) {
+            const vidUrl = `${origin}/${section}/${slug}/media/thumb.mp4`;
+            imageTag = `
+    <meta property="og:video" content="${escape(vidUrl)}" />
+    <meta property="og:video:type" content="video/mp4" />
+    <meta name="twitter:card" content="player" />
+    <meta name="twitter:player" content="${escape(vidUrl)}" />`;
+
+        } else {
+            const images = fs.readdirSync(mediaDir)
+                .filter(f =>
+                    /\.(png|jpg|jpeg|webp|gif)$/i.test(f) &&
+                    fs.statSync(path.join(mediaDir, f)).isFile()
+                )
+                .sort(naturalSort);
+
+            if (images.length > 0) {
+                const imgUrl = `${origin}/${section}/${slug}/media/${images[0]}`;
+                imageTag = `
+    <meta property="og:image" content="${escape(imgUrl)}" />
+    <meta name="twitter:image" content="${escape(imgUrl)}" />
+    <meta name="twitter:card" content="summary_large_image" />`;
+            } else {
+                imageTag = `\n    <meta name="twitter:card" content="summary" />`;
+            }
+        }
     }
-}
 
-function fileExists(filePath) {
-    try {
-        const st = fs.statSync(filePath);
-        return st.isFile();
-    } catch {
-        return false;
+    if (config.block) {
+        return `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${title}</title>
+    <meta name="description" content="${description}" />
+    <meta property="og:title" content="${title}" />
+    <meta property="og:description" content="${description}" />
+    <meta property="og:url" content="${escape(url)}" />
+    <meta property="og:type" content="article" />${imageTag}
+    <link rel="stylesheet" href="/css/main.css" />
+    <link rel="stylesheet" href="/projects.css" />
+  </head>
+  <body>
+    <main id="content" aria-label="${title}">
+      <div id="projects-container"></div>
+    </main>
+    <script>
+      window.__BLOCKED_SLUG__    = ${JSON.stringify(slug)};
+      window.__BLOCKED_SECTION__ = ${JSON.stringify(section)};
+    </script>
+    <script src="/projects.js" type="module"></script>
+  </body>
+</html>`;
     }
+
+    return `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${title}</title>
+    <meta name="description" content="${description}" />
+    <meta property="og:title" content="${title}" />
+    <meta property="og:description" content="${description}" />
+    <meta property="og:url" content="${escape(url)}" />
+    <meta property="og:type" content="article" />${imageTag}
+    <script>
+      window.location.replace("/${section}#${slug}");
+    </script>
+  </head>
+  <body></body>
+</html>`;
 }
 
-function notFound(res, baseHeaders) {
-    const html = "<!doctype html><html><head><meta charset=\"utf-8\"><title>404</title></head><body style=\"margin:0;background:#fff;color:#000;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial\"><div style=\"display:flex;align-items:center;justify-content:center;height:100vh;font-size:20px;\">404 page not present</div></body></html>";
-    return sendResponse(res, 404, { ...baseHeaders, "Content-Type": "text/html; charset=utf-8" }, html);
-}
+// ── Server ────────────────────────────────────────────────────────────────────
 
 const server = http.createServer((req, res) => {
-    const baseHeaders = {
-        "X-Content-Type-Options": "nosniff",
-        "X-Frame-Options": "SAMEORIGIN",
-        "X-XSS-Protection": "0",
-        "Referrer-Policy": "no-referrer-when-downgrade",
-        // For LAN dev, you can omit COOP/CORP to avoid warnings:
-        // "Cross-Origin-Opener-Policy": "same-origin",
-        // "Cross-Origin-Resource-Policy": "same-site",
-        "Cache-Control": "public, max-age=300",
-    };
-
-    if (!["GET", "HEAD"].includes(req.method || "")) {
-        return sendResponse(res, 405, { ...baseHeaders, "Content-Type": "text/plain; charset=utf-8", "Allow": "GET, HEAD" }, "Method Not Allowed");
+    if (!["GET", "HEAD"].includes(req.method)) {
+        res.writeHead(405, { "Content-Type": "text/plain" });
+        res.end("Method Not Allowed");
+        return;
     }
 
-    const safePath = sanitizeUrl(req.url || "/");
-    const ext = path.extname(safePath);
+    const safePath = sanitizePath(req.url || "/");
 
-    // 1) Try direct static file in PUBLIC_DIR
-    let fsPath = path.join(PUBLIC_DIR, safePath);
-    try {
-        const st = fs.statSync(fsPath);
-        if (st.isDirectory()) {
-            const indexPath = path.join(fsPath, "index.html");
-            if (fileExists(indexPath)) {
-                const headers = { ...baseHeaders, "Content-Type": getMimeType(indexPath), "Last-Modified": st.mtime.toUTCString() };
-                return sendResponse(res, 200, headers, req.method === "HEAD" ? "" : fs.createReadStream(indexPath));
+    // ── Manifest — /:section/manifest.json ───────────────────────────────────
+    const manifestMatch = safePath.match(/^\/(projects|small-projects)\/manifest\.json$/);
+    if (manifestMatch) {
+        const section  = manifestMatch[1];
+        const manifest = getProjectManifest(section, false);
+        const body     = JSON.stringify(manifest);
+        res.writeHead(200, {
+            "Content-Type":   "application/json; charset=utf-8",
+            "Content-Length": Buffer.byteLength(body),
+            "Cache-Control":  "no-store",
+        });
+        res.end(body);
+        return;
+    }
+
+    // ── Media folder listing — /:section/:slug/media-listing/:folder ─────────
+    const mediaListingMatch = safePath.match(
+        /^\/(projects|small-projects)\/([^\/]+)\/media-listing\/([^\/]+)\/?$/
+    );
+    if (mediaListingMatch) {
+        const section = mediaListingMatch[1];
+        const slug    = mediaListingMatch[2];
+        const folder  = mediaListingMatch[3];
+
+        if (!/^[\w\-]+$/.test(folder) || !/^[\w\-]+$/.test(slug)) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end("[]");
+            return;
+        }
+
+        const folderPath = path.join(PUBLIC_DIR, section, slug, "media", folder);
+        const SUPPORTED  = /\.(png|mp4)$/i;
+        let files = [];
+
+        if (fs.existsSync(folderPath) && fs.statSync(folderPath).isDirectory()) {
+            files = fs.readdirSync(folderPath)
+                .filter(f =>
+                    SUPPORTED.test(f) &&
+                    fs.statSync(path.join(folderPath, f)).isFile()
+                )
+                .sort(naturalSort);
+        }
+
+        const body = JSON.stringify(files);
+        res.writeHead(200, {
+            "Content-Type":   "application/json; charset=utf-8",
+            "Content-Length": Buffer.byteLength(body),
+            "Cache-Control":  "no-store",
+        });
+        res.end(body);
+        return;
+    }
+
+    // ── Project slug page — /:section/:slug ───────────────────────────────────
+    const slugMatch = safePath.match(/^\/(projects|small-projects)\/([^\/]+)\/?$/);
+    if (slugMatch) {
+        const section    = slugMatch[1];
+        const slug       = slugMatch[2];
+        const configPath = path.join(PUBLIC_DIR, section, slug, "config.json");
+
+        if (fs.existsSync(configPath)) {
+            try {
+                const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+                const origin = `${req.headers["x-forwarded-proto"] || "http"}://${req.headers.host}`;
+                const html   = buildProjectEmbedHtml(slug, config, origin, section);
+                res.writeHead(200, {
+                    "Content-Type":  "text/html; charset=utf-8",
+                    "Cache-Control": "no-store",
+                });
+                res.end(html);
+                return;
+            } catch (err) {
+                console.error("Failed to build project embed page:", err);
             }
-            // If directory without index.html, treat as missing
-        } else if (st.isFile()) {
-            const headers = { ...baseHeaders, "Content-Type": getMimeType(fsPath), "Last-Modified": st.mtime.toUTCString() };
-            return sendResponse(res, 200, headers, req.method === "HEAD" ? "" : fs.createReadStream(fsPath));
+        }
+    }
+
+    // ── Static file serving ───────────────────────────────────────────────────
+    let fsPath = path.join(PUBLIC_DIR, safePath);
+
+    try {
+        const stat = fs.statSync(fsPath);
+
+        if (stat.isDirectory()) {
+            const indexPath = path.join(fsPath, "index.html");
+            if (fs.existsSync(indexPath) && fs.statSync(indexPath).isFile()) {
+                fsPath = indexPath;
+            } else {
+                res.writeHead(404, { "Content-Type": "text/plain" });
+                res.end("404 Not Found");
+                return;
+            }
+        }
+
+        const finalStat = fs.statSync(fsPath);
+        res.writeHead(200, {
+            "Content-Type":   getMimeType(fsPath),
+            "Content-Length": finalStat.size,
+            "Cache-Control":  "public, max-age=300",
+        });
+
+        if (req.method === "HEAD") {
+            res.end();
+        } else {
+            fs.createReadStream(fsPath).pipe(res);
         }
     } catch {
-        // proceed to subpage / fallback
+        res.writeHead(404, { "Content-Type": "text/plain" });
+        res.end("404 Not Found");
     }
-
-    // 2) If request looks like a static asset (.json, .css, .js, images...) and not found → 404
-    if (ext) {
-        return notFound(res, baseHeaders);
-    }
-
-    // 3) Subpage routing: /slug -> /sub-page/slug/index.html
-    const parts = safePath.replace(/^\/+/, "").split("/");
-    const slug = parts[0] || "";
-    if (slug) {
-        const subIndex = path.join(PUBLIC_DIR, "sub-page", slug, "index.html");
-        if (fileExists(subIndex)) {
-            const st = fs.statSync(subIndex);
-            const headers = { ...baseHeaders, "Content-Type": "text/html; charset=utf-8", "Last-Modified": st.mtime.toUTCString() };
-            return sendResponse(res, 200, headers, req.method === "HEAD" ? "" : fs.createReadStream(subIndex));
-        }
-        // Missing subpage -> 404
-        return notFound(res, baseHeaders);
-    }
-
-    // 4) Root route: serve public/index.html or 404 if missing
-    const rootIndex = path.join(PUBLIC_DIR, "index.html");
-    if (fileExists(rootIndex)) {
-        const st = fs.statSync(rootIndex);
-        const headers = { ...baseHeaders, "Content-Type": "text/html; charset=utf-8", "Last-Modified": st.mtime.toUTCString() };
-        return sendResponse(res, 200, headers, req.method === "HEAD" ? "" : fs.createReadStream(rootIndex));
-    }
-
-    return notFound(res, baseHeaders);
 });
 
 server.listen(PORT, HOST, () => {
-    const url = `http://localhost:${PORT}`;
-    console.log(`Static server running at ${url}`);
-    console.log(`Serving directory: ${PUBLIC_DIR}`);
+    console.log(`Server running at http://localhost:${PORT}`);
+    console.log(`Serving: ${PUBLIC_DIR}`);
 });

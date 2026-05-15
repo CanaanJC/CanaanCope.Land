@@ -1,5 +1,26 @@
-[
-    { "text": "What is Craftech", "image": "/media/CrafTech/icon.png", "link": "craftech" },
-    { "text": "Projects", "link": "projects" },
-    { "text": "About Me", "link": "about-me" }
-]
+{
+    "logo": "/media/CrafTech/logo.png",
+    "slogan": "Aspiring Engineer    |    Proudly Canadian  🇨🇦   |    Forever Curious",
+    "dropdowns": [
+        {
+            "title": "Projects",
+            "items": [
+                {
+                    "name": "Project SciAnnex",
+                    "link": "/CrafTech",
+                    "icon": "/media/CrafTech/logo.png"
+                },
+                {
+                    "name": "Main Projects",
+                    "link": "/projects",
+                    "icon": ""
+                },
+                {
+                    "name": "Smaller Projects",
+                    "link": "/small-projects",
+                    "icon": ""
+                }
+            ]
+        }
+    ]
+}

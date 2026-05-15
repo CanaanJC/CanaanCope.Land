@@ -1,0 +1,126 @@
+:root {
+    --sidebar-collapsed: 64px;
+    --sidebar-expanded: 320px;
+    --icon-size: 36px;
+}
+
+.sidebar {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100vh;
+    width: var(--sidebar-collapsed);
+    background: #202020;
+    border-left: 1px solid #2a2a2a;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    transition: width 200ms ease;
+    overflow-x: hidden;
+    overflow-y: auto;
+    z-index: 1000;
+}
+
+.sidebar.expanded {
+    width: var(--sidebar-expanded);
+}
+
+.sidebar-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 12px 12px 4px;
+    height: 100%;
+    min-width: max-content;
+    scrollbar-width: thin;
+    scrollbar-color: #555 transparent;
+    cursor: pointer;
+}
+
+.sidebar.expanded .sidebar-inner {
+    padding: 12px;
+}
+
+.sidebar-inner::-webkit-scrollbar { 
+    width: 8px; 
+}
+
+.sidebar-inner::-webkit-scrollbar-thumb { 
+    background: #555; 
+    border-radius: 4px; 
+}
+
+.sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 8px;
+    color: var(--text);
+    text-decoration: none;
+    outline: none;
+    transition: background-color 140ms ease;
+    user-select: none;
+    cursor: pointer;
+}
+
+.sidebar-item:hover,
+.sidebar-item:focus-visible { 
+    background: #2a2a2a; 
+}
+
+.sidebar-item__icon {
+    width: var(--icon-size);
+    height: var(--icon-size);
+    flex: 0 0 var(--icon-size);
+    border-radius: 6px;
+    object-fit: cover;
+    background: #303030;
+    cursor: pointer;
+}
+
+.sidebar-item__icon.fallback {
+    object-fit: contain;
+    padding: 4px;
+    background: #2a2a2a;
+}
+
+.sidebar-item__text {
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 14px;
+    visibility: hidden;
+    transition: visibility 0ms 200ms;
+    pointer-events: none;
+}
+
+.sidebar.expanded .sidebar-item__text {
+    visibility: visible;
+    transition: visibility 0ms 0ms;
+}
+
+.sidebar--loading .sidebar-item__text {
+    visibility: hidden !important;
+    transition: none !important;
+}
+
+.sidebar.measuring {
+    width: var(--sidebar-expanded);
+    visibility: hidden;
+}
+
+.sidebar.measuring .sidebar-inner {
+    padding: 12px;
+}
+
+.sidebar.measuring .sidebar-item__text {
+    visibility: visible;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sidebar { 
+        transition: none; 
+    }
+}

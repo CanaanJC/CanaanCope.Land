@@ -1,0 +1,405 @@
+/* ── Hide scrollbar on projects/small-projects pages ── */
+
+html, body {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+    display: none;
+}
+
+body.gallery-open {
+    overflow: hidden;
+}
+
+/* ── Page layout ── */
+
+:root {
+    --projects-sidebar-offset: 64px;
+    --projects-side-padding: 48px;
+}
+
+#projects-container {
+    margin-right: calc(var(--projects-sidebar-offset) + var(--projects-side-padding));
+    margin-left: auto;
+    padding: 48px var(--projects-side-padding) 80px var(--projects-side-padding);
+    box-sizing: border-box;
+    max-width: calc((100% - var(--projects-sidebar-offset)) * 0.9);
+}
+
+/* ── Topbar By Month dropdown ── */
+
+#month-nav-dropdown .topbar-dropdown__item {
+    background: none;
+    border: none;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: var(--topbar-font-size);
+    color: var(--text);
+}
+
+.topbar-month-nav--year {
+    font-weight: 700;
+    color: var(--text) !important;
+    padding-top: 10px !important;
+}
+
+.topbar-month-nav--year:first-child {
+    padding-top: 8px !important;
+}
+
+.topbar-month-nav--month {
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace !important;
+    font-weight: 400 !important;
+    color: #666 !important;
+    padding-left: 24px !important;
+    font-size: 0.85rem !important;
+    letter-spacing: 0.06em;
+}
+
+.topbar-month-nav--month:hover {
+    color: var(--muted) !important;
+}
+
+/* ── Placeholder skeleton ── */
+
+.project-placeholder {
+    min-height: 400px;
+    border-radius: 10px;
+    background: linear-gradient(90deg, #1e1e1e 25%, #242424 50%, #1e1e1e 75%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.6s ease-in-out infinite;
+    opacity: 0.5;
+}
+
+@keyframes skeleton-shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* ── Divider ── */
+
+.project-divider {
+    border: none;
+    border-top: 1px solid #2a2a2a;
+    margin: 56px 0;
+}
+
+/* ── Project block ── */
+
+.project-block   { scroll-margin-top: 72px; }
+.project-header  { margin-bottom: 28px; }
+
+.project-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0 0 8px 0;
+    color: var(--text);
+    padding-left: 8px;
+}
+
+.project-date {
+    font-size: 0.95rem;
+    font-weight: 400;
+    color: var(--muted);
+    padding-left: 8px;
+    letter-spacing: 0.03em;
+}
+
+/* ── Content grid rows ── */
+
+.project-row         { display: grid; gap: 32px; margin-bottom: 32px; }
+.project-row--full   { grid-template-columns: 1fr; }
+.project-row--half   { grid-template-columns: 1fr 1fr; align-items: start; }
+.project-cell        { min-width: 0; }
+.project-cell--empty { /* blank */ }
+
+/* ── Markdown content ── */
+
+.project-cell .md-content {
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.75;
+}
+
+.project-cell .md-content h1,
+.project-cell .md-content h2,
+.project-cell .md-content h3,
+.project-cell .md-content h4 {
+    color: var(--text);
+    margin-top: 1.4em;
+    margin-bottom: 0.5em;
+    font-weight: 600;
+}
+
+.project-cell .md-content h1 { font-size: 1.5rem; }
+.project-cell .md-content h2 { font-size: 1.25rem; }
+.project-cell .md-content h3 { font-size: 1.1rem; }
+.project-cell .md-content p  { margin: 0 0 1em 0; }
+
+.project-cell .md-content ul,
+.project-cell .md-content ol {
+    padding-left: 1.5em;
+    margin: 0 0 1em 0;
+}
+
+.project-cell .md-content blockquote {
+    border-left: 3px solid #3a3a3a;
+    margin: 0 0 1em 0;
+    padding: 4px 16px;
+    color: var(--muted);
+    font-style: italic;
+}
+
+.project-cell .md-content code {
+    background: #252525;
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 0.875em;
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
+}
+
+.project-cell .md-content pre {
+    margin: 0 0 1.25em 0;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #1e1e1e;
+    border: 1px solid #2e2e2e;
+}
+
+.project-cell .md-content pre code {
+    display: block;
+    background: none;
+    border: none;
+    border-radius: 0;
+    padding: 16px 20px;
+    font-size: 0.875em;
+    overflow-x: auto;
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
+    line-height: 1.6;
+}
+
+.project-cell .md-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0 0 1.25em 0;
+    font-size: 0.9em;
+    background: #1e1e1e;
+    border: 1px solid #2e2e2e;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.project-cell .md-content th,
+.project-cell .md-content td {
+    border: 1px solid #2e2e2e;
+    padding: 8px 12px;
+    text-align: left;
+}
+
+.project-cell .md-content th {
+    background: #232323;
+    color: var(--text);
+    font-weight: 600;
+}
+
+.project-cell .md-content td      { color: var(--muted); }
+.project-cell .md-content a       { color: #7ab4f5; text-decoration: none; }
+.project-cell .md-content a:hover { text-decoration: underline; }
+
+/* ── Image / video card ── */
+
+.project-image-wrap {
+    display: block;
+    position: relative;
+    width: 100%;
+    border-radius: 10px;
+    border: 1px solid #2e2e2e;
+    overflow: hidden;
+    background: #1e1e1e;
+}
+
+.project-image {
+    width: 100%;
+    display: block;
+    object-fit: cover;
+}
+
+.project-video {
+    width: 100%;
+    display: block;
+    max-height: 560px;
+    background: #000;
+}
+
+/* ── Audio card ── */
+
+.project-audio-wrap {
+    display: block;
+    width: 100%;
+    border-radius: 10px;
+    border: 1px solid #2e2e2e;
+    background: #1e1e1e;
+    padding: 16px 20px;
+    box-sizing: border-box;
+}
+
+.project-audio {
+    width: 100%;
+    display: block;
+    accent-color: #7ab4f5;
+}
+
+/* ── Folder outer wrapper ──
+   position:relative here keeps the badge outside the overflow:hidden
+   clip of the inner image-wrap, so its hit area is never cut off.
+── */
+
+.project-folder-outer {
+    position: relative;
+    width: 100%;
+    display: block;
+    border-radius: 10px;
+}
+
+.project-folder-outer .project-image-wrap {
+    border-radius: 10px;
+}
+
+/* ── Folder badge ── */
+
+.project-folder-badge {
+    position: absolute;
+    bottom: 14px;
+    right: 14px;
+    background: rgba(0, 0, 0, 0.70);
+    color: #eaeaea;
+    font-size: 1rem;
+    font-weight: 700;
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
+    padding: 6px 16px;
+    border-radius: 8px;
+    letter-spacing: 0.04em;
+    backdrop-filter: blur(4px);
+    pointer-events: none;
+    user-select: none;
+    z-index: 2;
+}
+
+/* ── Cell layout helpers ── */
+
+.project-cell--image-right,
+.project-cell--image-left      { display: flex; align-items: flex-start; }
+.project-cell--text-beside-image { /* flush top */ }
+
+/* ── Gallery overlay ── */
+
+.gallery-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    background: rgba(0, 0, 0, 0.80);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(6px);
+    animation: gallery-fade-in 160ms ease forwards;
+}
+
+@keyframes gallery-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* ── Gallery card ── */
+
+.gallery-card {
+    position: relative;
+    width: 90vw;
+    max-height: 90vh;
+    background: #1c1c1c;
+    border: 1px solid #2e2e2e;
+    border-radius: 14px;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: gallery-card-in 180ms ease forwards;
+}
+
+@keyframes gallery-card-in {
+    from { opacity: 0; transform: scale(0.97); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
+/* ── Gallery close button ── */
+
+.gallery-close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    z-index: 10;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid #3a3a3a;
+    border-radius: 8px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: background 140ms ease, color 140ms ease;
+    flex-shrink: 0;
+}
+
+.gallery-close:hover {
+    background: rgba(255, 255, 255, 0.14);
+    color: var(--text);
+}
+
+/* ── Gallery scrollable body ── */
+
+.gallery-columns {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 52px 20px 20px 20px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.gallery-columns::-webkit-scrollbar { display: none; }
+
+.gallery-col {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.gallery-item {
+    width: 100%;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #111;
+}
+
+.gallery-media {
+    width: 100%;
+    display: block;
+}
+
+video.gallery-media {
+    max-height: 480px;
+    background: #000;
+}
