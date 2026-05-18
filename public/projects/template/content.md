@@ -11,7 +11,7 @@ right side, half sized paragraph
 [/P2b]
 
 [P3a]
-fig1.png
+testing <fig1.png> testing 
 [/P3a]
 
 [P3b]

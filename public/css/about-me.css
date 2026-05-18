@@ -1,0 +1,21 @@
+/* ── About-me page-specific styles ── */
+
+#about-me-content {
+    margin-right: calc(64px + 48px);
+    margin-left: auto;
+    padding: 48px 48px 0 48px;
+    box-sizing: border-box;
+    max-width: calc((100% - 64px) * 0.9);
+}
+
+/* ── Hide scrollbar on homepage ── */
+
+html, body {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+    display: none;
+}

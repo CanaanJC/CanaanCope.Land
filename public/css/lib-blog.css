@@ -1,0 +1,406 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   lib-blog.css — Shared styles for blog-style content
+   
+   Provides grid layout, markdown styling, media cards, folder badges,
+   gallery overlay, and lazy-load placeholders.
+   
+   Page-specific layout (margins, max-width, container) lives in the
+   consuming page's own CSS file.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* ── Body lock when gallery is open ── */
+
+body.blog-gallery-open {
+    overflow: hidden;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Content width cap
+   
+   Caps the maximum content width on all screens so images and layout
+   don't blow up on ultra-wide monitors. On smaller screens, the existing
+   90% width rule wins naturally (whichever is smaller).
+   
+   Content stays centered relative to the usable area
+   (viewport minus the right sidebar).
+   
+   --blog-max-content-width — max total width of the content column
+   --blog-sidebar-offset    — width of the right-side sidebar
+   
+   Tweak --blog-max-content-width to taste.
+   ───────────────────────────────────────────────────────────────────────── */
+
+:root {
+    --blog-max-content-width: 1440px;
+    --blog-sidebar-offset: 64px;
+}
+
+#about-me-content,
+#featured-content,
+#projects-container {
+    max-width: min(
+        var(--blog-max-content-width),
+        calc((100% - var(--blog-sidebar-offset)) * 0.9)
+    ) !important;
+    margin-left: auto !important;
+    margin-right: max(
+        calc(var(--blog-sidebar-offset) + 48px),
+        calc(
+            (100vw - var(--blog-max-content-width) - var(--blog-sidebar-offset)) / 2
+            + var(--blog-sidebar-offset)
+        )
+    ) !important;
+}
+
+/* ── Placeholder skeleton ── */
+
+.blog-placeholder {
+    min-height: 400px;
+    border-radius: 10px;
+    background: linear-gradient(90deg, #1e1e1e 25%, #242424 50%, #1e1e1e 75%);
+    background-size: 200% 100%;
+    animation: blog-skeleton-shimmer 1.6s ease-in-out infinite;
+    opacity: 0.5;
+}
+
+@keyframes blog-skeleton-shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* ── Divider ── */
+
+.blog-divider {
+    border: none;
+    border-top: 1px solid #2a2a2a;
+    margin: 56px 0;
+}
+
+.blog-divider--after-heading {
+    margin-top: 0;
+    margin-bottom: 56px;
+}
+
+/* ── Block ── */
+
+.blog-block   { scroll-margin-top: 72px; }
+.blog-header  { margin-bottom: 28px; }
+
+.blog-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0 0 8px 0;
+    color: var(--text);
+    padding-left: 8px;
+}
+
+.blog-date {
+    font-size: 0.95rem;
+    font-weight: 400;
+    color: var(--muted);
+    padding-left: 8px;
+    letter-spacing: 0.03em;
+}
+
+/* ── Section heading (used by featured) ── */
+
+.blog-section-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0 0 10px 0;
+    color: var(--text);
+    padding-left: 8px;
+}
+
+/* ── Content grid rows ── */
+
+.blog-row         { display: grid; gap: 32px; margin-bottom: 32px; }
+.blog-row--full   { grid-template-columns: 1fr; }
+.blog-row--half   { grid-template-columns: 1fr 1fr; align-items: start; }
+.blog-cell        { min-width: 0; }
+.blog-cell--empty { /* blank */ }
+
+/* ── Markdown content ── */
+
+.blog-md-content {
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.75;
+}
+
+.blog-md-content h1,
+.blog-md-content h2,
+.blog-md-content h3,
+.blog-md-content h4 {
+    color: var(--text);
+    margin-top: 1.4em;
+    margin-bottom: 0.5em;
+    font-weight: 600;
+}
+
+/* ── Strip top spacing from the first child so markdown content
+      sits flush with the top of its cell (aligns with adjacent media) ── */
+
+.blog-md-content > *:first-child {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+.blog-md-content h1 { font-size: 1.5rem; }
+.blog-md-content h2 { font-size: 1.25rem; }
+.blog-md-content h3 { font-size: 1.1rem; }
+.blog-md-content p  { margin: 0 0 1em 0; }
+
+.blog-md-content ul,
+.blog-md-content ol {
+    padding-left: 1.5em;
+    margin: 0 0 1em 0;
+}
+
+.blog-md-content blockquote {
+    border-left: 3px solid #3a3a3a;
+    margin: 0 0 1em 0;
+    padding: 4px 16px;
+    color: var(--muted);
+    font-style: italic;
+}
+
+.blog-md-content code {
+    background: #252525;
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 0.875em;
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
+}
+
+.blog-md-content pre {
+    margin: 0 0 1.25em 0;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #1e1e1e;
+    border: 1px solid #2e2e2e;
+}
+
+.blog-md-content pre code {
+    display: block;
+    background: none;
+    border: none;
+    border-radius: 0;
+    padding: 16px 20px;
+    font-size: 0.875em;
+    overflow-x: auto;
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
+    line-height: 1.6;
+}
+
+.blog-md-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0 0 1.25em 0;
+    font-size: 0.9em;
+    background: #1e1e1e;
+    border: 1px solid #2e2e2e;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.blog-md-content th,
+.blog-md-content td {
+    border: 1px solid #2e2e2e;
+    padding: 8px 12px;
+    text-align: left;
+}
+
+.blog-md-content th {
+    background: #232323;
+    color: var(--text);
+    font-weight: 600;
+}
+
+.blog-md-content td      { color: var(--muted); }
+.blog-md-content a       { color: #7ab4f5; text-decoration: none; }
+.blog-md-content a:hover { text-decoration: underline; }
+
+/* ── Image / video card ── */
+
+.blog-image-wrap {
+    display: block;
+    position: relative;
+    width: 100%;
+    border-radius: 10px;
+    border: 1px solid #2e2e2e;
+    overflow: hidden;
+    background: #1e1e1e;
+}
+
+.blog-image {
+    width: 100%;
+    display: block;
+    object-fit: cover;
+}
+
+.blog-video {
+    width: 100%;
+    display: block;
+    max-height: 560px;
+    background: #000;
+}
+
+/* ── Audio card ── */
+
+.blog-audio-wrap {
+    display: block;
+    width: 100%;
+    border-radius: 10px;
+    border: 1px solid #2e2e2e;
+    background: #1e1e1e;
+    padding: 16px 20px;
+    box-sizing: border-box;
+}
+
+.blog-audio {
+    width: 100%;
+    display: block;
+    accent-color: #7ab4f5;
+}
+
+/* ── Folder outer wrapper ── */
+
+.blog-folder-outer {
+    position: relative;
+    width: 100%;
+    display: block;
+    border-radius: 10px;
+}
+
+.blog-folder-outer .blog-image-wrap {
+    border-radius: 10px;
+}
+
+/* ── Folder badge ── */
+
+.blog-folder-badge {
+    position: absolute;
+    bottom: 14px;
+    right: 14px;
+    background: rgba(0, 0, 0, 0.70);
+    color: #eaeaea;
+    font-size: 1rem;
+    font-weight: 700;
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
+    padding: 6px 16px;
+    border-radius: 8px;
+    letter-spacing: 0.04em;
+    backdrop-filter: blur(4px);
+    pointer-events: none;
+    user-select: none;
+    z-index: 2;
+}
+
+/* ── Cell layout helpers ── */
+
+.blog-cell--image-right,
+.blog-cell--image-left      { display: flex; align-items: flex-start; }
+.blog-cell--text-beside-image { /* flush top */ }
+
+/* ── Gallery overlay ── */
+
+.blog-gallery-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    background: rgba(0, 0, 0, 0.80);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(6px);
+    animation: blog-gallery-fade-in 160ms ease forwards;
+}
+
+@keyframes blog-gallery-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.blog-gallery-card {
+    position: relative;
+    width: 90vw;
+    max-height: 90vh;
+    background: #1c1c1c;
+    border: 1px solid #2e2e2e;
+    border-radius: 14px;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: blog-gallery-card-in 180ms ease forwards;
+}
+
+@keyframes blog-gallery-card-in {
+    from { opacity: 0; transform: scale(0.97); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
+.blog-gallery-close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    z-index: 10;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid #3a3a3a;
+    border-radius: 8px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: background 140ms ease, color 140ms ease;
+    flex-shrink: 0;
+}
+
+.blog-gallery-close:hover {
+    background: rgba(255, 255, 255, 0.14);
+    color: var(--text);
+}
+
+.blog-gallery-columns {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 52px 20px 20px 20px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.blog-gallery-columns::-webkit-scrollbar { display: none; }
+
+.blog-gallery-col {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.blog-gallery-item {
+    width: 100%;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #111;
+}
+
+.blog-gallery-media {
+    width: 100%;
+    display: block;
+}
+
+video.blog-gallery-media {
+    max-height: 480px;
+    background: #000;
+}

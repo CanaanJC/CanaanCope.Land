@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 
 const HOST = "0.0.0.0";
-const PORT = 2138;
+const PORT = process.env.PORT ? Number(process.env.PORT) : 2138;
 const PUBLIC_DIR = path.join(__dirname, "public");
 
 const MIME_TYPES = {
@@ -34,8 +34,6 @@ const MIME_TYPES = {
     ".otf":  "font/otf",
 };
 
-const VALID_SECTIONS = new Set(["projects", "small-projects"]);
-
 function getMimeType(filePath) {
     const ext = path.extname(filePath).toLowerCase();
     return MIME_TYPES[ext] || "application/octet-stream";
@@ -53,7 +51,22 @@ function naturalSort(a, b) {
     return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
 }
 
-function getProjectManifest(section, includeBlocked = false) {
+function fileExists(filePath) {
+    try { return fs.statSync(filePath).isFile(); }
+    catch { return false; }
+}
+
+function escape(str) {
+    return String(str)
+        .replace(/&/g,  "&amp;")
+        .replace(/"/g,  "&quot;")
+        .replace(/</g,  "&lt;")
+        .replace(/>/g,  "&gt;");
+}
+
+// ── Project manifest ──────────────────────────────────────────────────────────
+
+function getProjectManifest(section) {
     const sectionDir = path.join(PUBLIC_DIR, section);
     if (!fs.existsSync(sectionDir)) return [];
 
@@ -61,8 +74,7 @@ function getProjectManifest(section, includeBlocked = false) {
         .filter(entry => {
             const entryPath = path.join(sectionDir, entry);
             if (!fs.statSync(entryPath).isDirectory()) return false;
-            const configPath = path.join(entryPath, "config.json");
-            return fs.existsSync(configPath);
+            return fs.existsSync(path.join(entryPath, "config.json"));
         })
         .map(slug => {
             const configPath = path.join(sectionDir, slug, "config.json");
@@ -80,16 +92,10 @@ function getProjectManifest(section, includeBlocked = false) {
                 return { slug, name: slug, date: null, description: "", featured: false, block: false };
             }
         })
-        .filter(p => includeBlocked ? true : !p.block);
+        .filter(p => !p.block);
 }
 
-function escape(str) {
-    return String(str)
-        .replace(/&/g,  "&amp;")
-        .replace(/"/g,  "&quot;")
-        .replace(/</g,  "&lt;")
-        .replace(/>/g,  "&gt;");
-}
+// ── Project embed HTML ────────────────────────────────────────────────────────
 
 function buildProjectEmbedHtml(slug, config, origin, section) {
     const title       = escape(config.name        || slug);
@@ -151,7 +157,8 @@ function buildProjectEmbedHtml(slug, config, origin, section) {
     <meta property="og:url" content="${escape(url)}" />
     <meta property="og:type" content="article" />${imageTag}
     <link rel="stylesheet" href="/css/main.css" />
-    <link rel="stylesheet" href="/projects.css" />
+    <link rel="stylesheet" href="/css/lib-blog.css" />
+    <link rel="stylesheet" href="/css/projects.css" />
   </head>
   <body>
     <main id="content" aria-label="${title}">
@@ -161,7 +168,7 @@ function buildProjectEmbedHtml(slug, config, origin, section) {
       window.__BLOCKED_SLUG__    = ${JSON.stringify(slug)};
       window.__BLOCKED_SECTION__ = ${JSON.stringify(section)};
     </script>
-    <script src="/projects.js" type="module"></script>
+    <script src="/js/projects.js" type="module"></script>
   </body>
 </html>`;
     }
@@ -188,8 +195,15 @@ function buildProjectEmbedHtml(slug, config, origin, section) {
 // ── Server ────────────────────────────────────────────────────────────────────
 
 const server = http.createServer((req, res) => {
-    if (!["GET", "HEAD"].includes(req.method)) {
-        res.writeHead(405, { "Content-Type": "text/plain" });
+    const baseHeaders = {
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "SAMEORIGIN",
+        "Referrer-Policy": "no-referrer-when-downgrade",
+        "Cache-Control": "public, max-age=300",
+    };
+
+    if (!["GET", "HEAD"].includes(req.method || "")) {
+        res.writeHead(405, { ...baseHeaders, "Content-Type": "text/plain", "Allow": "GET, HEAD" });
         res.end("Method Not Allowed");
         return;
     }
@@ -199,10 +213,10 @@ const server = http.createServer((req, res) => {
     // ── Manifest — /:section/manifest.json ───────────────────────────────────
     const manifestMatch = safePath.match(/^\/(projects|small-projects)\/manifest\.json$/);
     if (manifestMatch) {
-        const section  = manifestMatch[1];
-        const manifest = getProjectManifest(section, false);
+        const manifest = getProjectManifest(manifestMatch[1]);
         const body     = JSON.stringify(manifest);
         res.writeHead(200, {
+            ...baseHeaders,
             "Content-Type":   "application/json; charset=utf-8",
             "Content-Length": Buffer.byteLength(body),
             "Cache-Control":  "no-store",
@@ -211,7 +225,42 @@ const server = http.createServer((req, res) => {
         return;
     }
 
-    // ── Media folder listing — /:section/:slug/media-listing/:folder ─────────
+    // ── About-me media listing — /about-me/media-listing/:folder ─────────────
+    const aboutMeListingMatch = safePath.match(/^\/about-me\/media-listing\/([^\/]+)\/?$/);
+    if (aboutMeListingMatch) {
+        const folder = aboutMeListingMatch[1];
+
+        if (!/^[\w\-]+$/.test(folder)) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end("[]");
+            return;
+        }
+
+        const folderPath = path.join(PUBLIC_DIR, "media", "about-me", folder);
+        const SUPPORTED  = /\.(png|mp4)$/i;
+        let files = [];
+
+        if (fs.existsSync(folderPath) && fs.statSync(folderPath).isDirectory()) {
+            files = fs.readdirSync(folderPath)
+                .filter(f =>
+                    SUPPORTED.test(f) &&
+                    fs.statSync(path.join(folderPath, f)).isFile()
+                )
+                .sort(naturalSort);
+        }
+
+        const body = JSON.stringify(files);
+        res.writeHead(200, {
+            ...baseHeaders,
+            "Content-Type":   "application/json; charset=utf-8",
+            "Content-Length": Buffer.byteLength(body),
+            "Cache-Control":  "no-store",
+        });
+        res.end(body);
+        return;
+    }
+
+    // ── Project media listing — /:section/:slug/media-listing/:folder ─────────
     const mediaListingMatch = safePath.match(
         /^\/(projects|small-projects)\/([^\/]+)\/media-listing\/([^\/]+)\/?$/
     );
@@ -241,6 +290,7 @@ const server = http.createServer((req, res) => {
 
         const body = JSON.stringify(files);
         res.writeHead(200, {
+            ...baseHeaders,
             "Content-Type":   "application/json; charset=utf-8",
             "Content-Length": Buffer.byteLength(body),
             "Cache-Control":  "no-store",
@@ -262,6 +312,7 @@ const server = http.createServer((req, res) => {
                 const origin = `${req.headers["x-forwarded-proto"] || "http"}://${req.headers.host}`;
                 const html   = buildProjectEmbedHtml(slug, config, origin, section);
                 res.writeHead(200, {
+                    ...baseHeaders,
                     "Content-Type":  "text/html; charset=utf-8",
                     "Cache-Control": "no-store",
                 });
@@ -281,10 +332,10 @@ const server = http.createServer((req, res) => {
 
         if (stat.isDirectory()) {
             const indexPath = path.join(fsPath, "index.html");
-            if (fs.existsSync(indexPath) && fs.statSync(indexPath).isFile()) {
+            if (fileExists(indexPath)) {
                 fsPath = indexPath;
             } else {
-                res.writeHead(404, { "Content-Type": "text/plain" });
+                res.writeHead(404, { ...baseHeaders, "Content-Type": "text/plain" });
                 res.end("404 Not Found");
                 return;
             }
@@ -292,9 +343,9 @@ const server = http.createServer((req, res) => {
 
         const finalStat = fs.statSync(fsPath);
         res.writeHead(200, {
+            ...baseHeaders,
             "Content-Type":   getMimeType(fsPath),
             "Content-Length": finalStat.size,
-            "Cache-Control":  "public, max-age=300",
         });
 
         if (req.method === "HEAD") {
@@ -303,7 +354,7 @@ const server = http.createServer((req, res) => {
             fs.createReadStream(fsPath).pipe(res);
         }
     } catch {
-        res.writeHead(404, { "Content-Type": "text/plain" });
+        res.writeHead(404, { ...baseHeaders, "Content-Type": "text/plain" });
         res.end("404 Not Found");
     }
 });

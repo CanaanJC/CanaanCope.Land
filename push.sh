@@ -10,8 +10,8 @@ read -p "Enter commit message: " commit_msg
 echo ""
 
 # Run git commit with -C appended to message
-echo "Running: git commit -m \"$commit_msg -C\""
-git commit -m "$commit_msg -C"
+echo "Running: git commit -m \"$commit_msg\""
+git commit -m "$commit_msg"
 echo ""
 
 # Run git push

@@ -1,0 +1,9 @@
+/* ── Featured projects page-specific styles ── */
+
+#featured-content {
+    margin-right: calc(64px + 48px);
+    margin-left: auto;
+    padding: 0 48px 80px 48px;
+    box-sizing: border-box;
+    max-width: calc((100% - 64px) * 0.9);
+}

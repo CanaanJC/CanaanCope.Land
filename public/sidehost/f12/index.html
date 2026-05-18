@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Starship Flight 12 Countdown</title>
+    <style>
+        @font-face {
+            font-family: 'HKModular';
+            src: url('/sidehost/f12/HKModular.woff2') format('woff2');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            font-family: 'HKModular', 'Courier New', monospace;
+            color: white;
+        }
+
+        .video-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1;
+            background-color: #000;
+            overflow: hidden;
+        }
+
+        .video-background {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .aspect-ratio-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .content-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 100vw;
+            max-height: 56.25vw;
+            aspect-ratio: 16 / 9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        @media (min-aspect-ratio: 16/9) {
+            .content-wrapper {
+                max-width: 177.78vh;
+                max-height: 100vh;
+            }
+        }
+
+        .countdown-container {
+            text-align: center;
+            z-index: 1;
+        }
+
+        .mission-name {
+            font-size: 3vw;
+            font-weight: normal;
+            letter-spacing: 0.15em;
+            margin-bottom: 1.5vw;
+            text-transform: uppercase;
+        }
+
+        .countdown {
+            font-size: 8vw;
+            font-weight: normal;
+            letter-spacing: 0.05em;
+            font-variant-numeric: tabular-nums;
+            margin-bottom: 1.5vw;
+            font-feature-settings: "tnum";
+        }
+
+        .block-info {
+            font-size: 3vw;
+            font-weight: normal;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+        }
+
+        @media (min-aspect-ratio: 16/9) {
+            .mission-name {
+                font-size: 5.33vh;
+            }
+            .countdown {
+                font-size: 14.22vh;
+            }
+            .block-info {
+                font-size: 5.33vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="video-container">
+        <video class="video-background" autoplay muted loop playsinline preload="auto">
+            <source src="/sidehost/f12/F12prep.mp4" type="video/mp4">
+        </video>
+    </div>
+    
+    <div class="aspect-ratio-container">
+        <div class="content-wrapper">
+            <div class="countdown-container">
+                <div class="mission-name">Starship Flight 12</div>
+                <div class="countdown" id="countdown-display">T-000:00:00</div>
+                <div class="block-info">Block 3</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========== DEV SETTINGS ==========
+        const T0 = new Date('2026-05-19T18:30:00-04:00'); // Toronto time (EDT)
+        const TEXT_SHADOW_STRENGTH = 10; // Shadow blur in pixels
+        // ==================================
+
+        const countdownDisplay = document.getElementById('countdown-display');
+        const countdownContainer = document.querySelector('.countdown-container');
+
+        // Apply shadow setting
+        countdownContainer.style.textShadow = `0 2px ${TEXT_SHADOW_STRENGTH}px rgba(0, 0, 0, 0.5)`;
+
+        function updateCountdown() {
+            const now = new Date();
+            const diff = T0 - now;
+
+            if (diff <= 0) {
+                countdownDisplay.textContent = 'T+00:00:00';
+                return;
+            }
+
+            const totalSeconds = Math.floor(diff / 1000);
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+
+            // Pad with leading zeros
+            const hoursStr = String(hours).padStart(3, '0');
+            const minutesStr = String(minutes).padStart(2, '0');
+            const secondsStr = String(seconds).padStart(2, '0');
+
+            countdownDisplay.textContent = `T-${hoursStr}:${minutesStr}:${secondsStr}`;
+        }
+
+        // Initialize and update every second
+        updateCountdown();
+        setInterval(updateCountdown, 1000);
+    </script>
+</body>
+</html>
