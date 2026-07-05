@@ -4,12 +4,23 @@
 // Provides parsing, rendering, gallery, and lazy-loading utilities for
 // project entries (about-me, featured projects, project listings).
 //
-// No page-specific logic. Consumer apps import and call as needed.
+// Mobile vs desktop rendering:
+//   - parseContentMd extracts [P…] blocks AND strips any nested [M…]…[/M…]
+//     sub-blocks from their content — [M…] is mobile-only and is invisible
+//     to the desktop renderer.
+//   - parseAllBlocks (mobile path) extracts both [P…] and [M…] in document
+//     order. The mobile renderer (registered via setMobileRowsBuilder)
+//     handles nested [M…] inside P content itself by splitting the text.
+//   - buildRows wraps its output in a .blog-rows-wrapper (display:contents)
+//     that stores its render inputs, enabling rerenderAllBlogContent() to
+//     rebuild every rendered block in place when the viewport toggles
+//     between mobile and desktop.
 // ─────────────────────────────────────────────────────────────────────────────
 
 console.log("lib-blog module loaded");
 
 const MARKED_CDN = "https://cdn.jsdelivr.net/npm/marked@12/marked.min.js";
+const BLOG_ROWS_WRAPPER_CLASS = "blog-rows-wrapper";
 
 // ── Markdown loader ──────────────────────────────────────────────────────────
 
@@ -52,12 +63,33 @@ export function sortByEndDate(list) {
 
 // ── Content parsing ──────────────────────────────────────────────────────────
 
+// Desktop parser. Strips nested [M…]…[/M…] blocks from P content so they
+// never appear on desktop.
 export function parseContentMd(raw) {
-    const blockRegex = /\[P([^\]]+)\]([\s\S]*?)\[\/P\1\]/g;
+    const blockRegex   = /\[P([^\]]+)\]([\s\S]*?)\[\/P\1\]/g;
+    const innerMRegex  = /\[M([^\]]+)\]([\s\S]*?)\[\/M\1\]/g;
     const blocks = [];
     let match;
     while ((match = blockRegex.exec(raw)) !== null) {
-        blocks.push({ tag: match[1].trim(), content: match[2].trim() });
+        const cleanContent = match[2].replace(innerMRegex, "");
+        blocks.push({ tag: match[1].trim(), content: cleanContent.trim() });
+    }
+    return blocks;
+}
+
+// Mobile-aware parser. Extracts both [P…] and [M…] blocks in document order.
+// Returns { kind: "P"|"M", tag, content }. Nested [M…] inside P content stays
+// embedded — the mobile renderer splits it out itself.
+export function parseAllBlocks(raw) {
+    const blockRegex = /\[([PM])([^\]]+)\]([\s\S]*?)\[\/\1\2\]/g;
+    const blocks = [];
+    let match;
+    while ((match = blockRegex.exec(raw)) !== null) {
+        blocks.push({
+            kind:    match[1],
+            tag:     match[2].trim(),
+            content: match[3].trim(),
+        });
     }
     return blocks;
 }
@@ -67,11 +99,11 @@ export function isImageBlock(content) {
 }
 
 export function isVideoBlock(content) {
-    return /^[\w\-]+\.mp4$/i.test(content.trim());
+    return /^[\w\-]+\.(mp4|webm)$/i.test(content.trim());
 }
 
 export function isAudioBlock(content) {
-    return /^[\w\-]+\.mp3$/i.test(content.trim());
+    return /^[\w\-]+\.(mp3|wav)$/i.test(content.trim());
 }
 
 export function isFolderBlock(content) {
@@ -96,38 +128,28 @@ export function groupIntoRows(blocks) {
 // ── Inline media detection ───────────────────────────────────────────────────
 
 function isInlineMediaReference(text) {
-    return /<[\w\-]+\.(png|jpg|jpeg|gif|webp|svg|mp4|mp3)>/i.test(text);
+    return /<[\w\-]+\.(png|jpg|jpeg|gif|webp|svg|mp4|webm|mp3|wav)>/i.test(text) ||
+           /<\.\/[\w\-]+>/i.test(text);
 }
 
 function extractInlineMedia(text) {
-    // Returns array of segments: { type: 'text'|'media', content: string }
-    const regex = /<([\w\-]+\.(png|jpg|jpeg|gif|webp|svg|mp4|mp3))>/gi;
+    const regex = /<(\.\/[\w\-]+|[\w\-]+\.(png|jpg|jpeg|gif|webp|svg|mp4|webm|mp3|wav))>/gi;
     const segments = [];
     let lastIndex = 0;
     let match;
 
     while ((match = regex.exec(text)) !== null) {
-        // Add text before the media reference
         if (match.index > lastIndex) {
-            segments.push({
-                type: 'text',
-                content: text.substring(lastIndex, match.index)
-            });
+            segments.push({ type: "text", content: text.substring(lastIndex, match.index) });
         }
-        // Add media reference
-        segments.push({
-            type: 'media',
-            content: match[1] // filename without brackets
-        });
+        const value = match[1];
+        const isFolder = value.startsWith("./");
+        segments.push({ type: isFolder ? "folder" : "media", content: value });
         lastIndex = regex.lastIndex;
     }
 
-    // Add remaining text
     if (lastIndex < text.length) {
-        segments.push({
-            type: 'text',
-            content: text.substring(lastIndex)
-        });
+        segments.push({ type: "text", content: text.substring(lastIndex) });
     }
 
     return segments;
@@ -138,11 +160,42 @@ function isImageFile(filename) {
 }
 
 function isVideoFile(filename) {
-    return /\.mp4$/i.test(filename);
+    return /\.(mp4|webm)$/i.test(filename);
 }
 
 function isAudioFile(filename) {
-    return /\.mp3$/i.test(filename);
+    return /\.(mp3|wav)$/i.test(filename);
+}
+
+// ── Multi-media block parsing ────────────────────────────────────────────────
+
+function parseMediaLine(line) {
+    const trimmed = line.trim();
+    if (!trimmed) return null;
+
+    if (/^<\.\/[\w\-]+>$/.test(trimmed)) {
+        return { kind: "folder", value: trimmed.slice(1, -1) };
+    }
+    const inlineFile = trimmed.match(/^<([\w\-]+\.(png|jpg|jpeg|gif|webp|svg|mp4|webm|mp3|wav))>$/i);
+    if (inlineFile) {
+        return { kind: "file", value: inlineFile[1] };
+    }
+    if (/^\.\/[\w\-]+$/.test(trimmed)) {
+        return { kind: "folder", value: trimmed };
+    }
+    if (/^[\w\-]+\.(png|jpg|jpeg|gif|webp|svg|mp4|webm|mp3|wav)$/i.test(trimmed)) {
+        return { kind: "file", value: trimmed };
+    }
+
+    return null;
+}
+
+export function parseMultiMediaBlock(content) {
+    const lines  = content.split("\n").map(l => l.trim()).filter(Boolean);
+    if (lines.length < 2) return null;
+    const parsed = lines.map(parseMediaLine);
+    if (parsed.some(p => p === null)) return null;
+    return parsed;
 }
 
 // ── Gallery modal ────────────────────────────────────────────────────────────
@@ -193,11 +246,10 @@ export function openGalleryModal(files, mediaBaseUrl) {
     });
 
     files.forEach((file, i) => {
-        const isVid = /\.mp4$/i.test(file);
-        const item  = document.createElement("div");
+        const item = document.createElement("div");
         item.className = "blog-gallery-item";
 
-        if (isVid) {
+        if (isVideoFile(file)) {
             const video = document.createElement("video");
             video.className = "blog-gallery-media";
             video.controls = true;
@@ -205,9 +257,22 @@ export function openGalleryModal(files, mediaBaseUrl) {
             video.playsInline = true;
             const source = document.createElement("source");
             source.src  = `${mediaBaseUrl}/${file}`;
-            source.type = "video/mp4";
+            source.type = /\.webm$/i.test(file) ? "video/webm" : "video/mp4";
             video.appendChild(source);
             item.appendChild(video);
+        } else if (isAudioFile(file)) {
+            const wrap = document.createElement("div");
+            wrap.className = "blog-audio-wrap";
+            const audio = document.createElement("audio");
+            audio.className = "blog-audio";
+            audio.controls = true;
+            audio.preload = "metadata";
+            const source = document.createElement("source");
+            source.src  = `${mediaBaseUrl}/${file}`;
+            source.type = /\.wav$/i.test(file) ? "audio/wav" : "audio/mpeg";
+            audio.appendChild(source);
+            wrap.appendChild(audio);
+            item.appendChild(wrap);
         } else {
             const img = document.createElement("img");
             img.className = "blog-gallery-media";
@@ -250,12 +315,11 @@ export function renderFolderCell(folderName, mediaBaseUrl, listingUrl) {
         .then(files => {
             if (!files.length) return;
 
-            const first     = files[0];
-            const remaining = files.length - 1;
-            const isVid     = /\.mp4$/i.test(first);
+            const first           = files[0];
+            const remaining       = files.length - 1;
             const folderMediaBase = `${mediaBaseUrl}/${folderName}`;
 
-            if (isVid) {
+            if (isVideoFile(first)) {
                 const video = document.createElement("video");
                 video.className = "blog-video";
                 video.controls = true;
@@ -263,9 +327,22 @@ export function renderFolderCell(folderName, mediaBaseUrl, listingUrl) {
                 video.playsInline = true;
                 const source = document.createElement("source");
                 source.src  = `${folderMediaBase}/${first}`;
-                source.type = "video/mp4";
+                source.type = /\.webm$/i.test(first) ? "video/webm" : "video/mp4";
                 video.appendChild(source);
                 wrap.appendChild(video);
+            } else if (isAudioFile(first)) {
+                const audioWrap = document.createElement("div");
+                audioWrap.className = "blog-audio-wrap";
+                const audio = document.createElement("audio");
+                audio.className = "blog-audio";
+                audio.controls = true;
+                audio.preload = "metadata";
+                const source = document.createElement("source");
+                source.src  = `${folderMediaBase}/${first}`;
+                source.type = /\.wav$/i.test(first) ? "audio/wav" : "audio/mpeg";
+                audio.appendChild(source);
+                audioWrap.appendChild(audio);
+                wrap.appendChild(audioWrap);
             } else {
                 const img = document.createElement("img");
                 img.className = "blog-image";
@@ -292,7 +369,12 @@ export function renderFolderCell(folderName, mediaBaseUrl, listingUrl) {
 
 // ── Inline media renderer ────────────────────────────────────────────────────
 
-function renderInlineMedia(filename, mediaBaseUrl) {
+function renderInlineMedia(filename, mediaBaseUrl, listingBaseUrl) {
+    if (filename.startsWith("./")) {
+        const folderName = filename.slice(2);
+        return renderFolderCell(folderName, mediaBaseUrl, `${listingBaseUrl}/${folderName}`);
+    }
+
     if (isImageFile(filename)) {
         const wrap = document.createElement("span");
         wrap.className = "blog-image-wrap";
@@ -301,13 +383,10 @@ function renderInlineMedia(filename, mediaBaseUrl) {
         img.src = `${mediaBaseUrl}/${filename}`;
         img.alt = filename;
         img.loading = "lazy";
-        
-        // Handle 404 - replace with text
         img.addEventListener("error", () => {
             const textNode = document.createTextNode(`<${filename}>`);
             wrap.replaceWith(textNode);
         });
-        
         wrap.appendChild(img);
         return wrap;
 
@@ -321,14 +400,11 @@ function renderInlineMedia(filename, mediaBaseUrl) {
         video.playsInline = true;
         const source = document.createElement("source");
         source.src  = `${mediaBaseUrl}/${filename}`;
-        source.type = "video/mp4";
-        
-        // Handle 404 - replace with text
+        source.type = /\.webm$/i.test(filename) ? "video/webm" : "video/mp4";
         video.addEventListener("error", () => {
             const textNode = document.createTextNode(`<${filename}>`);
             wrap.replaceWith(textNode);
         });
-        
         video.appendChild(source);
         wrap.appendChild(video);
         return wrap;
@@ -342,20 +418,16 @@ function renderInlineMedia(filename, mediaBaseUrl) {
         audio.preload = "metadata";
         const source = document.createElement("source");
         source.src  = `${mediaBaseUrl}/${filename}`;
-        source.type = "audio/mpeg";
-        
-        // Handle 404 - replace with text
+        source.type = /\.wav$/i.test(filename) ? "audio/wav" : "audio/mpeg";
         audio.addEventListener("error", () => {
             const textNode = document.createTextNode(`<${filename}>`);
             wrap.replaceWith(textNode);
         });
-        
         audio.appendChild(source);
         wrap.appendChild(audio);
         return wrap;
     }
 
-    // Fallback: return as text
     return document.createTextNode(`<${filename}>`);
 }
 
@@ -370,26 +442,30 @@ export function renderCell(content, mediaBaseUrl, listingBaseUrl, isImage, isVid
     const cell = document.createElement("div");
     cell.className = "blog-cell";
 
-    // Check if content has inline media references
+    const multiMedia = parseMultiMediaBlock(content);
+    if (multiMedia) {
+        cell.classList.add("blog-cell--image-left", "blog-media-stack");
+        for (const entry of multiMedia) {
+            const item = document.createElement("div");
+            item.className = "blog-media-stack-item";
+            item.appendChild(renderInlineMedia(entry.value, mediaBaseUrl, listingBaseUrl));
+            cell.appendChild(item);
+        }
+        return cell;
+    }
+
     if (!isImage && !isVideo && !isAudio && isInlineMediaReference(content)) {
-        // Parse and render inline media
-        const segments = extractInlineMedia(content);
+        const segments  = extractInlineMedia(content);
         const container = document.createElement("div");
         container.className = "blog-md-content";
 
         for (const segment of segments) {
-            if (segment.type === 'text') {
-                // Render markdown text
+            if (segment.type === "text") {
                 const textDiv = document.createElement("div");
                 textDiv.innerHTML = window.marked.parse(segment.content);
-                // Extract children to avoid extra wrapper
-                while (textDiv.firstChild) {
-                    container.appendChild(textDiv.firstChild);
-                }
-            } else if (segment.type === 'media') {
-                // Render media inline
-                const mediaEl = renderInlineMedia(segment.content, mediaBaseUrl);
-                container.appendChild(mediaEl);
+                while (textDiv.firstChild) container.appendChild(textDiv.firstChild);
+            } else if (segment.type === "media" || segment.type === "folder") {
+                container.appendChild(renderInlineMedia(segment.content, mediaBaseUrl, listingBaseUrl));
             }
         }
 
@@ -397,7 +473,6 @@ export function renderCell(content, mediaBaseUrl, listingBaseUrl, isImage, isVid
         return cell;
     }
 
-    // Original standalone media rendering
     if (isImage) {
         const wrap = document.createElement("span");
         wrap.className = "blog-image-wrap";
@@ -419,7 +494,7 @@ export function renderCell(content, mediaBaseUrl, listingBaseUrl, isImage, isVid
         video.playsInline = true;
         const source = document.createElement("source");
         source.src  = `${mediaBaseUrl}/${content.trim()}`;
-        source.type = "video/mp4";
+        source.type = /\.webm$/i.test(content) ? "video/webm" : "video/mp4";
         video.appendChild(source);
         wrap.appendChild(video);
         cell.appendChild(wrap);
@@ -433,7 +508,7 @@ export function renderCell(content, mediaBaseUrl, listingBaseUrl, isImage, isVid
         audio.preload = "metadata";
         const source = document.createElement("source");
         source.src  = `${mediaBaseUrl}/${content.trim()}`;
-        source.type = "audio/mpeg";
+        source.type = /\.wav$/i.test(content) ? "audio/wav" : "audio/mpeg";
         audio.appendChild(source);
         wrap.appendChild(audio);
         cell.appendChild(wrap);
@@ -448,9 +523,24 @@ export function renderCell(content, mediaBaseUrl, listingBaseUrl, isImage, isVid
     return cell;
 }
 
-// ── Rows builder ─────────────────────────────────────────────────────────────
+// ── Mobile row builder hook ──────────────────────────────────────────────────
 
-export function buildRows(rawMd, mediaBaseUrl, listingBaseUrl) {
+let _mobileRowsBuilder = null;
+
+export function setMobileRowsBuilder(fn) {
+    _mobileRowsBuilder = fn;
+}
+
+// ── Internal: build the row fragment for the current mode ────────────────────
+
+function _renderRowsFragment(rawMd, mediaBaseUrl, listingBaseUrl) {
+    if (document.body.classList.contains("mobile") && _mobileRowsBuilder) {
+        return _mobileRowsBuilder(rawMd, mediaBaseUrl, listingBaseUrl);
+    }
+    return _buildDesktopRowsFragment(rawMd, mediaBaseUrl, listingBaseUrl);
+}
+
+function _buildDesktopRowsFragment(rawMd, mediaBaseUrl, listingBaseUrl) {
     const frag = document.createDocumentFragment();
     const rows = groupIntoRows(parseContentMd(rawMd));
 
@@ -514,18 +604,35 @@ export function buildRows(rawMd, mediaBaseUrl, listingBaseUrl) {
     return frag;
 }
 
+// ── Rows builder (public) ────────────────────────────────────────────────────
+
+export function buildRows(rawMd, mediaBaseUrl, listingBaseUrl) {
+    // Wrap the fragment in a tracker element so rerenderAllBlogContent()
+    // can find and rebuild it later when the viewport mode toggles.
+    // display:contents makes the wrapper invisible to layout — its children
+    // appear as if direct siblings under the parent, preserving all CSS.
+    const wrapper = document.createElement("div");
+    wrapper.className = BLOG_ROWS_WRAPPER_CLASS;
+    wrapper.style.display = "contents";
+    wrapper.__blogRenderArgs = { rawMd, mediaBaseUrl, listingBaseUrl };
+    wrapper.appendChild(_renderRowsFragment(rawMd, mediaBaseUrl, listingBaseUrl));
+    return wrapper;
+}
+
+// ── Re-render all tracked blog content (called on mode toggle) ───────────────
+
+export function rerenderAllBlogContent() {
+    const wrappers = document.querySelectorAll(`.${BLOG_ROWS_WRAPPER_CLASS}`);
+    for (const wrapper of wrappers) {
+        const args = wrapper.__blogRenderArgs;
+        if (!args) continue;
+        while (wrapper.firstChild) wrapper.removeChild(wrapper.firstChild);
+        wrapper.appendChild(_renderRowsFragment(args.rawMd, args.mediaBaseUrl, args.listingBaseUrl));
+    }
+}
+
 // ── Project block builder ────────────────────────────────────────────────────
-//
-// Builds a standard project block: <article> with header (title + date) and
-// content rows. Returns an <article> element with id = elementId.
-//
-//   options.elementId   — DOM id for the article (default: slug)
-//   options.title       — Project title text
-//   options.date        — string or [start, end] array (optional)
-//   options.rawMd       — Raw markdown content
-//   options.mediaBaseUrl — Base URL for media files (e.g. "/projects/foo/media")
-//   options.listingBaseUrl — Base URL for folder listings (e.g. "/projects/foo/media-listing")
-//
+
 export function buildProjectBlock(options) {
     const {
         elementId,
@@ -577,14 +684,7 @@ export function createPlaceholder(elementId, minHeight = 400) {
 }
 
 // ── Lazy loader ──────────────────────────────────────────────────────────────
-//
-// Sets up an IntersectionObserver that swaps each placeholder for its real
-// project block when it scrolls near the viewport.
-//
-//   slugs         — array of element ids (used as data-slug on placeholders)
-//   loadFn(slug)  — async function returning the real DOM element to insert
-//   preloadAhead  — number of viewport-heights ahead to start loading (default 2)
-//
+
 export function setupLazyLoading(slugs, loadFn, preloadAhead = 2) {
     const preloadMargin = `${preloadAhead * 100}%`;
     const observer = new IntersectionObserver(

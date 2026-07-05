@@ -33,6 +33,7 @@ body.blog-gallery-open {
 :root {
     --blog-max-content-width: 1440px;
     --blog-sidebar-offset: 64px;
+    --blog-paragraph-gap: 1em;
 }
 
 #about-me-content,
@@ -303,6 +304,26 @@ body.blog-gallery-open {
 .blog-cell--image-right,
 .blog-cell--image-left      { display: flex; align-items: flex-start; }
 .blog-cell--text-beside-image { /* flush top */ }
+
+/* ── Multi-media stack ── */
+
+.blog-media-stack {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: var(--blog-paragraph-gap);
+}
+
+.blog-media-stack-item {
+    width: 100%;
+    min-width: 0;
+}
+
+/* Stack items that contain a folder cell need their inner cell
+   wrapper flattened so it doesn't double-wrap with extra padding */
+.blog-media-stack-item > .blog-cell {
+    padding: 0;
+}
 
 /* ── Gallery overlay ── */
 

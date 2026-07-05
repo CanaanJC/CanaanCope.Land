@@ -1,0 +1,550 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   mobile.css — Mobile patch overlay
+   
+   Activated by body.mobile class (toggled by mobile.js) and/or
+   @media (max-width: 768px). All rules are scoped so they
+   only apply when in mobile mode and never affect desktop.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* ── Mobile root variables ──────────────────────────────────────────────── */
+
+body.mobile {
+    --mobile-burger-size: 56px;
+    --mobile-menu-width: min(320px, 80vw);
+    --mobile-menu-icon-size: 28px;
+    --mobile-side-padding: 16px;
+}
+
+/* ── Topbar adjustments ─────────────────────────────────────────────────── */
+
+body.mobile .topbar-logo {
+    display: none !important;
+}
+
+body.mobile .topbar-dropdown {
+    display: none !important;
+}
+
+body.mobile .topbar-inner {
+    justify-content: center;
+    padding: 0 12px;
+    position: relative;
+}
+
+body.mobile .topbar-slogan {
+    position: static;
+    transform: none;
+    left: auto;
+    width: 100%;
+    text-align: center;
+    /* Single line, scales down to fit the viewport */
+    font-size: clamp(0.5rem, 3vw, 1.1rem);
+    white-space: nowrap;
+    overflow: hidden;
+    line-height: 1.2;
+    padding: 0 8px;
+    box-sizing: border-box;
+}
+
+/* ── Sidebar — completely hidden ────────────────────────────────────────── */
+
+body.mobile .sidebar {
+    display: none !important;
+}
+
+/* ── Hamburger button (bottom-left, floating) ───────────────────────────── */
+
+.mobile-burger {
+    display: none;
+}
+
+body.mobile .mobile-burger {
+    display: flex;
+    position: fixed;
+    bottom: 16px;
+    left: 16px;
+    width: var(--mobile-burger-size);
+    height: var(--mobile-burger-size);
+    align-items: center;
+    justify-content: center;
+    background: #202020;
+    border: 1px solid #2a2a2a;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    cursor: pointer;
+    z-index: 1500;
+    padding: 0;
+    transition: background-color 140ms ease, transform 140ms ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body.mobile .mobile-burger:hover,
+body.mobile .mobile-burger:active {
+    background: #2a2a2a;
+}
+
+body.mobile .mobile-burger:active {
+    transform: scale(0.95);
+}
+
+.mobile-burger__icon {
+    width: 24px;
+    height: 18px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.mobile-burger__bar {
+    display: block;
+    width: 100%;
+    height: 2px;
+    background: var(--text);
+    border-radius: 2px;
+}
+
+/* ── Slide-out menu (from left) ─────────────────────────────────────────── */
+
+.mobile-menu-overlay {
+    display: none;
+}
+
+body.mobile .mobile-menu-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: 1800;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 220ms ease;
+}
+
+body.mobile .mobile-menu-overlay.open {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.mobile-menu {
+    display: none;
+}
+
+body.mobile .mobile-menu {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: var(--mobile-menu-width);
+    background: #202020;
+    border-right: 1px solid #2a2a2a;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    z-index: 1900;
+    transform: translateX(-100%);
+    transition: transform 240ms ease;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: #555 transparent;
+    /* Tighter padding to match sidebar item spacing */
+    padding: 12px 12px 12px 12px;
+    box-sizing: border-box;
+    gap: 4px;
+}
+
+body.mobile .mobile-menu.open {
+    transform: translateX(0);
+}
+
+body.mobile .mobile-menu::-webkit-scrollbar {
+    width: 6px;
+}
+
+body.mobile .mobile-menu::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 3px;
+}
+
+/* ── Menu logo (2x size, top) ───────────────────────────────────────────── */
+
+.mobile-menu__logo {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    /* Tight padding so the gap below the logo matches the gap between items */
+    padding: 4px 8px 4px 8px;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-menu__logo-img {
+    width: calc(var(--mobile-menu-icon-size) * 2);
+    height: calc(var(--mobile-menu-icon-size) * 2);
+    object-fit: contain;
+    border-radius: 8px;
+    display: block;
+}
+
+.mobile-menu__logo-img.fallback {
+    background: #2a2a2a;
+    padding: 2px;
+}
+
+/* ── Menu items (shared style) ──────────────────────────────────────────── */
+
+.mobile-menu__item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 8px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 1rem;
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color 140ms ease;
+    box-sizing: border-box;
+}
+
+.mobile-menu__item:hover,
+.mobile-menu__item:active {
+    background: #2a2a2a;
+}
+
+.mobile-menu__icon-slot {
+    width: var(--mobile-menu-icon-size);
+    height: var(--mobile-menu-icon-size);
+    flex: 0 0 var(--mobile-menu-icon-size);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mobile-menu__icon {
+    width: var(--mobile-menu-icon-size);
+    height: var(--mobile-menu-icon-size);
+    object-fit: contain;
+    border-radius: 5px;
+}
+
+.mobile-menu__icon.fallback {
+    background: #2a2a2a;
+    padding: 2px;
+}
+
+.mobile-menu__label {
+    flex: 1 1 auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── Menu divider ───────────────────────────────────────────────────────── */
+
+.mobile-menu__divider {
+    border: none;
+    border-top: 1px solid #2a2a2a;
+    /* Compact margins so the gaps stay consistent with item spacing */
+    margin: 6px 4px;
+    opacity: 0.7;
+}
+
+/* ── Page dropdown slot (injected by projects.js / CrafTech.js) ─────────── */
+
+.mobile-menu__page-dropdown-slot {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+.mobile-menu__page-dropdown-slot:empty {
+    display: none;
+}
+
+/* Hide the divider immediately following an empty dropdown slot
+   so we don't get a floating divider with no content above it */
+.mobile-menu__page-dropdown-slot:empty + .mobile-menu__divider {
+    display: none;
+}
+
+/* Style the dropdown when relocated inside the mobile menu */
+.mobile-menu .topbar-dropdown {
+    position: relative;
+    width: 100%;
+    height: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.mobile-menu .topbar-dropdown__trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: auto;
+    padding: 8px 10px;
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 1rem;
+    width: 100%;
+    box-sizing: border-box;
+    background: none;
+    user-select: none;
+}
+
+.mobile-menu .topbar-dropdown__trigger::after {
+    content: "▾";
+    font-size: 0.85em;
+    margin-left: 8px;
+    color: var(--muted);
+    transition: transform 160ms ease;
+}
+
+.mobile-menu .topbar-dropdown.open .topbar-dropdown__trigger::after {
+    transform: rotate(180deg);
+}
+
+.mobile-menu .topbar-dropdown:hover .topbar-dropdown__trigger,
+.mobile-menu .topbar-dropdown.open .topbar-dropdown__trigger {
+    background: #2a2a2a;
+}
+
+.mobile-menu .topbar-dropdown__menu {
+    position: static;
+    top: auto;
+    left: auto;
+    min-width: 0;
+    width: 100%;
+    background: none;
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    display: none;
+    flex-direction: column;
+    padding: 2px 0 2px 12px;
+    opacity: 1;
+    pointer-events: all;
+    transform: none;
+    transition: none;
+    white-space: normal;
+}
+
+.mobile-menu .topbar-dropdown.open .topbar-dropdown__menu {
+    display: flex;
+}
+
+.mobile-menu .topbar-dropdown__item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 0.95rem;
+    border-radius: 6px;
+    background: none;
+    border: none;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-menu .topbar-dropdown__item:hover,
+.mobile-menu .topbar-dropdown__item:active {
+    background: #2a2a2a;
+}
+
+.mobile-menu .topbar-dropdown__icon-slot {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mobile-menu .topbar-dropdown__icon {
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+    border-radius: 3px;
+}
+
+.mobile-menu .topbar-dropdown__icon.fallback {
+    background: #2a2a2a;
+    padding: 1px;
+}
+
+/* Re-style projects.js / CrafTech.js dropdown items inside the menu */
+.mobile-menu .topbar-month-nav--year {
+    font-weight: 700;
+    color: var(--text) !important;
+    padding-top: 8px !important;
+    font-size: 0.95rem !important;
+}
+
+.mobile-menu .topbar-month-nav--year:first-child {
+    padding-top: 6px !important;
+}
+
+.mobile-menu .topbar-month-nav--month {
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace !important;
+    font-weight: 400 !important;
+    color: #888 !important;
+    padding-left: 24px !important;
+    font-size: 0.82rem !important;
+    letter-spacing: 0.06em;
+}
+
+.mobile-menu .topbar-month-nav--month:hover,
+.mobile-menu .topbar-month-nav--month:active {
+    color: var(--muted) !important;
+}
+
+/* ── Blog content (mobile) — full-width, stacked ────────────────────────── */
+
+body.mobile #about-me-content,
+body.mobile #featured-content,
+body.mobile #projects-container {
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding: 24px var(--mobile-side-padding) 80px var(--mobile-side-padding) !important;
+    box-sizing: border-box !important;
+}
+
+body.mobile #about-me-content {
+    padding-top: 24px !important;
+    padding-bottom: 0 !important;
+}
+
+/* Stack two-column rows into a single column. Because buildRows always
+   appends side "a" before side "b", and rows iterate by number, the
+   natural DOM order is P1 → P1a → P1b → P2 → P2a → P2b … */
+body.mobile .blog-row--half {
+    grid-template-columns: 1fr !important;
+    gap: 20px !important;
+}
+
+body.mobile .blog-row--full {
+    grid-template-columns: 1fr !important;
+}
+
+body.mobile .blog-row {
+    margin-bottom: 24px !important;
+}
+
+/* Empty cells from one-sided rows shouldn't take vertical space */
+body.mobile .blog-cell--empty {
+    display: none !important;
+}
+
+/* Center images at 95% width for slight side indent */
+body.mobile .blog-image-wrap,
+body.mobile .blog-folder-outer,
+body.mobile .blog-audio-wrap,
+body.mobile .blog-video-wrap {
+    width: 95% !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+/* Multi-media stack: keep stacking but each item gets the 95% rule */
+body.mobile .blog-media-stack {
+    width: 100% !important;
+}
+
+body.mobile .blog-media-stack-item {
+    width: 100% !important;
+}
+
+/* Cells holding text — full width */
+body.mobile .blog-cell {
+    width: 100% !important;
+}
+
+body.mobile .blog-cell--image-left,
+body.mobile .blog-cell--image-right,
+body.mobile .blog-cell--text-beside-image {
+    display: block !important;
+}
+
+/* Typography scaling */
+body.mobile .blog-title {
+    font-size: 1.5rem !important;
+    padding-left: 4px !important;
+}
+
+body.mobile .blog-date {
+    font-size: 0.85rem !important;
+    padding-left: 4px !important;
+}
+
+body.mobile .blog-section-title {
+    font-size: 1.5rem !important;
+    padding-left: 4px !important;
+}
+
+body.mobile .blog-divider {
+    margin: 36px 0 !important;
+}
+
+body.mobile .blog-divider--after-heading {
+    margin-top: 0 !important;
+    margin-bottom: 36px !important;
+}
+
+body.mobile .blog-header {
+    margin-bottom: 20px !important;
+}
+
+body.mobile .blog-md-content {
+    font-size: 14.5px;
+    line-height: 1.7;
+}
+
+/* Folder badge — slightly smaller on mobile */
+body.mobile .blog-folder-badge {
+    font-size: 0.85rem;
+    padding: 4px 12px;
+    bottom: 10px;
+    right: 10px;
+}
+
+/* ── Gallery modal — single column on mobile ────────────────────────────── */
+
+body.mobile .blog-gallery-card {
+    width: 95vw;
+    max-height: 92vh;
+}
+
+body.mobile .blog-gallery-columns {
+    flex-direction: column;
+    padding: 52px 12px 12px 12px;
+    gap: 12px;
+}
+
+body.mobile .blog-gallery-col {
+    width: 100%;
+    flex: 0 0 auto;
+}
+
+body.mobile video.blog-gallery-media {
+    max-height: 60vh;
+}
+
+/* ── Body scroll lock when menu is open ─────────────────────────────────── */
+
+body.mobile.mobile-menu-open {
+    overflow: hidden;
+}

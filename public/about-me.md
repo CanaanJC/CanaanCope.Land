@@ -1,13 +1,12 @@
 [P1a]
 # Hey! I'm Canaan Copeland
-I am an aspiring engineer living in Ontario Canada. I graduated High School in 2024 and am now working full time to fun Univercity in 2027 to get my mechatronics dagree.
+I am an aspiring engineer living in Ontario, Canada. I graduated High School in 2024 and am now working full time to fund University in 2027 to get my mechatronics degree.
+[M1] fig1.png [/M1]
+All my life I have been fascinated with space and the technology that will get us there. My Goal is to develop my skills and one day play an integral role in developing deep space robots and systems.  
 
-My goal is to one day soon be part of a team that developes robotics that will explore the fringes of our solor system and perhaps beyond!
+When not at work I’m always tinkering on projects and developing solutions to problems or inconveniences. To do this I leverage my skills in engineering and computer science to build or program new tools to improve my everyday life. 
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus malesuada rutrum nisl, a tincidunt urna pharetra in. Vestibulum commodo auctor facilisis. Proin tempus blandit ex ac viverra. Sed vitae leo id libero congue vestibulum. Sed urna diam, facilisis et ultrices finibus, feugiat ut leo. Vestibulum nunc leo, porta quis mi et, tempus efficitur urna. Quisque eu posuere nibh, vitae fermentum metus.
-
-Cras non libero tellus. Mauris vel pretium ex. Proin eget feugiat ipsum. Aliquam rutrum congue sem sed porttitor. Quisque pharetra gravida tortor, a blandit augue tincidunt eget. Aenean eget rutrum elit, nec semper elit. Etiam sed nunc eu dolor pharetra semper. Ut bibendum est eget mi pretium placerat. Cras suscipit massa ut est pharetra bibendum.
-
+Not everything goes to plan. Sometimes I spend weeks on a project just for it to completely fail. It's never a loss. I always learn new things along the way. These skills can then be applied going forward and enable tomorrow's projects to succeed where yesterdays failed. 
 
 [/P1a]
 [P1b]

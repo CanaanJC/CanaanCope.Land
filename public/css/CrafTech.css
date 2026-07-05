@@ -1,0 +1,72 @@
+/* ── CrafTech page-specific styles ── */
+
+/* Hide scrollbar */
+
+html, body {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+    display: none;
+}
+
+/* Page layout — mirrors projects.css */
+
+:root {
+    --projects-sidebar-offset: 64px;
+    --projects-side-padding: 48px;
+}
+
+#projects-container {
+    margin-right: calc(var(--projects-sidebar-offset) + var(--projects-side-padding));
+    margin-left: auto;
+    padding: 48px var(--projects-side-padding) 80px var(--projects-side-padding);
+    box-sizing: border-box;
+    max-width: calc((100% - var(--projects-sidebar-offset)) * 0.9);
+}
+
+/* Topbar contents dropdown */
+
+#craftech-nav-dropdown .topbar-dropdown__item {
+    background: none;
+    border: none;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: var(--topbar-font-size);
+    color: var(--text);
+}
+
+/* Major section headings in dropdown */
+
+.topbar-month-nav--year {
+    font-weight: 700;
+    color: var(--text) !important;
+    padding-top: 10px !important;
+}
+
+.topbar-month-nav--year:first-child {
+    padding-top: 8px !important;
+}
+
+/* Sub-entry items in dropdown */
+
+.topbar-month-nav--month {
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace !important;
+    font-weight: 400 !important;
+    color: #666 !important;
+    padding-left: 24px !important;
+    font-size: 0.85rem !important;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 260px;
+}
+
+.topbar-month-nav--month:hover {
+    color: var(--muted) !important;
+}

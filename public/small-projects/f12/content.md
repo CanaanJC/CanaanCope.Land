@@ -6,5 +6,5 @@ The Site is curently counting down to `2026-05-19T18:30:00-04:00` in Toronto Tim
 The page is curently hosting at https://canaancope.land/sidehost/f12 but will be moved to `archive/f12` after the flight. I plan on re using this page and or adding to it for later flights. 
 [/P1a]
 [P1b]
-fig1.png
+fig1.gif
 [/P1b]

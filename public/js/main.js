@@ -1,3 +1,4 @@
+import './mobile.js';
 import './sidebar.js';
 import './topbar.js';
 import './about-me.js';

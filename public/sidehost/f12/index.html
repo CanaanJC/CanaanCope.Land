@@ -135,7 +135,7 @@
 
     <script>
         // ========== DEV SETTINGS ==========
-        const T0 = new Date('2026-05-19T18:30:00-04:00'); // Toronto time (EDT)
+        const T0 = new Date('2027-05-22T18:30:00-04:00'); // Toronto time (EDT)
         const TEXT_SHADOW_STRENGTH = 10; // Shadow blur in pixels
         // ==================================
 
@@ -165,6 +165,7 @@
             const secondsStr = String(seconds).padStart(2, '0');
 
             countdownDisplay.textContent = `T-${hoursStr}:${minutesStr}:${secondsStr}`;
+            // countdownDisplay.textContent = `T-"ehh, sometime"`;
         }
 
         // Initialize and update every second
