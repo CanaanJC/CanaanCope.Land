@@ -7,9 +7,9 @@ ADMIN/elements/admin-master.json/config.json
 ADMIN/elements/admin-master.json/element.css
 ADMIN/elements/admin-master.json/element.html
 ADMIN/elements/admin-master.json/element.js
+ADMIN/elements/archive/element.css
 ADMIN/elements/archive/element.html
 ADMIN/elements/archive/element.js
-ADMIN/elements/archive/element-old.css
 ADMIN/elements/library-editor/element.css
 ADMIN/elements/library-editor/element.html
 ADMIN/elements/library-editor/element.js
@@ -35,7 +35,6 @@ config/libraries.json
 config/manifest.txt
 config/version.txt
 .gitignore
-git.sh
 lib/adminRoutes.js
 lib/adminServer.js
 lib/archiveManager.js
@@ -52,6 +51,7 @@ lib/siteConfig.js
 lib/staticFile.js
 lib/utils.js
 node.js
+package.json
 public/404/404.css
 public/404/404.html
 public/404/404.js
@@ -85,6 +85,9 @@ public/js/sidebar.js
 public/js/theme.js
 public/js/topbar.js
 README.md
-remove.txt
-update.sh
+scripts/git.sh
+scripts/run.sh
+scripts/.service-name
+scripts/service.sh
+scripts/update.sh
 .vscode/settings.json

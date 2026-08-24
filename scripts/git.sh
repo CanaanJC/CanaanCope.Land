@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #
-# git.sh — everyday git helper for this repo.
+# scripts/git.sh — everyday git helper for this repo. Run from anywhere;
+# always operates on the project root (one level up from this script).
 #
 #   Option 1: Push        — first auto-untracks anything that's tracked but
 #                            matches .gitignore (the exact bug class that bit
@@ -22,7 +23,7 @@ set -euo pipefail
 BRANCH="main"
 MANIFEST_PATH="config/manifest.txt"
 
-cd "$(dirname "${BASH_SOURCE[0]}")"
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 if [[ ! -d .git ]]; then
     echo "git.sh: no .git repo found in $(pwd)." >&2
@@ -52,10 +53,10 @@ untrack_ignored_files() {
 # added files are already reflected in the index, and it excludes anything
 # .gitignore'd since untrack_ignored_files + `git add -A` never stage those.
 #
-# This file is what the update system (update.sh, not written yet) uses to
-# diff "what files exist in release A vs release B" WITHOUT downloading
-# either release's full source archive — it just reads this one small text
-# file from each tag via raw.githubusercontent.com.
+# This file is what scripts/update.sh uses to diff "what files exist in
+# release A vs release B" WITHOUT downloading either release's full source
+# archive — it just reads this one small text file from each tag via
+# raw.githubusercontent.com.
 regenerate_manifest() {
     mkdir -p "$(dirname "${MANIFEST_PATH}")"
     git ls-files | sort > "${MANIFEST_PATH}"
