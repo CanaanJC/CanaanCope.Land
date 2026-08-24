@@ -85,5 +85,6 @@ public/js/sidebar.js
 public/js/theme.js
 public/js/topbar.js
 README.md
-update.sh
+test.sh
+test.txt
 .vscode/settings.json

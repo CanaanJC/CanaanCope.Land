@@ -1,4 +1,4 @@
 {
-    "target": "ADMIN/config/master.json",
-    "name": "Admin Page Config"
+  "target": "ADMIN/config/master.json",
+  "name": "Admin Page Config"
 }

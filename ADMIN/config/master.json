@@ -1,15 +1,15 @@
 {
-    "columns": [
-        [
-            "master.json"
-        ],
-        [
-            "archive",
-            "library-editor",
-            "topbar.json",
-            "admin-master.json",
-            "logo-uploader",
-            "sidebar.json"
-        ]
+  "columns": [
+    [
+      "master.json"
+    ],
+    [
+      "archive",
+      "library-editor",
+      "topbar.json",
+      "admin-master.json",
+      "logo-uploader",
+      "sidebar.json"
     ]
+  ]
 }

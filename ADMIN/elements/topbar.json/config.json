@@ -1,4 +1,4 @@
 {
-    "target": "public/json/topbar.json",
-    "name": "Top Bar Config"
+  "target": "public/json/topbar.json",
+  "name": "Top Bar Config"
 }

@@ -1,55 +1,55 @@
 {
-    "siteName": "MyPage",
-    "siteAddress": "https://mypage.ca",
-    "slogan": "This is my amazing page!",
-    "hosting": {
-        "host": "0.0.0.0",
-        "port": 9138,
-        "adminPort": 9832
+  "siteName": "MyPage",
+  "siteAddress": "https://mypage.ca",
+  "slogan": "This is my amazing page!",
+  "hosting": {
+    "host": "0.0.0.0",
+    "port": 9138,
+    "adminPort": 9832
+  },
+  "webhooks": {
+    "notFound": "",
+    "backup": ""
+  },
+  "backup": {
+    "path": "",
+    "interval": "monthly",
+    "time": "00:00",
+    "enabled": false,
+    "lanIp": ""
+  },
+  "archive": {
+    "maxConcurrentInstances": 3,
+    "idleTimeoutMinutes": 10,
+    "maxRuntimeMinutes": 60
+  },
+  "theme": {
+    "backgroundColor": "#181818",
+    "page": {
+      "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, \"Apple Color Emoji\", \"Segoe UI Emoji\"",
+      "textColor": "#eaeaea",
+      "code": {
+        "backgroundColor": "#252525",
+        "borderColor": "#333333",
+        "textColor": "#eaeaea",
+        "blockBackgroundColor": "#1e1e1e",
+        "blockBorderColor": "#2e2e2e"
+      }
     },
-    "webhooks": {
-        "notFound": "",
-        "backup": ""
+    "topbar": {
+      "backgroundColor": "#202020",
+      "depth": 56,
+      "icon": "/media/logo.png",
+      "slogan": {
+        "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, \"Apple Color Emoji\", \"Segoe UI Emoji\"",
+        "fontSize": 20,
+        "color": "#bdbdbd"
+      }
     },
-    "backup": {
-        "path": "",
-        "interval": "monthly",
-        "time": "00:00",
-        "enabled": false,
-        "lanIp": ""
-    },
-    "archive": {
-        "maxConcurrentInstances": 3,
-        "idleTimeoutMinutes": 10,
-        "maxRuntimeMinutes": 60
-    },
-    "theme": {
-        "backgroundColor": "#181818",
-        "page": {
-            "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, \"Apple Color Emoji\", \"Segoe UI Emoji\"",
-            "textColor": "#eaeaea",
-            "code": {
-                "backgroundColor": "#252525",
-                "borderColor": "#333333",
-                "textColor": "#eaeaea",
-                "blockBackgroundColor": "#1e1e1e",
-                "blockBorderColor": "#2e2e2e"
-            }
-        },
-        "topbar": {
-            "backgroundColor": "#202020",
-            "depth": 56,
-            "icon": "/media/logo.png",
-            "slogan": {
-                "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, \"Apple Color Emoji\", \"Segoe UI Emoji\"",
-                "fontSize": 20,
-                "color": "#bdbdbd"
-            }
-        },
-        "sidebar": {
-            "backgroundColor": "#202020",
-            "collapsedWidth": 64,
-            "expandedWidth": 320
-        }
+    "sidebar": {
+      "backgroundColor": "#202020",
+      "collapsedWidth": 64,
+      "expandedWidth": 320
     }
+  }
 }
