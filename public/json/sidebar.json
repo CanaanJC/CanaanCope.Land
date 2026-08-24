@@ -1,22 +1,7 @@
 [
     {
-        "text": "Discord",
-        "link": "https://discord.com/users/1233960205843173407",
-        "image": "/media/sidebar/discord.png"
-    },
-    {
-        "text": "YouTube",
-        "link": "https://www.youtube.com/channel/UCYksIjmba_d3jtll1a8zKgA",
-        "image": "/media/sidebar/yt.png"
-    },
-    {
-        "text": "GitHub",
-        "link": "https://github.com/CanaanJC",
-        "image": "/media/sidebar/git.png"
-    },
-    {
-        "text": "CrafTech Map",
-        "link": "https://map.craftech.canaancope.land/#world:1506:205:764:0:0.62:0.99:0:0:free",
-        "image": "/media/sidebar/server-icon.png"
+        "text": "",
+        "link": "",
+        "image": ""
     }
 ]
