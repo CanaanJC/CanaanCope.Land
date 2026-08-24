@@ -32,6 +32,7 @@ ADMIN/index.html
 ADMIN/js/admin.js
 config/defaults.json
 config/libraries.json
+config/manifest.txt
 config/version.txt
 .gitignore
 git.sh
@@ -84,4 +85,6 @@ public/js/sidebar.js
 public/js/theme.js
 public/js/topbar.js
 README.md
+test.txt
+update.sh
 .vscode/settings.json
