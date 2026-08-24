@@ -1,5 +1,4 @@
 {
   "target": "config/master.json",
-  "name": "Master",
-  "test": ""
+  "name": "Master Config"
 }
