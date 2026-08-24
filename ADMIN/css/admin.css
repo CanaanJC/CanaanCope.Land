@@ -47,6 +47,17 @@ html, body {
     display: block;
 }
 
+/* Shown while a header logo (Public Page / Local Page) is displaying the
+   inline SVG fallback icon instead of a real logo.png — most commonly
+   because this is a fresh checkout of the repo with no media/logo.png yet
+   (media/ is gitignored). Contained + padded slightly so the placeholder
+   glyph doesn't look like a stretched/cropped real logo. */
+.admin-logo--fallback {
+    object-fit: contain;
+    background: #2a2a2a;
+    padding: 4px;
+}
+
 .admin-header-label {
     font-weight: 700;
     font-size: 0.95rem;

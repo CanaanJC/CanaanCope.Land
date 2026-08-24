@@ -7,6 +7,11 @@
 // the library-editor element — a card per entry with a Delete button, a
 // "+ Add Link" button at the bottom to append a new blank entry, and a single
 // Save button that writes the whole array back via /api/file.
+//
+// The Image field also has an upload button (mirrors the library-editor's
+// icon uploader) — it requires the entry's Text field to be filled out
+// first (used as the uploaded filename), and creates
+// public/media/sidebar/ on demand if it doesn't exist yet.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const FIELDS = [
@@ -16,7 +21,7 @@ const FIELDS = [
 ];
 
 // One shared overlay/modal per element instance — created once, reused for
-// every delete confirmation rather than rebuilt each time.
+// every confirmation (delete OR overwrite) rather than rebuilt each time.
 function createConfirmModal(root) {
     const overlay = document.createElement("div");
     overlay.className = "admin-modal-overlay";
@@ -66,12 +71,36 @@ function createConfirmModal(root) {
     });
 
     return {
+        // Back-compat convenience wrapper — matches the original
+        // (itemName, callback) delete-confirm call shape.
         open(itemName, callback) {
             message.textContent = `Are you sure you want to delete "${itemName}"?`;
+            confirmBtn.textContent = "Delete";
+            confirmBtn.className = "admin-button admin-button--danger";
+            onConfirm = callback;
+            overlay.hidden = false;
+        },
+        // General-purpose version — lets callers set a custom message and
+        // confirm-button label (e.g. "Overwrite" instead of "Delete").
+        openCustom(messageText, confirmLabel, callback) {
+            message.textContent = messageText;
+            confirmBtn.textContent = confirmLabel;
+            confirmBtn.className = "admin-button admin-button--danger";
             onConfirm = callback;
             overlay.hidden = false;
         },
     };
+}
+
+// Client-side mirror of the server's sanitizeAssetName() — used only to
+// predict/display what the uploaded filename will be; the server is always
+// the source of truth and re-sanitizes independently.
+function sanitizeAssetName(name) {
+    return String(name || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
 }
 
 // `elementConfig` is this element's own sibling config.json, loaded and
@@ -152,6 +181,81 @@ export default function init(root, elementConfig) {
             });
 
             row.appendChild(input);
+
+            // ── Image field gets an upload button + hidden file input ───
+            // Requires the entry's Text field to be filled out first (used
+            // as the uploaded filename), and creates public/media/sidebar/
+            // on demand if it doesn't exist yet.
+            if (field.key === "image") {
+                const fileInput = document.createElement("input");
+                fileInput.type = "file";
+                fileInput.accept = "image/png";
+                fileInput.hidden = true;
+
+                const uploadBtn = document.createElement("button");
+                uploadBtn.type = "button";
+                uploadBtn.className = "admin-icon-upload-btn";
+                uploadBtn.title = "Upload image PNG";
+                uploadBtn.textContent = "⬆";
+
+                const requireName = () => {
+                    const linkName = (item.text || "").trim();
+                    if (!linkName) {
+                        alert("Please enter Text (the link name) before uploading an image.");
+                        return null;
+                    }
+                    return linkName;
+                };
+
+                uploadBtn.addEventListener("click", () => {
+                    if (!requireName()) return;
+                    fileInput.click();
+                });
+
+                function doUpload(file, linkName, overwrite) {
+                    file.arrayBuffer()
+                        .then((buf) => {
+                            const params = new URLSearchParams({ name: linkName });
+                            if (overwrite) params.set("overwrite", "true");
+                            return fetch(`/api/upload/sidebar?${params.toString()}`, {
+                                method: "POST",
+                                headers: { "Content-Type": file.type || "application/octet-stream" },
+                                body: buf,
+                            });
+                        })
+                        .then(async (res) => {
+                            const data = await res.json().catch(() => ({}));
+                            if (res.status === 409 && data.exists) {
+                                const predicted = sanitizeAssetName(linkName);
+                                confirmModal.openCustom(
+                                    `A file already exists at "media/sidebar/${predicted}.png". Overwrite it?`,
+                                    "Overwrite",
+                                    () => doUpload(file, linkName, true)
+                                );
+                                return;
+                            }
+                            if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+                            input.value = data.path;
+                            item.image = data.path;
+                        })
+                        .catch((e) => {
+                            alert(`Image upload failed: ${e.message}`);
+                        });
+                }
+
+                fileInput.addEventListener("change", () => {
+                    const file = fileInput.files[0];
+                    fileInput.value = "";
+                    if (!file) return;
+                    const linkName = requireName();
+                    if (!linkName) return;
+                    doUpload(file, linkName, false);
+                });
+
+                row.appendChild(uploadBtn);
+                row.appendChild(fileInput);
+            }
+
             fieldsWrap.appendChild(row);
         }
 

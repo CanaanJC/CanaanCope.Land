@@ -12,6 +12,34 @@ let _isMobile   = false;
 let _columnEls  = []; // in DOM order, one per column
 let _menuOpen   = false;
 
+// Inline fallback icon — same shape used across the public site (topbar.js /
+// sidebar.js / logo-uploader) for missing images. Shown here whenever either
+// header logo (Public Page / Local Page) fails to load — most commonly
+// because this is a fresh checkout of the repo with no media/logo.png yet
+// (media/ is gitignored), but also covers any other load failure.
+const FALLBACK_ICON =
+    'data:image/svg+xml;charset=UTF-8,' +
+    encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none">
+  <rect x="3" y="3" width="18" height="18" rx="3" ry="3" fill="#3a3a3a" stroke="#5a5a5a"/>
+  <path d="M7 15l2.5-3 2 2.5L14.5 12 17 15" stroke="#cfcfcf" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="9" cy="9" r="1.25" fill="#cfcfcf"/>
+</svg>`);
+
+function attachLogoFallback(imgEl) {
+    imgEl.addEventListener("error", () => {
+        if (imgEl.src !== FALLBACK_ICON) {
+            imgEl.src = FALLBACK_ICON;
+            imgEl.classList.add("admin-logo--fallback");
+        }
+    });
+}
+
+// Wire up the fallback immediately so it applies no matter when/whether
+// loadHeader() ever successfully sets a real src.
+attachLogoFallback(domainLogoEl);
+attachLogoFallback(localLogoEl);
+
 function applyTheme(theme) {
     const root = document.documentElement;
     if (theme.backgroundColor) root.style.setProperty("--admin-bg", theme.backgroundColor);
@@ -25,6 +53,13 @@ function applyTheme(theme) {
 // target couldn't be determined.
 function hideHeaderLink(linkEl) {
     linkEl.style.visibility = "hidden";
+}
+
+// Sets a logo <img>'s src to a real URL, clearing any previously-applied
+// fallback styling so it displays normally if this URL loads successfully.
+function setLogoSrc(imgEl, src) {
+    imgEl.classList.remove("admin-logo--fallback");
+    imgEl.src = src;
 }
 
 async function loadHeader() {
@@ -55,7 +90,7 @@ async function loadHeader() {
     if (siteInfo.siteAddress) {
         const domainBase = siteInfo.siteAddress.replace(/\/$/, "");
         domainLinkEl.href = domainBase;
-        domainLogoEl.src  = `${domainBase}${logoRelPath}`;
+        setLogoSrc(domainLogoEl, `${domainBase}${logoRelPath}`);
     } else {
         hideHeaderLink(domainLinkEl);
     }
@@ -64,7 +99,7 @@ async function loadHeader() {
         const localHost = window.location.hostname;
         const localBase = `http://${localHost}:${publicPort}`;
         localLinkEl.href = localBase;
-        localLogoEl.src  = `${localBase}${logoRelPath}`;
+        setLogoSrc(localLogoEl, `${localBase}${logoRelPath}`);
     } else {
         hideHeaderLink(localLinkEl);
     }

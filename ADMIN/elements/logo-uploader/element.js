@@ -1,13 +1,39 @@
+// Inline fallback icon — same shape used on the public site (topbar.js /
+// sidebar.js) for missing images. Shown here whenever no logo.png exists yet
+// at the live site's /media/logo.png (a fresh checkout of this repo ships
+// without a media/ folder at all, since it's gitignored).
+const FALLBACK_ICON =
+    'data:image/svg+xml;charset=UTF-8,' +
+    encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 24 24" fill="none">
+  <rect x="3" y="3" width="18" height="18" rx="3" ry="3" fill="#3a3a3a" stroke="#5a5a5a"/>
+  <path d="M7 15l2.5-3 2 2.5L14.5 12 17 15" stroke="#cfcfcf" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="9" cy="9" r="1.25" fill="#cfcfcf"/>
+</svg>`);
+
 export default function init(root) {
-    const preview  = root.querySelector("#lu-preview");
-    const fileIn   = root.querySelector("#lu-file");
-    const chooseBtn= root.querySelector("#lu-choose");
-    const statusEl = root.querySelector("#lu-status");
+    const preview   = root.querySelector("#lu-preview");
+    const fileIn    = root.querySelector("#lu-file");
+    const chooseBtn = root.querySelector("#lu-choose");
+    const statusEl  = root.querySelector("#lu-status");
 
     let siteAddress = "";
 
+    // Show the fallback icon immediately, before anything has loaded, so
+    // there's never a moment showing a broken-image icon.
+    preview.src = FALLBACK_ICON;
+    preview.classList.add("admin-logo-preview--fallback");
+
+    preview.addEventListener("error", () => {
+        if (preview.src !== FALLBACK_ICON) {
+            preview.src = FALLBACK_ICON;
+            preview.classList.add("admin-logo-preview--fallback");
+        }
+    });
+
     function refreshPreview() {
         if (!siteAddress) return;
+        preview.classList.remove("admin-logo-preview--fallback");
         preview.src = `${siteAddress.replace(/\/$/, "")}/media/logo.png?t=${Date.now()}`;
     }
 

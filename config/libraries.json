@@ -1,35 +1,8 @@
 [
     {
-        "id": "projects",
-        "name": "Projects",
-        "path": "projects",
-        "depth": 1,
-        "useDates": true,
-        "icon": "media/libraries/projects.png",
-        "hidden": false
-    },
-    {
-        "id": "small-projects",
-        "name": "Small Projects",
-        "path": "small-projects",
-        "depth": 1,
-        "useDates": true,
-        "icon": "media/libraries/small-projects.png",
-        "hidden": true
-    },
-    {
-        "id": "craftech",
-        "name": "Project SciAnnex II",
-        "path": "CrafTech",
-        "depth": 2,
-        "useDates": false,
-        "icon": "media/sidebar/server-icon.png",
-        "hidden": false
-    },
-    {
-        "id": "in_dev",
-        "name": "in_dev",
-        "path": "in_dev",
+        "id": "template",
+        "name": "template",
+        "path": "template",
         "depth": 1,
         "useDates": true,
         "icon": "",
