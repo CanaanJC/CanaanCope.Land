@@ -52,7 +52,16 @@ export default function init(root) {
                 link.href = `http://${host}:${publicPort}/archive/${entry.uuid}`;
                 link.target = "_blank";
                 link.rel = "noopener noreferrer";
-                link.textContent = `${fmtDate(entry.timestamp)} — ${entry.uuid}`;
+
+                // Shows the tag instead of the uuid — e.g. "2026-08-23 14:30:00 — monthly backup".
+                // If this entry has no tag (older backups made before this
+                // feature, or something went wrong writing it), the tag
+                // portion is simply left blank rather than falling back to
+                // the uuid.
+                link.textContent = entry.tag
+                    ? `${fmtDate(entry.timestamp)} — ${entry.tag}`
+                    : `${fmtDate(entry.timestamp)} — `;
+                link.title = entry.uuid; // uuid still available on hover
 
                 const downloadLink = document.createElement("a");
                 downloadLink.className = "admin-archive-download";
