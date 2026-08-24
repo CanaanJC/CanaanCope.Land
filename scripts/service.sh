@@ -57,17 +57,24 @@ fi
 
 # ── Live logs (menu option 5) ─────────────────────────────────────────────────
 #
-# Plain read-only tail of this unit's journal. Ctrl+C just interrupts
-# journalctl (SIGINT) and returns control to this script's menu loop below —
-# it has no effect whatsoever on the actual running service.
+# Plain read-only tail of this unit's journal, using journalctl's "cat"
+# output format — this strips all of journald's own metadata (timestamp,
+# hostname, unit/PID prefix) from every line and prints just the raw
+# message content, i.e. exactly what the node process itself writes to
+# stdout/stderr — the same thing you'd see running `node node.js` directly
+# in a terminal, not a service-log-formatted view of it.
+# Ctrl+C just interrupts journalctl (SIGINT) and returns control to this
+# script's menu loop below — it has no effect whatsoever on the actual
+# running service.
 live_logs() {
     echo ""
     echo "── Live logs for \"${SERVICE_NAME}\" (Ctrl+C to return to menu) ──"
     echo ""
-    journalctl -u "${SERVICE_NAME}" -f --no-pager || true
+    journalctl -u "${SERVICE_NAME}" -f -o cat --no-pager || true
     echo ""
     echo "── returned to menu ──"
 }
+
 
 # ── Uninstall (menu option 8) ─────────────────────────────────────────────────
 
