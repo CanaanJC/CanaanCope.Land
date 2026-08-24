@@ -2,8 +2,10 @@
 #
 # git.sh — everyday git helper for this repo.
 #
-#   Option 1: Push        — stage everything, commit with a message you type,
-#                            then push to origin.
+#   Option 1: Push        — first auto-untracks anything that's tracked but
+#                            matches .gitignore (the exact bug class that bit
+#                            us before), then stages everything, commits with
+#                            a message you type, and pushes.
 #   Option 2: .gitignore   — type a path (relative to repo root). If it's not
 #                            already ignored, it gets added. If it's already
 #                            ignored, it gets removed (toggle). Leave the
@@ -22,6 +24,22 @@ if [[ ! -d .git ]]; then
     exit 1
 fi
 
+# Finds any file that is BOTH currently tracked by git AND matches a rule in
+# .gitignore, and untracks it (git rm --cached) without touching the file on
+# disk. This is what prevents the "added a .gitignore rule after the fact and
+# it silently kept getting committed anyway" bug from ever recurring.
+untrack_ignored_files() {
+    local ignored_tracked
+    ignored_tracked="$(git ls-files -ci --exclude-standard)"
+
+    if [[ -n "${ignored_tracked}" ]]; then
+        echo "git.sh: found tracked files that are now .gitignore'd — untracking them:"
+        echo "${ignored_tracked}" | sed 's/^/  - /'
+        echo "${ignored_tracked}" | git rm -r --cached --quiet --pathspec-from-file=- 2>/dev/null || \
+            echo "${ignored_tracked}" | xargs -d '\n' git rm -r --cached --quiet --
+    fi
+}
+
 echo "canaancope.dev — git helper"
 echo "  1) Push changes"
 echo "  2) Add/remove a path in .gitignore"
@@ -29,6 +47,7 @@ read -rp "Choose an option [1-2]: " choice
 
 case "${choice}" in
     1)
+        untrack_ignored_files
         git add -A
 
         if git diff --cached --quiet; then
@@ -77,6 +96,8 @@ case "${choice}" in
         else
             echo "${entry}" >> .gitignore
             echo "git.sh: added \"${entry}\" to .gitignore."
+            echo "git.sh: note — if \"${entry}\" was already tracked by git, it will be"
+            echo "        automatically untracked the next time you push (option 1)."
         fi
         ;;
 
