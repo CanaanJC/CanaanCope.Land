@@ -6,8 +6,8 @@ if (window.location.pathname !== "/") {
     throw new Error("[about-me.js] Not the homepage, halting module.");
 }
 
-const MEDIA_BASE   = "/media/about-me";
-const LISTING_BASE = "/about-me/media-listing";
+const MEDIA_BASE   = "/aboutme/media";
+const LISTING_BASE = "/aboutme/media-listing";
 
 async function loadAboutMe() {
     const container = document.getElementById("content");
@@ -17,11 +17,11 @@ async function loadAboutMe() {
 
     let rawMd;
     try {
-        const res = await fetch(`/about-me.md?_=${Date.now()}`, { cache: "no-store" });
-        if (!res.ok) throw new Error(`about-me.md HTTP ${res.status}`);
+        const res = await fetch(`/aboutme/content.md?_=${Date.now()}`, { cache: "no-store" });
+        if (!res.ok) throw new Error(`content.md HTTP ${res.status}`);
         rawMd = await res.text();
     } catch (err) {
-        console.error("Failed to load about-me.md:", err);
+        console.error("Failed to load /aboutme/content.md:", err);
         return;
     }
 

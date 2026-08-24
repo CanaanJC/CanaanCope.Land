@@ -91,7 +91,7 @@ body.blog-gallery-open {
     font-size: 2rem;
     font-weight: 700;
     margin: 0 0 8px 0;
-    color: var(--text);
+    color: var(--page-text-color, var(--text));
     padding-left: 8px;
 }
 
@@ -109,7 +109,7 @@ body.blog-gallery-open {
     font-size: 2rem;
     font-weight: 700;
     margin: 0 0 10px 0;
-    color: var(--text);
+    color: var(--page-text-color, var(--text));
     padding-left: 8px;
 }
 
@@ -124,7 +124,7 @@ body.blog-gallery-open {
 /* ── Markdown content ── */
 
 .blog-md-content {
-    color: var(--text);
+    color: var(--page-text-color, var(--text));
     font-size: 15px;
     line-height: 1.75;
 }
@@ -133,7 +133,7 @@ body.blog-gallery-open {
 .blog-md-content h2,
 .blog-md-content h3,
 .blog-md-content h4 {
-    color: var(--text);
+    color: var(--page-text-color, var(--text));
     margin-top: 1.4em;
     margin-bottom: 0.5em;
     font-weight: 600;
@@ -167,11 +167,12 @@ body.blog-gallery-open {
 }
 
 .blog-md-content code {
-    background: #252525;
-    border: 1px solid #333;
+    background: var(--md-code-bg, #252525);
+    border: 1px solid var(--md-code-border, #333);
     border-radius: 4px;
     padding: 1px 5px;
     font-size: 0.875em;
+    color: var(--md-code-text, var(--page-text-color, var(--text)));
     font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
 }
 
@@ -179,8 +180,8 @@ body.blog-gallery-open {
     margin: 0 0 1.25em 0;
     border-radius: 10px;
     overflow: hidden;
-    background: #1e1e1e;
-    border: 1px solid #2e2e2e;
+    background: var(--md-block-bg, #1e1e1e);
+    border: 1px solid var(--md-block-border, #2e2e2e);
 }
 
 .blog-md-content pre code {
@@ -191,6 +192,7 @@ body.blog-gallery-open {
     padding: 16px 20px;
     font-size: 0.875em;
     overflow-x: auto;
+    color: var(--md-code-text, var(--page-text-color, var(--text)));
     font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
     line-height: 1.6;
 }
@@ -200,22 +202,22 @@ body.blog-gallery-open {
     border-collapse: collapse;
     margin: 0 0 1.25em 0;
     font-size: 0.9em;
-    background: #1e1e1e;
-    border: 1px solid #2e2e2e;
+    background: var(--md-block-bg, #1e1e1e);
+    border: 1px solid var(--md-block-border, #2e2e2e);
     border-radius: 10px;
     overflow: hidden;
 }
 
 .blog-md-content th,
 .blog-md-content td {
-    border: 1px solid #2e2e2e;
+    border: 1px solid var(--md-block-border, #2e2e2e);
     padding: 8px 12px;
     text-align: left;
 }
 
 .blog-md-content th {
-    background: #232323;
-    color: var(--text);
+    background: var(--md-code-bg, #232323);
+    color: var(--page-text-color, var(--text));
     font-weight: 600;
 }
 

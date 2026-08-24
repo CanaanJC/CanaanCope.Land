@@ -1,5 +1,9 @@
 :root {
     --topbar-font-size: 20px;
+    --topbar-bg: #202020;
+    --slogan-font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    --slogan-font-size: 20px;
+    --slogan-color: var(--muted);
 }
 
 .topbar {
@@ -7,13 +11,15 @@
     top: 0;
     left: 0;
     right: 0;
-    height: 56px;
-    background: #202020;
+    height: var(--topbar-depth);
+    background: var(--topbar-bg);
     border-bottom: 1px solid #2a2a2a;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
     z-index: 900;
     display: flex;
     align-items: center;
+    /* Fixed chrome font — independent from the page font control */
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
 }
 
 .topbar-inner {
@@ -89,7 +95,9 @@
     position: absolute;
     top: 100%;
     left: 0;
+    width: max-content;
     min-width: 100%;
+    max-width: min(480px, 90vw);
     background: #202020;
     border: 1px solid #2a2a2a;
     border-top: none;
@@ -104,6 +112,7 @@
     transition: opacity 160ms ease, transform 160ms ease;
     z-index: 1100;
     white-space: nowrap;
+    overflow-x: auto;
 }
 
 .topbar-dropdown.open .topbar-dropdown__menu {
@@ -158,8 +167,9 @@
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
-    color: var(--muted);
-    font-size: var(--topbar-font-size);
+    font-family: var(--slogan-font-family);
+    font-size: var(--slogan-font-size);
+    color: var(--slogan-color);
     white-space: pre;
     pointer-events: none;
     user-select: none;

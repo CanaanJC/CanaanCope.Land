@@ -2,6 +2,9 @@
     --bg: #181818;
     --text: #eaeaea;
     --muted: #bdbdbd;
+    --topbar-depth: 56px;
+    --page-font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    --page-text-color: #eaeaea;
 }
 
 *, *::before, *::after { 
@@ -15,11 +18,11 @@ html, body {
 body {
     margin: 0;
     background: var(--bg);
-    color: var(--text);
-    font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    color: var(--page-text-color);
+    font-family: var(--page-font-family);
 }
 
 main#content { 
     min-height: 100vh;
-    padding-top: 56px;
+    padding-top: var(--topbar-depth);
 }

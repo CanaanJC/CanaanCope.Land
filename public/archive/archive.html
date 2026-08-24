@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Archived Instance</title>
+    <link rel="stylesheet" href="/css/base.css" />
+    <link rel="stylesheet" href="/archive/archive.css?v=4" />
+  </head>
+  <body>
+    <div id="archive-page">
+      <h1 class="archive-title">Archived Instance</h1>
+      <p class="archive-uuid" id="archive-uuid"></p>
+      <p class="archive-next-backup" id="archive-next-backup" hidden></p>
+
+      <div id="archive-idle" class="archive-panel" hidden>
+        <p class="archive-status">Server not running</p>
+        <button id="archive-start-btn" class="archive-button" type="button">Start Server</button>
+      </div>
+
+      <div id="archive-status-panel" class="archive-panel" hidden>
+        <p class="archive-status" id="archive-status-text"></p>
+
+        <div id="archive-link-wrap" hidden>
+          <p class="archive-link-label">Visit on your LAN:</p>
+          <a id="archive-lan-link" class="archive-link" href="#" target="_blank" rel="noopener noreferrer"></a>
+        </div>
+
+        <div id="archive-admin-link-wrap" hidden>
+          <p class="archive-link-label">Visit Admin on your LAN:</p>
+          <a id="archive-admin-lan-link" class="archive-link" href="#" target="_blank" rel="noopener noreferrer"></a>
+        </div>
+
+        <button id="archive-kill-btn" class="archive-button archive-button--danger" type="button" hidden>Kill Instance</button>
+
+        <p id="archive-countdown" class="archive-countdown" hidden></p>
+
+        <pre id="archive-log" class="archive-log"></pre>
+      </div>
+    </div>
+
+    <script type="module" src="/js/theme.js"></script>
+    <script src="/archive/archive.js?v=4"></script>
+  </body>
+</html>

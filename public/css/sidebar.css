@@ -2,6 +2,7 @@
     --sidebar-collapsed: 64px;
     --sidebar-expanded: 320px;
     --icon-size: 36px;
+    --sidebar-bg: #202020;
 }
 
 .sidebar {
@@ -10,13 +11,15 @@
     right: 0;
     height: 100vh;
     width: var(--sidebar-collapsed);
-    background: #202020;
+    background: var(--sidebar-bg);
     border-left: 1px solid #2a2a2a;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
     transition: width 200ms ease;
     overflow-x: hidden;
     overflow-y: auto;
     z-index: 1000;
+    /* Fixed chrome font — independent from the page font control */
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
 }
 
 .sidebar.expanded {
@@ -104,19 +107,6 @@
 .sidebar--loading .sidebar-item__text {
     visibility: hidden !important;
     transition: none !important;
-}
-
-.sidebar.measuring {
-    width: var(--sidebar-expanded);
-    visibility: hidden;
-}
-
-.sidebar.measuring .sidebar-inner {
-    padding: 12px;
-}
-
-.sidebar.measuring .sidebar-item__text {
-    visibility: visible;
 }
 
 @media (prefers-reduced-motion: reduce) {

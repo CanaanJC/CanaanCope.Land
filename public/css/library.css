@@ -1,0 +1,85 @@
+/* ── Library page-specific styles (projects, small-projects, CrafTech, any
+      other library defined in config/libraries.json) ── */
+
+/* Hide scrollbar */
+
+html, body {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+    display: none;
+}
+
+/* Page layout */
+
+:root {
+    --library-sidebar-offset: 64px;
+    --library-side-padding: 48px;
+}
+
+#projects-container {
+    margin-right: calc(var(--library-sidebar-offset) + var(--library-side-padding));
+    margin-left: auto;
+    padding: 48px var(--library-side-padding) 80px var(--library-side-padding);
+    box-sizing: border-box;
+    max-width: calc((100% - var(--library-sidebar-offset)) * 0.9);
+}
+
+/* Topbar nav dropdown ("By Month" for date-mode, "Contents" for title-mode) */
+
+#library-nav-dropdown .topbar-dropdown__item {
+    background: none;
+    border: none;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: var(--topbar-font-size);
+    color: var(--text);
+}
+
+/* Generic tree item — works for date Year/Month or title-mode N-level trees.
+   No max-width/ellipsis here on purpose: the dropdown box itself sizes to
+   the longest item (see topbar.css `.topbar-dropdown__menu { width: max-content }`),
+   so titles are never clipped. */
+
+.topbar-tree-item {
+    display: block;
+    white-space: nowrap;
+}
+
+.topbar-tree-item--group {
+    font-weight: 700;
+    color: var(--text) !important;
+    padding-top: 10px !important;
+}
+
+.topbar-tree-item--group:first-child {
+    padding-top: 8px !important;
+}
+
+.topbar-tree-item--leaf {
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace !important;
+    font-weight: 400 !important;
+    color: #666 !important;
+    font-size: 0.85rem !important;
+    letter-spacing: 0.06em;
+}
+
+.topbar-tree-item--leaf:hover {
+    color: var(--muted) !important;
+}
+
+/* Indent by nesting depth. data-level="0" is the first (top) grouping level;
+   works for any library depth — add more rules here if you ever go past 6
+   nested levels deep. */
+
+.topbar-tree-item[data-level="0"] { padding-left: 12px !important; }
+.topbar-tree-item[data-level="1"] { padding-left: 24px !important; }
+.topbar-tree-item[data-level="2"] { padding-left: 36px !important; }
+.topbar-tree-item[data-level="3"] { padding-left: 48px !important; }
+.topbar-tree-item[data-level="4"] { padding-left: 60px !important; }
+.topbar-tree-item[data-level="5"] { padding-left: 72px !important; }

@@ -4,6 +4,16 @@
 // Provides parsing, rendering, gallery, and lazy-loading utilities for
 // project entries (about-me, featured projects, project listings).
 //
+// Media rules:
+//   - Filenames keep their real extensions (e.g. fig1.png, clip.mp4).
+//   - Any .gif is rendered as a looping, muted, autoplay <video> (no controls),
+//     matching a GIF's behaviour. The server transparently serves the MP4
+//     variant for the .gif URL; while the variant is still building the raw
+//     .gif is served and a bulletproof fallback swaps in an animated <img>.
+//   - A trailing "loop" keyword on a video token (e.g. "clip.mp4 loop" or
+//     "<clip.mp4 loop>") renders that video as a looping, muted, autoplay clip
+//     with no controls. The loop keyword is ignored on non-video files.
+//
 // Mobile vs desktop rendering:
 //   - parseContentMd extracts [P…] blocks AND strips any nested [M…]…[/M…]
 //     sub-blocks from their content — [M…] is mobile-only and is invisible
@@ -61,6 +71,28 @@ export function sortByEndDate(list) {
     });
 }
 
+// ── Loop keyword + gif helpers ───────────────────────────────────────────────
+
+// Parse a trailing "loop" keyword off a single media token. Only triggers when
+// the token before " loop" looks like a filename (has an extension), so prose
+// that happens to end with the word "loop" is never affected.
+function parseLoopToken(raw) {
+    const trimmed = String(raw).trim();
+    const m = trimmed.match(/^([\w\-./]+\.[a-z0-9]+)\s+loop$/i);
+    if (m) return { value: m[1], loop: true };
+    return { value: trimmed, loop: false };
+}
+
+// Strip a trailing "loop" keyword for block-type classification only.
+function stripLoop(content) {
+    const m = String(content).trim().match(/^([\w\-./]+\.[a-z0-9]+)\s+loop$/i);
+    return m ? m[1] : String(content).trim();
+}
+
+function isGifFile(filename) {
+    return /\.gif$/i.test(filename);
+}
+
 // ── Content parsing ──────────────────────────────────────────────────────────
 
 // Desktop parser. Strips nested [M…]…[/M…] blocks from P content so they
@@ -94,16 +126,18 @@ export function parseAllBlocks(raw) {
     return blocks;
 }
 
+// Block classifiers are loop-aware: a trailing "loop" keyword is stripped
+// before testing so "clip.mp4 loop" still classifies as a video block.
 export function isImageBlock(content) {
-    return /^[\w\-]+\.(png|jpg|jpeg|gif|webp|svg)$/i.test(content.trim());
+    return /^[\w\-]+\.(png|jpg|jpeg|gif|webp|svg|avif)$/i.test(stripLoop(content));
 }
 
 export function isVideoBlock(content) {
-    return /^[\w\-]+\.(mp4|webm)$/i.test(content.trim());
+    return /^[\w\-]+\.(mp4|webm)$/i.test(stripLoop(content));
 }
 
 export function isAudioBlock(content) {
-    return /^[\w\-]+\.(mp3|wav)$/i.test(content.trim());
+    return /^[\w\-]+\.(mp3|wav)$/i.test(stripLoop(content));
 }
 
 export function isFolderBlock(content) {
@@ -128,12 +162,12 @@ export function groupIntoRows(blocks) {
 // ── Inline media detection ───────────────────────────────────────────────────
 
 function isInlineMediaReference(text) {
-    return /<[\w\-]+\.(png|jpg|jpeg|gif|webp|svg|mp4|webm|mp3|wav)>/i.test(text) ||
+    return /<[\w\-]+\.(png|jpg|jpeg|gif|webp|svg|avif|mp4|webm|mp3|wav)(?:\s+loop)?>/i.test(text) ||
            /<\.\/[\w\-]+>/i.test(text);
 }
 
 function extractInlineMedia(text) {
-    const regex = /<(\.\/[\w\-]+|[\w\-]+\.(png|jpg|jpeg|gif|webp|svg|mp4|webm|mp3|wav))>/gi;
+    const regex = /<(\.\/[\w\-]+|[\w\-]+\.(?:png|jpg|jpeg|gif|webp|svg|avif|mp4|webm|mp3|wav)(?:\s+loop)?)>/gi;
     const segments = [];
     let lastIndex = 0;
     let match;
@@ -156,7 +190,7 @@ function extractInlineMedia(text) {
 }
 
 function isImageFile(filename) {
-    return /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(filename);
+    return /\.(png|jpg|jpeg|gif|webp|svg|avif)$/i.test(filename);
 }
 
 function isVideoFile(filename) {
@@ -165,6 +199,81 @@ function isVideoFile(filename) {
 
 function isAudioFile(filename) {
     return /\.(mp3|wav)$/i.test(filename);
+}
+
+// ── Loop / gif video element ─────────────────────────────────────────────────
+
+// Build a looping, muted, autoplay <video> with no controls (a GIF replacement).
+// For gif sources, uses a bulletproof fallback: if the video can't decode (the
+// server is still serving the raw .gif while the MP4 variant builds), swap in an
+// animated <img>. Detection combines <video>/<source> error events AND a
+// timeout guard (videoWidth stays 0), because source-level errors are unreliable.
+function buildLoopVideoEl(src, file, isGif, className) {
+    const video = document.createElement("video");
+    video.className = className || "blog-video blog-loop-video";
+    video.autoplay = true;
+    video.loop = true;
+    video.muted = true;
+    video.playsInline = true;
+    video.controls = false;
+    video.setAttribute("muted", "");
+    video.setAttribute("autoplay", "");
+    video.setAttribute("loop", "");
+    video.setAttribute("playsinline", "");
+    video.setAttribute("disablepictureinpicture", "");
+
+    const source = document.createElement("source");
+    source.src  = src;
+    source.type = /\.webm$/i.test(file) ? "video/webm" : "video/mp4";
+    video.appendChild(source);
+
+    let fallbackTimer = null;
+
+    const kickPlay = () => { video.play().catch(() => {}); };
+
+    video.addEventListener("loadeddata", () => {
+        if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+        kickPlay();
+    });
+    video.addEventListener("canplay", kickPlay);
+
+    // GIF-only fallback to an animated <img>. Not applied to real loop-MP4s,
+    // whose bytes always decode (the original MP4 is served while its smaller
+    // variant builds).
+    if (isGif) {
+        let swapped = false;
+        const swapToImg = () => {
+            if (swapped) return;
+            swapped = true;
+            if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+            const img = document.createElement("img");
+            img.className = "blog-image";
+            img.src = src;   // same .gif URL — plays natively as an animated image
+            img.alt = file;
+            img.loading = "lazy";
+            if (video.parentNode) video.replaceWith(img);
+        };
+
+        // Error can surface on either the <video> (all sources failed) or the
+        // <source> child — listen on both.
+        video.addEventListener("error", swapToImg, { once: true });
+        source.addEventListener("error", swapToImg, { once: true });
+
+        // Guard: if after a short delay the video still has no decodable track,
+        // the server is serving the raw .gif — fall back to <img>.
+        fallbackTimer = setTimeout(() => {
+            if (!swapped && video.videoWidth === 0) swapToImg();
+        }, 1200);
+    }
+
+    return video;
+}
+
+function makeLoopWrap(src, file, isGif) {
+    const wrap = document.createElement("span");
+    wrap.className = "blog-image-wrap blog-video-wrap blog-loop-wrap";
+    wrap.appendChild(buildLoopVideoEl(src, file, isGif, "blog-video blog-loop-video"));
+    return wrap;
 }
 
 // ── Multi-media block parsing ────────────────────────────────────────────────
@@ -176,14 +285,14 @@ function parseMediaLine(line) {
     if (/^<\.\/[\w\-]+>$/.test(trimmed)) {
         return { kind: "folder", value: trimmed.slice(1, -1) };
     }
-    const inlineFile = trimmed.match(/^<([\w\-]+\.(png|jpg|jpeg|gif|webp|svg|mp4|webm|mp3|wav))>$/i);
+    const inlineFile = trimmed.match(/^<([\w\-]+\.(?:png|jpg|jpeg|gif|webp|svg|avif|mp4|webm|mp3|wav)(?:\s+loop)?)>$/i);
     if (inlineFile) {
         return { kind: "file", value: inlineFile[1] };
     }
     if (/^\.\/[\w\-]+$/.test(trimmed)) {
         return { kind: "folder", value: trimmed };
     }
-    if (/^[\w\-]+\.(png|jpg|jpeg|gif|webp|svg|mp4|webm|mp3|wav)$/i.test(trimmed)) {
+    if (/^[\w\-]+\.(?:png|jpg|jpeg|gif|webp|svg|avif|mp4|webm|mp3|wav)(?:\s+loop)?$/i.test(trimmed)) {
         return { kind: "file", value: trimmed };
     }
 
@@ -249,7 +358,9 @@ export function openGalleryModal(files, mediaBaseUrl) {
         const item = document.createElement("div");
         item.className = "blog-gallery-item";
 
-        if (isVideoFile(file)) {
+        if (isGifFile(file)) {
+            item.appendChild(buildLoopVideoEl(`${mediaBaseUrl}/${file}`, file, true, "blog-gallery-media blog-loop-video"));
+        } else if (isVideoFile(file)) {
             const video = document.createElement("video");
             video.className = "blog-gallery-media";
             video.controls = true;
@@ -319,7 +430,9 @@ export function renderFolderCell(folderName, mediaBaseUrl, listingUrl) {
             const remaining       = files.length - 1;
             const folderMediaBase = `${mediaBaseUrl}/${folderName}`;
 
-            if (isVideoFile(first)) {
+            if (isGifFile(first)) {
+                wrap.appendChild(buildLoopVideoEl(`${folderMediaBase}/${first}`, first, true, "blog-video blog-loop-video"));
+            } else if (isVideoFile(first)) {
                 const video = document.createElement("video");
                 video.className = "blog-video";
                 video.controls = true;
@@ -369,10 +482,17 @@ export function renderFolderCell(folderName, mediaBaseUrl, listingUrl) {
 
 // ── Inline media renderer ────────────────────────────────────────────────────
 
-function renderInlineMedia(filename, mediaBaseUrl, listingBaseUrl) {
-    if (filename.startsWith("./")) {
-        const folderName = filename.slice(2);
+function renderInlineMedia(rawToken, mediaBaseUrl, listingBaseUrl) {
+    if (rawToken.startsWith("./")) {
+        const folderName = rawToken.slice(2);
         return renderFolderCell(folderName, mediaBaseUrl, `${listingBaseUrl}/${folderName}`);
+    }
+
+    const { value: filename, loop } = parseLoopToken(rawToken);
+
+    // GIFs always render as looping muted video (served as MP4 by the server).
+    if (isGifFile(filename)) {
+        return makeLoopWrap(`${mediaBaseUrl}/${filename}`, filename, true);
     }
 
     if (isImageFile(filename)) {
@@ -391,6 +511,9 @@ function renderInlineMedia(filename, mediaBaseUrl, listingBaseUrl) {
         return wrap;
 
     } else if (isVideoFile(filename)) {
+        if (loop) {
+            return makeLoopWrap(`${mediaBaseUrl}/${filename}`, filename, false);
+        }
         const wrap = document.createElement("span");
         wrap.className = "blog-image-wrap blog-video-wrap";
         const video = document.createElement("video");
@@ -428,7 +551,7 @@ function renderInlineMedia(filename, mediaBaseUrl, listingBaseUrl) {
         return wrap;
     }
 
-    return document.createTextNode(`<${filename}>`);
+    return document.createTextNode(`<${rawToken}>`);
 }
 
 // ── Cell renderer ────────────────────────────────────────────────────────────
@@ -474,30 +597,43 @@ export function renderCell(content, mediaBaseUrl, listingBaseUrl, isImage, isVid
     }
 
     if (isImage) {
-        const wrap = document.createElement("span");
-        wrap.className = "blog-image-wrap";
-        const img = document.createElement("img");
-        img.className = "blog-image";
-        img.src = `${mediaBaseUrl}/${content.trim()}`;
-        img.alt = content.trim();
-        img.loading = "lazy";
-        wrap.appendChild(img);
-        cell.appendChild(wrap);
+        const { value: file } = parseLoopToken(content);
+
+        // GIFs render as looping muted video.
+        if (isGifFile(file)) {
+            cell.appendChild(makeLoopWrap(`${mediaBaseUrl}/${file}`, file, true));
+        } else {
+            const wrap = document.createElement("span");
+            wrap.className = "blog-image-wrap";
+            const img = document.createElement("img");
+            img.className = "blog-image";
+            img.src = `${mediaBaseUrl}/${file}`;
+            img.alt = file;
+            img.loading = "lazy";
+            wrap.appendChild(img);
+            cell.appendChild(wrap);
+        }
 
     } else if (isVideo) {
-        const wrap = document.createElement("span");
-        wrap.className = "blog-image-wrap blog-video-wrap";
-        const video = document.createElement("video");
-        video.className = "blog-video";
-        video.controls = true;
-        video.preload = "auto";
-        video.playsInline = true;
-        const source = document.createElement("source");
-        source.src  = `${mediaBaseUrl}/${content.trim()}`;
-        source.type = /\.webm$/i.test(content) ? "video/webm" : "video/mp4";
-        video.appendChild(source);
-        wrap.appendChild(video);
-        cell.appendChild(wrap);
+        const { value: file, loop } = parseLoopToken(content);
+
+        if (loop) {
+            cell.appendChild(makeLoopWrap(`${mediaBaseUrl}/${file}`, file, false));
+        } else {
+            const wrap = document.createElement("span");
+            wrap.className = "blog-image-wrap blog-video-wrap";
+            const video = document.createElement("video");
+            video.className = "blog-video";
+            video.controls = true;
+            video.preload = "auto";
+            video.playsInline = true;
+            const source = document.createElement("source");
+            source.src  = `${mediaBaseUrl}/${file}`;
+            source.type = /\.webm$/i.test(file) ? "video/webm" : "video/mp4";
+            video.appendChild(source);
+            wrap.appendChild(video);
+            cell.appendChild(wrap);
+        }
 
     } else if (isAudio) {
         const wrap = document.createElement("div");

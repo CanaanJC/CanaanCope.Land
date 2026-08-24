@@ -5,17 +5,23 @@
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Canaan Copeland</title>
 
-        <!-- OG / embed tags -->
-        <meta property="og:type" content="website" />
-        <meta property="og:title" content="Canaan Copeland" />
-        <meta property="og:description" content="Aspiring Engineer | Proudly Canadian 🇨🇦 | Forever Curious" />
-        <meta property="og:url" content="https://canaancope.land" />
-        <meta property="og:image" content="https://canaancope.land/media/about-me/fig1.png" />
-        <meta name="description" content="Aspiring Engineer | Proudly Canadian 🇨🇦 | Forever Curious" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Canaan Copeland" />
-        <meta name="twitter:description" content="Aspiring Engineer | Proudly Canadian 🇨🇦 | Forever Curious" />
-        <meta name="twitter:image" content="https://canaancope.land/media/about-me/fig1.png" />
+        <!-- Favicon — hardcoded to the auto-generated file so it's present
+             immediately, before any JS runs. theme.js will still update this
+             tag's href at runtime if theme.json specifies a different icon,
+             but this guarantees something always shows up. -->
+        <link rel="icon" type="image/png" href="/media/favicon.png" />
+        <link rel="shortcut icon" href="/favicon.png" />
+
+        <!-- OG / Twitter / description meta tags are injected dynamically by
+             the server (see lib/routes.js: serveHomepageWithEmbed) from this
+             page's <title> tag, config/master.json's "slogan", and
+             /media/logo.png. Nothing here is hardcoded on purpose — anyone
+             deploying their own copy of this site just edits the <title>
+             above and the "slogan" in config/master.json, and their embed
+             updates automatically. If server-side injection ever fails
+             (e.g. this file is served as a raw static file some other way),
+             no OG tags are added at all — the page still works, it just
+             won't have a rich embed. -->
 
         <link rel="stylesheet" href="./css/main.css" />
     </head>

@@ -58,34 +58,12 @@ async function loadSidebar() {
         }
         container.appendChild(frag);
 
-        calculateSidebarWidth();
         setupSidebarToggle();
 
         document.querySelector(".sidebar")?.classList.remove("sidebar--loading");
     } catch (err) {
         console.error("Sidebar load failed:", err);
     }
-}
-
-function calculateSidebarWidth() {
-    const sidebar = document.querySelector(".sidebar");
-    const items = document.querySelectorAll(".sidebar-item");
-    if (!sidebar || items.length === 0) return;
-
-    sidebar.classList.add("measuring");
-    
-    let maxWidth = 0;
-    items.forEach(item => {
-        const width = item.scrollWidth;
-        if (width > maxWidth) maxWidth = width;
-    });
-
-    const padding = 32;
-    const expandedWidth = maxWidth + padding;
-    
-    document.documentElement.style.setProperty("--sidebar-expanded", `${expandedWidth}px`);
-    
-    sidebar.classList.remove("measuring");
 }
 
 function setupSidebarToggle() {

@@ -8,3 +8,4 @@ The page is curently hosting at https://canaancope.land/sidehost/f12 but will be
 [P1b]
 fig1.gif
 [/P1b]
+[M1] fig1.gif [/M1]

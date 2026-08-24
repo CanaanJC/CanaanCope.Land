@@ -3,9 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Project</title>
+    <title>Redirecting…</title>
     <script>
-      window.location.replace("/projects");
+      // This file is a static fallback only.
+      // The server dynamically generates this page for OG embeds and redirects
+      // (see lib/routes.js + lib/embed.js). This copy only fires if the request
+      // somehow bypasses that route and hits the file directly.
+      const parts = window.location.pathname.split("/").filter(Boolean);
+      window.location.replace("/" + (parts[0] || ""));
     </script>
   </head>
   <body></body>

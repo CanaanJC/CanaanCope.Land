@@ -1,0 +1,130 @@
+html, body {
+    height: 100%;
+    margin: 0;
+}
+
+#archive-page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 64px 24px;
+    box-sizing: border-box;
+    gap: 16px;
+    color: var(--page-text-color, var(--text));
+    font-family: var(--page-font-family, inherit);
+}
+
+.archive-title {
+    font-size: 2.2rem;
+    font-weight: 800;
+    margin: 0;
+}
+
+.archive-uuid {
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin: 0 0 16px 0;
+}
+
+.archive-next-backup {
+    font-size: 0.9rem;
+    color: var(--muted);
+    margin: -8px 0 8px 0;
+}
+
+.archive-panel {
+    width: min(700px, 90vw);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+}
+
+/* Without this, the [hidden] attribute loses to the class's `display: flex`
+   rule (same specificity, this rule loads later) — both panels rendered
+   simultaneously regardless of JS toggling. This restores correct hiding. */
+.archive-panel[hidden] {
+    display: none;
+}
+
+#archive-link-wrap[hidden],
+#archive-admin-link-wrap[hidden] {
+    display: none;
+}
+
+.archive-button {
+    background: #2a2a2a;
+    border: 1px solid #3a3a3a;
+    color: var(--page-text-color, var(--text));
+    font-size: 1.1rem;
+    font-weight: 700;
+    padding: 12px 28px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 140ms ease;
+}
+
+.archive-button:hover {
+    background: #353535;
+}
+
+.archive-button--danger {
+    background: #4a1f1f;
+    border-color: #6a2a2a;
+}
+
+.archive-button--danger:hover {
+    background: #5c2727;
+}
+
+.archive-status {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.archive-status--error {
+    color: #e06060;
+}
+
+.archive-link-label {
+    margin: 0;
+    color: var(--muted);
+}
+
+.archive-link {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #7ab4f5;
+    text-decoration: none;
+}
+
+.archive-link:hover {
+    text-decoration: underline;
+}
+
+.archive-log {
+    width: 100%;
+    max-height: 400px;
+    overflow-y: auto;
+    background: #111;
+    border: 1px solid #2e2e2e;
+    border-radius: 8px;
+    padding: 14px;
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    font-size: 0.8rem;
+    color: #9be89b;
+    white-space: pre-wrap;
+    word-break: break-word;
+    box-sizing: border-box;
+}
+
+.archive-countdown {
+    margin: 0;
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #e06060;
+}

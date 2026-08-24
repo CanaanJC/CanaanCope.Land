@@ -14,3 +14,4 @@ Here is a  [Amazon.ca](https://www.amazon.ca/dp/B085TJ6B78) link to the hub. And
 [P1b]
 fig1.png
 [/P1b]
+[M1] fig1.png [/M1]

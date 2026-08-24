@@ -1,0 +1,12 @@
+/* Uses shared .admin-lib-card / .admin-lib-summary rules from /css/admin.css */
+
+.admin-lib-title--link {
+    text-decoration: none;
+    color: var(--admin-text);
+    cursor: pointer;
+}
+
+.admin-lib-title--link:hover {
+    text-decoration: underline;
+    color: #7ab4f5;
+}

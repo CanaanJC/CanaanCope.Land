@@ -152,6 +152,8 @@ body.mobile .mobile-menu {
     padding: 12px 12px 12px 12px;
     box-sizing: border-box;
     gap: 4px;
+    /* Fixed chrome font — independent from the page font control */
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
 }
 
 body.mobile .mobile-menu.open {
@@ -257,7 +259,7 @@ body.mobile .mobile-menu::-webkit-scrollbar-thumb {
     opacity: 0.7;
 }
 
-/* ── Page dropdown slot (injected by projects.js / CrafTech.js) ─────────── */
+/* ── Page dropdown slot (injected by library.js) ─────────────────────────── */
 
 .mobile-menu__page-dropdown-slot {
     display: flex;
@@ -385,29 +387,28 @@ body.mobile .mobile-menu::-webkit-scrollbar-thumb {
     padding: 1px;
 }
 
-/* Re-style projects.js / CrafTech.js dropdown items inside the menu */
-.mobile-menu .topbar-month-nav--year {
+/* Re-style library.js dropdown items inside the menu */
+.mobile-menu .topbar-tree-item--group {
     font-weight: 700;
     color: var(--text) !important;
     padding-top: 8px !important;
     font-size: 0.95rem !important;
 }
 
-.mobile-menu .topbar-month-nav--year:first-child {
+.mobile-menu .topbar-tree-item--group:first-child {
     padding-top: 6px !important;
 }
 
-.mobile-menu .topbar-month-nav--month {
+.mobile-menu .topbar-tree-item--leaf {
     font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace !important;
     font-weight: 400 !important;
     color: #888 !important;
-    padding-left: 24px !important;
     font-size: 0.82rem !important;
     letter-spacing: 0.06em;
 }
 
-.mobile-menu .topbar-month-nav--month:hover,
-.mobile-menu .topbar-month-nav--month:active {
+.mobile-menu .topbar-tree-item--leaf:hover,
+.mobile-menu .topbar-tree-item--leaf:active {
     color: var(--muted) !important;
 }
 
@@ -547,4 +548,11 @@ body.mobile video.blog-gallery-media {
 
 body.mobile.mobile-menu-open {
     overflow: hidden;
+}
+
+/* ── Site credit — clear space for the floating mobile burger button ── */
+
+body.mobile .site-credit {
+    margin: 16px var(--mobile-side-padding) calc(var(--mobile-burger-size) + 32px) var(--mobile-side-padding);
+    font-size: 12px;
 }

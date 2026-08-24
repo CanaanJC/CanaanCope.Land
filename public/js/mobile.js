@@ -3,10 +3,18 @@
 //
 // Activates a mobile layout when viewport width ≤ 768px. Manages:
 //   - body.mobile class toggle
-//   - floating hamburger button + slide-out menu (built from topbar.json
-//     and sidebar.json)
-//   - relocation of page-specific dropdowns (projects.js / CrafTech.js)
-//     into the menu
+//   - floating hamburger button + slide-out menu:
+//       • logo from media/logo.png
+//       • top nav section: on the homepage, the flat libraries list
+//         (config/libraries.json, hidden libraries excluded — same rule as
+//         the desktop topbar dropdown); once inside a library, that same
+//         section is replaced with the library's own manifest-driven
+//         nav tree (bold year → months for date-mode libraries, or the
+//         nested title tree for others) — a direct mirror of the
+//         desktop topbar dropdown's contents, always expanded, and shown
+//         regardless of that library's own hidden flag (hidden only
+//         affects whether it appears in the flat list, not its own page)
+//       • social links from sidebar.json
 //   - mobile blog renderer (registered with lib-blog at module load)
 //   - re-render of all blog content when the viewport mode toggles
 //
@@ -15,7 +23,8 @@
 //     is split on any nested [M…] tags, with text segments rendered as
 //     markdown (inline <file> / <./folder> refs stripped) and media
 //     segments rendered as full-width media cells inline.
-//   - [M…] blocks (top-level): rendered as full-width media.
+//   - [M…] blocks (top-level): rendered as full-width media. Loop videos and
+//     .gif (looping muted video) are handled by lib-blog's renderCell.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import {
@@ -28,13 +37,16 @@ import {
     isFolderBlock,
     renderCell,
     rerenderAllBlogContent,
+    getEndDate,
+    sortByEndDate,
 } from "./lib-blog.js";
 
 console.log("Mobile module loaded");
 
-const MOBILE_BREAKPOINT = 768;
-const TOPBAR_DATA_URL   = "/json/topbar.json";
-const SIDEBAR_DATA_URL  = "/json/sidebar.json";
+const MOBILE_BREAKPOINT   = 768;
+const LOGO_URL            = "/media/logo.png";
+const LIBRARIES_DATA_URL  = "/config/libraries.json";
+const SIDEBAR_DATA_URL    = "/json/sidebar.json";
 
 const FALLBACK_ICON =
     'data:image/svg+xml;charset=UTF-8,' +
@@ -45,14 +57,13 @@ const FALLBACK_ICON =
   <circle cx="9" cy="9" r="1.25" fill="#cfcfcf"/>
 </svg>`);
 
-const INLINE_MEDIA_REGEX = /<(\.\/[\w\-]+|[\w\-]+\.(png|jpg|jpeg|gif|webp|svg|mp4|webm|mp3|wav))>/gi;
+const INLINE_MEDIA_REGEX = /<(\.\/[\w\-]+|[\w\-]+\.[a-z0-9]+(?:\s+loop)?)>/gi;
 const INNER_M_BLOCK_REGEX = /\[M([^\]]+)\]([\s\S]*?)\[\/M\1\]/g;
 
-let _isMobile          = false;
-let _menuBuilt         = false;
-let _menuOpen          = false;
-let _topbarObserver    = null;
-let _relocatedDropdown = null;
+let _isMobile       = false;
+let _menuBuilt      = false;
+let _menuOpen       = false;
+let _topbarObserver = null;
 
 // ── Mobile blog renderer ─────────────────────────────────────────────────────
 
@@ -163,13 +174,11 @@ function checkMobile() {
 
 // ── DOM refs ─────────────────────────────────────────────────────────────────
 
-function getBurger()          { return document.getElementById("mobileBurger"); }
-function getMenu()            { return document.getElementById("mobileMenu"); }
-function getMenuOverlay()     { return document.getElementById("mobileMenuOverlay"); }
-function getProjectsSlot()    { return document.getElementById("mobileMenuProjectsSlot"); }
-function getSidebarSlot()     { return document.getElementById("mobileMenuSidebarSlot"); }
-function getDropdownSlot()    { return document.getElementById("mobileMenuPageDropdownSlot"); }
-function getDropdownDivider() { return document.getElementById("mobileMenuDropdownDivider"); }
+function getBurger()       { return document.getElementById("mobileBurger"); }
+function getMenu()         { return document.getElementById("mobileMenu"); }
+function getMenuOverlay()  { return document.getElementById("mobileMenuOverlay"); }
+function getProjectsSlot() { return document.getElementById("mobileMenuProjectsSlot"); }
+function getSidebarSlot()  { return document.getElementById("mobileMenuSidebarSlot"); }
 
 // ── Build hamburger button ───────────────────────────────────────────────────
 
@@ -224,7 +233,7 @@ function buildMenuShell() {
     const logoImg = document.createElement("img");
     logoImg.className = "mobile-menu__logo-img";
     logoImg.alt = "Site logo";
-    logoImg.src = FALLBACK_ICON;
+    logoImg.src = LOGO_URL;
     logoImg.addEventListener("error", () => {
         logoImg.src = FALLBACK_ICON;
         logoImg.classList.add("fallback");
@@ -245,44 +254,211 @@ function buildMenuShell() {
     sidebarSlot.id = "mobileMenuSidebarSlot";
     menu.appendChild(sidebarSlot);
 
-    const div2 = document.createElement("hr");
-    div2.className = "mobile-menu__divider";
-    div2.id = "mobileMenuDropdownDivider";
-    div2.style.display = "none";
-    menu.appendChild(div2);
-
-    const dropdownSlot = document.createElement("div");
-    dropdownSlot.id = "mobileMenuPageDropdownSlot";
-    dropdownSlot.className = "mobile-menu__page-dropdown-slot";
-    menu.appendChild(dropdownSlot);
-
     document.body.appendChild(menu);
+}
+
+// ── Library nav helpers (mirrors library.js's manifest-tree logic) ──────────
+
+function entryId(slugPath) {
+    return slugPath.join("--");
+}
+
+function scrollToMobileId(id) {
+    closeMenu();
+    setTimeout(() => {
+        const el = document.getElementById(id) || document.getElementById(`placeholder-${id}`);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 260);
+}
+
+function sortLibraryManifest(library, manifest) {
+    if (library.useDates) return sortByEndDate(manifest);
+    return [...manifest].sort((a, b) => {
+        const segA = a.segments, segB = b.segments;
+        const len = Math.max(segA.length, segB.length);
+        for (let i = 0; i < len; i++) {
+            const sa = segA[i], sb = segB[i];
+            if (!sa) return -1;
+            if (!sb) return 1;
+            if (sa.num !== sb.num) return sa.num - sb.num;
+            const c = sa.title.localeCompare(sb.title);
+            if (c !== 0) return c;
+        }
+        return 0;
+    });
+}
+
+// Date-mode nav: bold year, indented months underneath (matches desktop's
+// buildTopbarDateNav content exactly, just always expanded instead of
+// living behind a hover dropdown).
+function buildMobileDateNav(sortedManifest, container) {
+    const yearToId   = new Map();
+    const monthToId  = new Map();
+    const yearMonths = new Map();
+
+    for (const entry of sortedManifest) {
+        const endDate = getEndDate(entry.date);
+        if (!endDate) continue;
+        const parts = endDate.split("/");
+        if (parts.length < 2) continue;
+        const year  = parts[0];
+        const month = parts[1].padStart(2, "0");
+        const key   = `${year}/${month}`;
+        const id    = entryId(entry.slugPath);
+        if (!yearToId.has(year))   yearToId.set(year, id);
+        if (!monthToId.has(key))   monthToId.set(key, id);
+        if (!yearMonths.has(year)) yearMonths.set(year, new Set());
+        yearMonths.get(year).add(month);
+    }
+
+    const years = [...yearMonths.keys()].sort((a, b) => Number(b) - Number(a));
+
+    for (const year of years) {
+        const yearBtn = document.createElement("button");
+        yearBtn.className = "mobile-menu__item topbar-tree-item topbar-tree-item--group";
+        yearBtn.dataset.level = "0";
+        yearBtn.textContent = year;
+        yearBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            scrollToMobileId(yearToId.get(year));
+        });
+        container.appendChild(yearBtn);
+
+        const months = [...yearMonths.get(year)].sort((a, b) => Number(b) - Number(a));
+        for (const month of months) {
+            const monthBtn = document.createElement("button");
+            monthBtn.className = "mobile-menu__item topbar-tree-item topbar-tree-item--leaf";
+            monthBtn.dataset.level = "1";
+            monthBtn.textContent = month;
+            monthBtn.addEventListener("click", (e) => {
+                e.preventDefault();
+                scrollToMobileId(monthToId.get(`${year}/${month}`));
+            });
+            container.appendChild(monthBtn);
+        }
+    }
+}
+
+// Title-mode nav: recursive N-level tree from folder segments (matches
+// desktop's buildTopbarTreeNav content exactly).
+function buildLibraryTree(manifest) {
+    const root = { children: new Map() };
+    for (const entry of manifest) {
+        let node = root;
+        for (const seg of entry.segments) {
+            if (!node.children.has(seg.slug)) {
+                node.children.set(seg.slug, {
+                    slug: seg.slug,
+                    num: seg.num,
+                    title: seg.title,
+                    children: new Map(),
+                    entry: null,
+                });
+            }
+            node = node.children.get(seg.slug);
+        }
+        node.entry = entry;
+    }
+    return root;
+}
+
+function firstLeafSlugPath(node) {
+    if (node.entry) return node.entry.slugPath;
+    const sorted = [...node.children.values()].sort((a, b) => a.num - b.num || a.title.localeCompare(b.title));
+    return sorted.length ? firstLeafSlugPath(sorted[0]) : null;
+}
+
+function renderMobileTreeNodes(node, depth, container) {
+    const children = [...node.children.values()]
+        .sort((a, b) => a.num - b.num || a.title.localeCompare(b.title));
+
+    for (const child of children) {
+        const isLeaf = child.children.size === 0;
+
+        const btn = document.createElement("button");
+        btn.className = `mobile-menu__item topbar-tree-item ${isLeaf ? "topbar-tree-item--leaf" : "topbar-tree-item--group"}`;
+        btn.dataset.level = String(depth);
+        btn.textContent = child.title;
+        btn.addEventListener("click", (e) => {
+            e.preventDefault();
+            const targetSlugPath = isLeaf ? child.entry.slugPath : firstLeafSlugPath(child);
+            if (targetSlugPath) scrollToMobileId(entryId(targetSlugPath));
+        });
+        container.appendChild(btn);
+
+        if (!isLeaf) renderMobileTreeNodes(child, depth + 1, container);
+    }
+}
+
+function buildMobileTreeNav(sortedManifest, container) {
+    const tree = buildLibraryTree(sortedManifest);
+    renderMobileTreeNodes(tree, 0, container);
+}
+
+// Resolves which library (if any) the current page belongs to — matches
+// the first URL path segment, or the blocked/embed marker set by
+// buildLibraryEmbedHtml for `block: true` entries. Works regardless of a
+// library's own `hidden` flag — hidden only affects whether it shows up in
+// the flat nav list below, never whether its own page functions normally.
+function getCurrentLibrary(libraries) {
+    const blockedPath = window.__LIBRARY_BLOCKED_PATH__;
+    if (blockedPath) return libraries.find(l => l.path === blockedPath) || null;
+    const seg = window.location.pathname.split("/").filter(Boolean)[0];
+    return libraries.find(l => l.path === seg) || null;
+}
+
+async function populateLibraryNav(container, library) {
+    try {
+        const res = await fetch(`/${library.path}/manifest.json?_=${Date.now()}`, { cache: "no-store" });
+        if (!res.ok) throw new Error(`manifest HTTP ${res.status}`);
+        let manifest = await res.json();
+        if (!Array.isArray(manifest) || manifest.length === 0) return;
+
+        manifest = sortLibraryManifest(library, manifest);
+
+        if (library.useDates) buildMobileDateNav(manifest, container);
+        else buildMobileTreeNav(manifest, container);
+    } catch (err) {
+        console.error(`Mobile: failed to load manifest for "${library.path}":`, err);
+    }
 }
 
 // ── Populate menu from JSON ──────────────────────────────────────────────────
 
 async function populateMenu() {
+    const projectsSlot = getProjectsSlot();
     try {
-        const res = await fetch(`${TOPBAR_DATA_URL}?_=${Date.now()}`, { cache: "no-store" });
-        if (res.ok) {
-            const data = await res.json();
-            if (data.logo) {
-                const img = document.querySelector("#mobileMenuLogo .mobile-menu__logo-img");
-                if (img) img.src = data.logo;
-            }
-            const projectsSlot = getProjectsSlot();
-            if (projectsSlot && Array.isArray(data.dropdowns)) {
-                projectsSlot.innerHTML = "";
-                for (const dropdown of data.dropdowns) {
-                    if (!Array.isArray(dropdown.items)) continue;
-                    for (const item of dropdown.items) {
-                        projectsSlot.appendChild(buildMenuLink(item));
-                    }
+        const res = await fetch(`${LIBRARIES_DATA_URL}?_=${Date.now()}`, { cache: "no-store" });
+        const libraries = res.ok ? await res.json() : [];
+
+        if (projectsSlot && Array.isArray(libraries)) {
+            projectsSlot.innerHTML = "";
+
+            const currentLibrary = getCurrentLibrary(libraries);
+            if (currentLibrary) {
+                // Inside a library page — show that library's own manifest
+                // nav instead of the flat libraries list. Shown regardless
+                // of this library's own `hidden` flag — hidden only hides
+                // it from the flat list below, not from its own page nav.
+                await populateLibraryNav(projectsSlot, currentLibrary);
+            } else {
+                // Homepage (or anywhere else not inside a library) — flat
+                // libraries list, matching the desktop dropdown's items.
+                // Hidden libraries are excluded here, same rule as the
+                // desktop topbar dropdown.
+                const visibleLibraries = libraries.filter(lib => lib && !lib.hidden);
+                for (const lib of visibleLibraries) {
+                    if (!lib.path) continue;
+                    projectsSlot.appendChild(buildMenuLink({
+                        name: lib.name || lib.path,
+                        link: `/${lib.path}`,
+                        icon: lib.icon,
+                    }));
                 }
             }
         }
     } catch (err) {
-        console.error("Mobile: failed to load topbar.json:", err);
+        console.error("Mobile: failed to load libraries.json:", err);
     }
 
     try {
@@ -382,64 +558,9 @@ function fixSloganSpacing() {
     if (slogan.textContent !== text) slogan.textContent = text;
 }
 
-// ── Topbar dropdown relocator ────────────────────────────────────────────────
-
-function relocateDropdownIfPresent() {
-    if (!_isMobile) return;
-    const topbar = document.getElementById("topbarList");
-    const slot   = getDropdownSlot();
-    if (!topbar || !slot) return;
-
-    const dropdown = topbar.querySelector(".topbar-dropdown");
-    if (!dropdown) return;
-    if (dropdown === _relocatedDropdown && dropdown.parentNode === slot) return;
-
-    slot.innerHTML = "";
-    slot.appendChild(dropdown);
-    _relocatedDropdown = dropdown;
-
-    const divider = getDropdownDivider();
-    if (divider) divider.style.display = "";
-
-    rewireDropdownForTouch(dropdown);
-
-    dropdown.querySelectorAll(".topbar-dropdown__item").forEach(item => {
-        if (item.__mobileWired) return;
-        item.__mobileWired = true;
-        item.addEventListener("click", () => setTimeout(() => closeMenu(), 0));
-    });
-}
-
-function rewireDropdownForTouch(dropdown) {
-    if (dropdown.__mobileTouchWired) return;
-    dropdown.__mobileTouchWired = true;
-
-    const trigger = dropdown.querySelector(".topbar-dropdown__trigger");
-    if (!trigger) return;
-
-    trigger.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        dropdown.classList.toggle("open");
-    });
-}
-
-function restoreDropdown() {
-    if (!_relocatedDropdown) return;
-    const topbar = document.getElementById("topbarList");
-    if (!topbar) return;
-
-    const logo = topbar.querySelector(".topbar-logo");
-    if (logo && logo.nextSibling) topbar.insertBefore(_relocatedDropdown, logo.nextSibling);
-    else topbar.appendChild(_relocatedDropdown);
-
-    const divider = getDropdownDivider();
-    if (divider) divider.style.display = "none";
-
-    _relocatedDropdown = null;
-}
-
-// ── Topbar observer ──────────────────────────────────────────────────────────
+// ── Topbar observer (slogan spacing only — nav content is built directly
+//    from libraries.json / manifest.json in populateMenu(), not relocated
+//    from the live desktop DOM) ────────────────────────────────────────────
 
 function startTopbarObserver() {
     if (_topbarObserver) return;
@@ -447,7 +568,6 @@ function startTopbarObserver() {
     if (!topbar) return;
 
     _topbarObserver = new MutationObserver(() => {
-        relocateDropdownIfPresent();
         fixSloganSpacing();
     });
     _topbarObserver.observe(topbar, { childList: true, subtree: false });
@@ -474,7 +594,6 @@ async function activateMobile() {
     buildMenuShell();
 
     startTopbarObserver();
-    relocateDropdownIfPresent();
     fixSloganSpacing();
 
     if (!_menuBuilt) {
@@ -482,7 +601,6 @@ async function activateMobile() {
         _menuBuilt = true;
     }
 
-    relocateDropdownIfPresent();
     fixSloganSpacing();
 }
 
@@ -496,7 +614,6 @@ function deactivateMobile() {
     rerenderAllBlogContent();
 
     stopTopbarObserver();
-    restoreDropdown();
 }
 
 // ── Resize handler ───────────────────────────────────────────────────────────
