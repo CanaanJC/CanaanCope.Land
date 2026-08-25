@@ -55,9 +55,11 @@
 #  10. Runs a final verification pass: confirms config/version.txt now
 #      reads the target version and that every manifest-listed file
 #      actually exists on disk post-sync.
-#  11. For every version strictly after LOCAL_VERSION and up to AND
-#      INCLUDING REMOTE_VERSION that has a config/update-notes/<version>.md
-#      upstream, prints a clickable link AND the note's full contents to
+#  11. AFTER the sync has completed (so this reads real on-disk files
+#      under config/update-notes/, not the tmp extraction dir), for every
+#      version strictly after LOCAL_VERSION and up to AND INCLUDING
+#      REMOTE_VERSION that has a config/update-notes/<version>.md present
+#      on disk, prints a clickable link AND the note's full contents to
 #      the terminal, oldest → newest, one section per file — always,
 #      regardless of verbosity — so skipping several releases never
 #      misses anything requiring manual steps.
@@ -105,6 +107,37 @@ vecho() {
     if [[ "${VERBOSE}" == true ]]; then
         echo "$@"
     fi
+}
+
+# Returns 0 (true) if $1 is strictly greater than $2 (low, exclusive lower
+# bound) and less than or equal to $3 (high, inclusive upper bound), using
+# `sort -V` version-aware comparison. Returns 1 (false) otherwise —
+# including the edge case where $1 == $2 (not in range, since low is
+# exclusive).
+in_version_range() {
+    local ver="$1" low="$2" high="$3"
+
+    # exclusive lower bound
+    if [[ "${ver}" == "${low}" ]]; then
+        return 1
+    fi
+
+    # ver must be > low: if sort -V puts low on top of [ver, low], ver <= low
+    local lowest
+    lowest="$(printf '%s\n%s\n' "${ver}" "${low}" | sort -V | head -n1)"
+    if [[ "${lowest}" == "${ver}" ]]; then
+        return 1
+    fi
+
+    # ver must be <= high: if sort -V puts ver on top of [ver, high] and
+    # ver != high, then ver > high
+    local highest
+    highest="$(printf '%s\n%s\n' "${ver}" "${high}" | sort -V | tail -n1)"
+    if [[ "${highest}" == "${ver}" ]] && [[ "${ver}" != "${high}" ]]; then
+        return 1
+    fi
+
+    return 0
 }
 
 # ── Dependency checks ──────────────────────────────────────────────────────────
@@ -560,14 +593,14 @@ fi
 
 # ── Update notes — every version between local and target, INCLUSIVE of target ──
 #
-# All config/update-notes/<version>.md files that have ever existed are
-# still present in the just-downloaded EXTRACTED_ROOT tarball (nothing in
-# that folder is ever deleted upstream), so there is no need for a second
-# GitHub API call or any raw-file fetches — just read them straight off
-# the already-downloaded release and link back to them by tag.
+# Runs AFTER the sync above, and reads directly from the real on-disk
+# config/update-notes/ directory in the project root (NOT the tmp
+# extraction dir) — so this reflects exactly what's actually on disk right
+# now, post-sync, including any notes files that were just added by this
+# very update.
 
 NOTES_FOUND=0
-NOTES_DIR="${EXTRACTED_ROOT}/config/update-notes"
+NOTES_DIR="${PROJECT_ROOT}/config/update-notes"
 
 if [[ -d "${NOTES_DIR}" ]]; then
     IN_RANGE_VERSIONS="$(
