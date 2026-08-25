@@ -38,9 +38,7 @@
 #                    the inode this process already has open and is
 #                    executing from — so the currently-running process is
 #                    completely unaffected, and the new version takes
-#                    effect on the next run. (Writing in-place / truncating
-#                    the file while it's open is what previously caused
-#                    "Text file busy" / "unbound variable" crashes.)
+#                    effect on the next run.
 #        - *.json  → deep-merged with an ORDER-PRESERVING merge that
 #                    mirrors lib/siteConfig.js's deepMerge(): any field,
 #                    array, or nested structure that exists in the new
@@ -57,10 +55,12 @@
 #  10. Runs a final verification pass: confirms config/version.txt now
 #      reads the target version and that every manifest-listed file
 #      actually exists on disk post-sync.
-#  11. Prints (never fetches the body of) a clickable link to every
-#      config/update-notes/<version>.md that exists upstream for every
-#      version between the old and new one (inclusive of the new one),
-#      oldest → newest — so skipping several releases never misses notes.
+#  11. For every version strictly after LOCAL_VERSION and up to AND
+#      INCLUDING REMOTE_VERSION that has a config/update-notes/<version>.md
+#      upstream, prints a clickable link AND the note's full contents to
+#      the terminal, oldest → newest, one section per file — always,
+#      regardless of verbosity — so skipping several releases never
+#      misses anything requiring manual steps.
 #  12. Cleans up all temp files (via trap, runs even on error/abort/Ctrl-C)
 #      and prints "done".
 #
@@ -473,14 +473,12 @@ fi
 # the directory entry at a new inode; it never touches the inode this
 # process already has open and is executing from, so the currently-running
 # process is completely safe, and the new script takes effect on the next
-# run. (In-place overwrite/truncation of the open file is what previously
-# caused "Text file busy" / "unbound variable" crashes.)
+# run.
 
 vecho ""
 vecho "update.sh: syncing files (JSON files are order-preserving deep-merged; everything else is added/overwritten)..."
 
 SYNCED_COUNT=0
-SELF_UPDATED=0
 
 while IFS= read -r rel; do
     [[ -z "${rel}" ]] && continue
@@ -493,8 +491,7 @@ while IFS= read -r rel; do
             cp -f "${SRC_SELF}" "${SELF_TMP}"
             chmod --reference="${DEST_SELF}" "${SELF_TMP}" 2>/dev/null || chmod +x "${SELF_TMP}"
             mv -f "${SELF_TMP}" "${DEST_SELF}"
-            vecho "  self-updated (safe atomic rename — this run is unaffected): ${rel}"
-            SELF_UPDATED=1
+            vecho "  synced (atomic self-update): ${rel}"
         fi
         SYNCED_COUNT=$((SYNCED_COUNT + 1))
         continue
@@ -561,71 +558,55 @@ else
     echo "update.sh: verification found issues (see warnings above) — review before trusting this update." >&2
 fi
 
-# ── Update notes links — every version between local and target ──────────────
+# ── Update notes — every version between local and target, INCLUSIVE of target ──
 #
-# Prints a link for EVERY release's config/update-notes/<version>.md between
-# (LOCAL_VERSION, REMOTE_VERSION] that actually has one, oldest → newest, so
-# skipping several releases never misses a note. Links only — content is
-# never fetched or printed.
-
-vecho ""
-vecho "update.sh: checking for update instructions across all skipped releases..."
-
-is_version_gt() {
-    local a="$1" b="$2"
-    [[ "${a}" == "${b}" ]] && return 1
-    local highest
-    highest="$(printf '%s\n%s\n' "${a}" "${b}" | sort -V | tail -n1)"
-    [[ "${highest}" == "${a}" ]]
-}
-
-is_version_le() {
-    local a="$1" b="$2"
-    ! is_version_gt "${a}" "${b}"
-}
-
-ALL_RELEASES_JSON="$(curl -fsSL "https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases?per_page=100" 2>/dev/null || echo "[]")"
-
-RELEASE_PAIRS="$(echo "${ALL_RELEASES_JSON}" | jq -r '.[] | "\(.tag_name)\t\(.tag_name | sub("^v"; ""))"' 2>/dev/null || echo "")"
+# All config/update-notes/<version>.md files that have ever existed are
+# still present in the just-downloaded EXTRACTED_ROOT tarball (nothing in
+# that folder is ever deleted upstream), so there is no need for a second
+# GitHub API call or any raw-file fetches — just read them straight off
+# the already-downloaded release and link back to them by tag.
 
 NOTES_FOUND=0
+NOTES_DIR="${EXTRACTED_ROOT}/config/update-notes"
 
-if [[ -n "${RELEASE_PAIRS}" ]]; then
-    IN_RANGE_PAIRS="$(
-        while IFS=$'\t' read -r tag ver; do
-            [[ -z "${tag}" ]] && continue
-            if is_version_gt "${ver}" "${LOCAL_VERSION}" && is_version_le "${ver}" "${REMOTE_VERSION}"; then
-                printf '%s\t%s\n' "${tag}" "${ver}"
+if [[ -d "${NOTES_DIR}" ]]; then
+    IN_RANGE_VERSIONS="$(
+        find "${NOTES_DIR}" -maxdepth 1 -type f -name '*.md' -exec basename {} .md \; \
+        | while IFS= read -r ver; do
+            [[ -z "${ver}" ]] && continue
+            if in_version_range "${ver}" "${LOCAL_VERSION}" "${REMOTE_VERSION}"; then
+                printf '%s\n' "${ver}"
             fi
-        done <<< "${RELEASE_PAIRS}" | sort -t $'\t' -k2 -V
+        done | sort -V
     )"
 
-    if [[ -n "${IN_RANGE_PAIRS}" ]]; then
-        while IFS=$'\t' read -r tag ver; do
-            [[ -z "${tag}" ]] && continue
+    if [[ -n "${IN_RANGE_VERSIONS}" ]]; then
+        while IFS= read -r ver; do
+            [[ -z "${ver}" ]] && continue
             notes_rel="config/update-notes/${ver}.md"
-            notes_raw_url="https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/${tag}/${notes_rel}"
-            notes_blob_url="https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/blob/${tag}/${notes_rel}"
+            notes_path="${NOTES_DIR}/${ver}.md"
+            notes_blob_url="https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/blob/${REMOTE_TAG}/${notes_rel}"
 
-            if curl -fsSL --head "${notes_raw_url}" >/dev/null 2>&1; then
-                echo "  ${ver}: ${notes_blob_url}"
+            if [[ -f "${notes_path}" ]]; then
                 NOTES_FOUND=$((NOTES_FOUND + 1))
+                echo ""
+                echo "==================="
+                echo "update notes ${ver}"
+                echo "==================="
+                echo "link: ${notes_blob_url}"
+                echo "==================="
+                cat "${notes_path}"
+                echo "==================="
             fi
-        done <<< "${IN_RANGE_PAIRS}"
+        done <<< "${IN_RANGE_VERSIONS}"
     fi
 fi
 
 if [[ ${NOTES_FOUND} -eq 0 ]]; then
-    vecho "update.sh: no update instructions found for any version between ${LOCAL_VERSION} and ${REMOTE_VERSION}."
+    echo "update.sh: no update instructions found for any version between ${LOCAL_VERSION} and ${REMOTE_VERSION}."
 else
-    echo "update.sh: ${NOTES_FOUND} update-notes link(s) found above — review in order for anything requiring manual steps."
-fi
-
-if [[ ${SELF_UPDATED} -eq 1 ]]; then
     echo ""
-    echo "update.sh: this script itself was updated to the new version (safe atomic rename)."
-    echo "           the update was applied on disk without affecting this run; the new"
-    echo "           version will be used automatically the next time update.sh is run."
+    echo "update.sh: ${NOTES_FOUND} update note(s) found above — review in order for anything requiring manual steps."
 fi
 
 echo ""
