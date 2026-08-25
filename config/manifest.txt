@@ -63,7 +63,7 @@ public/archive/archive.html
 public/archive/archive.js
 public/css/about-me.css
 public/css/base.css
-public/css/credit.css
+public/css/bottom-page.css
 public/css/featured.css
 public/css/lib-blog.css
 public/css/library.css
@@ -73,7 +73,7 @@ public/css/sidebar.css
 public/css/topbar.css
 public/index.html
 public/js/about-me.js
-public/js/credit.js
+public/js/bottom-page.js
 public/js/featured.js
 public/js/lib-blog.js
 public/js/library.js
@@ -90,4 +90,5 @@ scripts/run.sh
 scripts/.service-name
 scripts/service.sh
 scripts/update.sh
+test.txt
 .vscode/settings.json

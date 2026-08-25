@@ -1,0 +1,106 @@
+/* ── Bottom page group (homepage only) — bottom-text + site credit, loaded
+      in together as one unit after a configurable delay (config/master.json's
+      "bottomPageLoadDelayMs", themed via config/theme.json's theme.bottomText),
+      then permanently pinned to the true bottom of the page as more content
+      lazy-loads in below it. Intentionally NOT overridden in mobile.css —
+      same layout in both modes. ── */
+
+.bottom-page {
+    position: relative;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--icon-size, 36px);
+    padding: 24px;
+    box-sizing: border-box;
+}
+
+/* ── Bottom text ── */
+
+.bottom-text {
+    width: 100%;
+    max-width: min(
+        var(--blog-max-content-width, 1440px),
+        calc((100% - var(--blog-sidebar-offset, 64px)) * 0.9)
+    );
+    margin: 0 auto;
+    padding: 0;
+    box-sizing: border-box;
+    text-align: center;
+    color: var(--bottom-text-color, var(--page-text-color, var(--text)));
+    font-family: var(--bottom-text-font-family, var(--page-font-family));
+    font-size: var(--bottom-text-font-size, 15px);
+    line-height: 1.75;
+}
+
+.bottom-text p {
+    margin: 0 0 0.6em 0;
+}
+
+.bottom-text p:last-child {
+    margin-bottom: 0;
+}
+
+.bottom-text a {
+    color: #7ab4f5;
+    text-decoration: none;
+}
+
+.bottom-text a:hover {
+    text-decoration: underline;
+}
+
+/* ── Site credit ── */
+
+.site-credit {
+    position: absolute;
+    left: 24px;
+    bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: fit-content;
+    margin: 0;
+    padding: 6px 4px;
+    text-decoration: none;
+    color: var(--muted);
+    font-size: 13px;
+    opacity: 0.8;
+    transition: opacity 140ms ease, color 140ms ease;
+}
+
+.site-credit:hover {
+    opacity: 1;
+    color: var(--text);
+}
+
+.site-credit__icon {
+    width: var(--icon-size, 36px);
+    height: var(--icon-size, 36px);
+    flex: 0 0 var(--icon-size, 36px);
+    object-fit: cover;
+    border-radius: 6px;
+    background: #303030;
+}
+
+/* Column of one or two lines — the parent row's align-items: center keeps
+   this whole stack vertically centered against the icon regardless of
+   whether the version line is present. */
+.site-credit__text-wrap {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+}
+
+.site-credit__version {
+    white-space: nowrap;
+    font-size: 11px;
+    font-weight: 700;
+    opacity: 0.85;
+}
+
+.site-credit__text {
+    white-space: nowrap;
+}

@@ -2,6 +2,7 @@
   "siteName": "MyPage",
   "siteAddress": "https://mypage.ca",
   "slogan": "This is my amazing page!",
+  "bottomText": "This is my amazing bottom [text](https://canaancope.land/bottom_text)!",
   "hosting": {
     "host": "0.0.0.0",
     "port": 9138,
@@ -50,6 +51,11 @@
       "backgroundColor": "#202020",
       "collapsedWidth": 64,
       "expandedWidth": 320
+    },
+    "bottomText": {
+      "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, \"Apple Color Emoji\", \"Segoe UI Emoji\"",
+      "fontSize": 15,
+      "color": "#eaeaea"
     }
   }
 }

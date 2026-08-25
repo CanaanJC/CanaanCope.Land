@@ -50,6 +50,13 @@ function applyThemeVars(theme) {
         if (theme.sidebar.collapsedWidth != null) root.setProperty("--sidebar-collapsed", `${theme.sidebar.collapsedWidth}px`);
         if (theme.sidebar.expandedWidth != null)  root.setProperty("--sidebar-expanded", `${theme.sidebar.expandedWidth}px`);
     }
+
+    if (theme.bottomText) {
+        const b = theme.bottomText;
+        if (b.fontFamily) root.setProperty("--bottom-text-font-family", b.fontFamily);
+        if (b.fontSize != null) root.setProperty("--bottom-text-font-size", `${b.fontSize}px`);
+        if (b.color) root.setProperty("--bottom-text-color", b.color);
+    }
 }
 
 async function loadTheme() {
