@@ -486,7 +486,7 @@ if [[ -n "${RELEASE_PAIRS}" ]]; then
     fi
 fi
 
-if [[ ${NOTES_FOUND} -eq 0 ]]; then
+if [[ ${NOTES_FOUND} -eok q 0 ]]; then
     echo "update.sh: no update instructions found for any version between ${LOCAL_VERSION} and ${REMOTE_VERSION}."
 else
     echo "update.sh: ${NOTES_FOUND} update-notes file(s) found above — review in order for anything requiring manual steps."
