@@ -33,7 +33,7 @@ ADMIN/js/admin.js
 config/defaults.json
 config/libraries.json
 config/manifest.txt
-config/update-notes/26.8.1.md
+config/update-notes/26.8.2.md
 config/version.txt
 .gitignore
 lib/adminRoutes.js
@@ -90,5 +90,4 @@ scripts/run.sh
 scripts/.service-name
 scripts/service.sh
 scripts/update.sh
-test.txt
 .vscode/settings.json

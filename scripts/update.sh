@@ -7,77 +7,69 @@
 # end, an optional `sudo systemctl restart` if a service was set up via
 # run.sh).
 #
-# ── One-time setup ────────────────────────────────────────────────────────
-# Edit GITHUB_OWNER / GITHUB_REPO below (or export them as env vars before
-# running) to point at your actual GitHub repo. The script refuses to run
-# until these are set to something other than the CHANGE_ME placeholders.
-#
 # ── What it does, in order ───────────────────────────────────────────────
 #   1. Checks dependencies (curl, jq, tar, node, npm) — offers to
 #      apt-get install anything missing.
-#   2. Reads config/version.txt (local, defaults to "0.0.0" if missing) and
-#      compares it against the latest GitHub Release's tag name, using
-#      version-aware sort (26.8.0 < 26.8.2 < 27.11.0). If not newer, exits
-#      cleanly with nothing touched.
-#   3. If newer, shows old → new and asks to confirm.
+#   2. Finds the latest GitHub Release's tag, then fetches ONLY that
+#      release's config/version.txt (via raw.githubusercontent.com — no
+#      full repo/tarball download at this stage) and compares it against
+#      the local config/version.txt using version-aware sort
+#      (26.8.0 < 26.8.2 < 27.11.0). If not newer, exits cleanly with
+#      nothing touched.
+#   3. If newer, shows old → new and asks to confirm (y/n).
 #   4. Verifies config/master.json's backup.path is actually configured —
-#      if it's empty, aborts immediately with an error (an "unconfigured"
-#      backup is treated as a failed backup, never as a silent no-op skip,
-#      since this script's entire safety model depends on a real backup
-#      having happened first).
-#   5. Runs the backup via the same lib/backup.js performBackup() the
-#      terminal/scheduler use, tagged with the version bump, wrapped in a
-#      hard timeout. If it fails, times out, or never responds, the script
-#      exits immediately with that error — nothing else on disk is ever
-#      touched unless the backup genuinely, provably succeeded.
-#   6. Downloads the new release's config/manifest.txt and diffs it against
-#      the current local config/manifest.txt (if one exists) to find files
-#      that existed before but were removed upstream. Your own project
-#      content (media/, extra library entries, etc.) is never listed in
-#      either manifest, so it's never a candidate here.
-#   7. Downloads the new release's full tarball, extracts it to a temp dir.
-#   8. Syncs every file listed in the NEW manifest into the project root:
-#        - *.json   → deep-merged via a recursive jq function that mirrors
-#                     lib/siteConfig.js's deepMerge() exactly: recurse into
-#                     matching object keys on both sides; whenever either
-#                     side isn't a plain object (this includes arrays), the
-#                     LOCAL (your existing) value wins wholesale for that
-#                     key. Net effect: any brand-new key/section the new
-#                     release introduces gets added automatically, while
-#                     every value you already have — including entire
-#                     arrays — is always preserved untouched. Works for any
-#                     JSON file in the manifest, not just config/master.json,
-#                     and requires no per-file special-casing.
-#        - everything else → copied over as-is (can never delete anything
-#                     on its own — files not in the manifest simply aren't
-#                     touched).
-#   9. Prompts to delete the files identified as removed-upstream in step 6
+#      if it's empty, aborts immediately (an "unconfigured" backup is
+#      treated as a failed backup, never a silent skip — this script's
+#      entire safety model depends on a real backup existing first).
+#   5. Runs the backup via lib/backup.js's performBackup(), tagged with the
+#      version bump ("update from X to Y"), wrapped in a hard timeout.
+#   6. Confirms the backup genuinely landed on disk — re-reads the backup
+#      root's manifest.json for a fresh entry with that exact tag and
+#      checks its folderPath actually exists. Only once that's true does
+#      the script proceed to touch anything else.
+#   7. Downloads the new release's config/manifest.txt and diffs it
+#      against the current local config/manifest.txt (if one exists) to
+#      find files that existed before but were removed upstream.
+#   8. Downloads the new release's full tarball, extracts it to a temp dir.
+#   9. Syncs every file listed in the NEW manifest into the project root:
+#        - *.json   → deep-merged via a recursive jq function mirroring
+#                     lib/siteConfig.js's deepMerge() exactly: any brand-new
+#                     key/array/structure the release introduces gets added;
+#                     every existing local value (including whole arrays)
+#                     is preserved untouched.
+#        - everything else → copied over as-is, including config/version.txt
+#                     itself (which is IN the manifest, so the version bump
+#                     is applied automatically as part of this sync — no
+#                     separate "write the version" step needed).
+#  10. Prompts to delete the files identified as removed-upstream in step 7
 #      (skipped entirely if there were none).
-#  10. Writes the new version into config/version.txt.
 #  11. Runs npm install (in case package.json/package-lock.json changed).
 #  12. If scripts/.service-name exists (i.e. run.sh set up a systemd
 #      service), offers to restart it now via sudo.
-#  13. Prints a browser link to config/update-notes/<version>.md from the
-#      release if that file exists upstream (e.g. 26.8.0.md), otherwise
-#      prints "No update instructions for this update."
+#  13. Prints a LINK (never the raw content) to every
+#      config/update-notes/<version>.md that exists upstream for every
+#      version strictly greater than the old local version and up to and
+#      including the new version — covers every skipped release in the
+#      gap, not just the final target, printed oldest → newest.
 #  14. Cleans up all temp files (via trap, runs even on error/abort).
+#
+# No manual version write and no separate "final verification" pass —
+# config/version.txt is itself one of the manifest-synced files (so it's
+# updated as part of the normal sync in step 9), and any merge/copy
+# failure during that sync already aborts the script outright rather than
+# leaving a half-applied update to "verify" afterward.
+#
+# ── Update source ─────────────────────────────────────────────────────────
+# Hardcoded to this project's public GitHub repo. No auth, no env vars,
+# no per-machine setup required — works out of the box for any user.
 #
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 PROJECT_ROOT="$(pwd)"
 
-# ── One-time setup — EDIT THESE ───────────────────────────────────────────────
-
-GITHUB_OWNER="${GITHUB_OWNER:-CHANGE_ME}"
-GITHUB_REPO="${GITHUB_REPO:-CHANGE_ME}"
-
-if [[ "${GITHUB_OWNER}" == "CHANGE_ME" || "${GITHUB_REPO}" == "CHANGE_ME" ]]; then
-    echo "update.sh: GITHUB_OWNER/GITHUB_REPO are not configured." >&2
-    echo "           edit the top of scripts/update.sh (or export GITHUB_OWNER=... GITHUB_REPO=..." >&2
-    echo "           before running) to point at your actual GitHub repository." >&2
-    exit 1
-fi
+GITHUB_OWNER="CanaanJC"
+GITHUB_REPO="CanaanCope.Land"
 
 VERSION_FILE="config/version.txt"
 MANIFEST_FILE="config/manifest.txt"
@@ -195,7 +187,8 @@ merge_json_file() {
     fi
 }
 
-# ── Version check ──────────────────────────────────────────────────────────────
+# ── Version check — fetch ONLY config/version.txt from the release, no
+# full repo/tarball download at this stage ───────────────────────────────
 
 LOCAL_VERSION="0.0.0"
 if [[ -f "${VERSION_FILE}" ]]; then
@@ -208,7 +201,7 @@ echo "update.sh: local version is ${LOCAL_VERSION}"
 echo "update.sh: checking latest release on GitHub (${GITHUB_OWNER}/${GITHUB_REPO})..."
 
 RELEASE_JSON="$(curl -fsSL "https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest")" || {
-    echo "update.sh: failed to reach GitHub API — check your connection/repo name." >&2
+    echo "update.sh: failed to reach GitHub API — check your connection." >&2
     exit 1
 }
 
@@ -219,9 +212,17 @@ if [[ -z "${REMOTE_TAG}" ]]; then
     exit 1
 fi
 
-REMOTE_VERSION="${REMOTE_TAG#v}" # strip a leading "v" if the tag uses one (v26.8.0 -> 26.8.0)
+echo "update.sh: latest release tag is \"${REMOTE_TAG}\" — fetching its ${VERSION_FILE} directly..."
 
-echo "update.sh: latest release tag is \"${REMOTE_TAG}\" (version ${REMOTE_VERSION})"
+REMOTE_VERSION_URL="https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/${REMOTE_TAG}/${VERSION_FILE}"
+REMOTE_VERSION="$(curl -fsSL "${REMOTE_VERSION_URL}" 2>/dev/null | tr -d '[:space:]' || true)"
+
+if [[ -z "${REMOTE_VERSION}" ]]; then
+    echo "update.sh: could not fetch ${VERSION_FILE} from release \"${REMOTE_TAG}\" — aborting." >&2
+    exit 1
+fi
+
+echo "update.sh: latest release version is ${REMOTE_VERSION}"
 
 if [[ "${LOCAL_VERSION}" == "${REMOTE_VERSION}" ]]; then
     echo "update.sh: already up to date (${LOCAL_VERSION})."
@@ -243,7 +244,8 @@ if [[ ! "${confirm_update}" =~ ^[Yy]$ ]]; then
     exit 0
 fi
 
-# ── Backup — must genuinely succeed or the script aborts entirely ────────────
+# ── Backup — must genuinely succeed and be verifiable on disk, or the
+# script aborts entirely ────────────────────────────────────────────────
 
 echo ""
 echo "update.sh: verifying a backup destination is configured..."
@@ -262,10 +264,16 @@ if [[ -z "${BACKUP_PATH_CONFIGURED}" ]]; then
     exit 1
 fi
 
+SITE_NAME_CONFIGURED="$(jq -r '.siteName // "site"' "${MASTER_CONFIG_FILE}" 2>/dev/null || echo "site")"
+SITE_FOLDER="$(echo "${SITE_NAME_CONFIGURED}" | sed 's/[^a-zA-Z0-9._-]/_/g')"
+BACKUP_ROOT="${BACKUP_PATH_CONFIGURED}/${SITE_FOLDER}"
+BACKUP_MANIFEST_PATH="${BACKUP_ROOT}/manifest.json"
+
 echo "update.sh: backup destination is \"${BACKUP_PATH_CONFIGURED}\" — running backup now"
 echo "update.sh: (hard timeout: ${BACKUP_TIMEOUT_SECS}s — treated as a failure if exceeded)"
 
-BACKUP_TAG="updating version from ${LOCAL_VERSION} to ${REMOTE_VERSION}"
+BACKUP_TAG="update from ${LOCAL_VERSION} to ${REMOTE_VERSION}"
+BACKUP_START_EPOCH="$(date +%s)"
 
 set +e
 timeout "${BACKUP_TIMEOUT_SECS}" node -e "
@@ -285,7 +293,32 @@ elif [[ ${BACKUP_EXIT_CODE} -ne 0 ]]; then
     exit 1
 fi
 
-echo "update.sh: backup complete and verified."
+# Belt-and-suspenders: confirm a fresh manifest entry with this exact tag
+# actually exists AND its folderPath genuinely exists on disk. A backup
+# that "didn't throw" but somehow didn't land is treated as a failure.
+echo "update.sh: verifying the backup actually landed on disk..."
+
+if [[ ! -f "${BACKUP_MANIFEST_PATH}" ]]; then
+    echo "update.sh: backup manifest not found at ${BACKUP_MANIFEST_PATH} after backup ran — aborting." >&2
+    exit 1
+fi
+
+BACKUP_FOLDER_PATH="$(jq -r --arg tag "${BACKUP_TAG}" --argjson since "${BACKUP_START_EPOCH}" '
+    map(select(.tag == $tag and ((.timestamp | fromdateiso8601) >= $since)))
+    | sort_by(.timestamp) | last | .folderPath // empty
+' "${BACKUP_MANIFEST_PATH}" 2>/dev/null || echo "")"
+
+if [[ -z "${BACKUP_FOLDER_PATH}" ]]; then
+    echo "update.sh: could not find a matching manifest entry for this backup (tag: \"${BACKUP_TAG}\") — aborting." >&2
+    exit 1
+fi
+
+if [[ ! -d "${BACKUP_FOLDER_PATH}" ]]; then
+    echo "update.sh: manifest entry found but its folder is missing on disk (${BACKUP_FOLDER_PATH}) — aborting." >&2
+    exit 1
+fi
+
+echo "update.sh: backup verified on disk at ${BACKUP_FOLDER_PATH}"
 
 # ── Scratch dir setup ──────────────────────────────────────────────────────────
 
@@ -350,7 +383,9 @@ if [[ ! -f "${EXTRACTED_ROOT}/${MANIFEST_FILE}" ]]; then
     exit 1
 fi
 
-# ── Sync every manifest-listed file — merge JSON, overwrite/create everything else ──
+# ── Sync every manifest-listed file — merge JSON, overwrite/create everything
+# else. config/version.txt is itself in this manifest, so the version bump
+# happens automatically here — no separate write-version step needed. ───────
 
 echo ""
 echo "update.sh: syncing files (JSON files are deep-merged; everything else is overwritten/created)..."
@@ -398,11 +433,6 @@ if [[ -n "${REMOVED_FILES}" ]]; then
     fi
 fi
 
-# ── Write new version (belt-and-suspenders — should already match post-sync) ──
-
-echo "${REMOTE_VERSION}" > "${VERSION_FILE}"
-echo "update.sh: config/version.txt confirmed at ${REMOTE_VERSION}."
-
 # ── npm install (in case dependencies changed) ────────────────────────────────
 
 if [[ -f "${PROJECT_ROOT}/package.json" ]]; then
@@ -423,18 +453,17 @@ if [[ -f "${SERVICE_NAME_FILE}" ]]; then
             sudo systemctl restart "${SERVICE_NAME}"
             echo "update.sh: \"${SERVICE_NAME}\" restarted."
         else
-            echo "update.sh: skipping restart — run 'sudo ./scripts/service.sh' (option 4) whenever you're ready."
+            echo "update.sh: skipping restart — restart it manually whenever you're ready."
         fi
     fi
 fi
 
 # ── Update notes links — every version between local and target ──────────────
 #
-# If the user skipped several releases, print a link for EVERY release's
+# Prints a LINK (never the raw content) for EVERY release's
 # config/update-notes/<version>.md between (LOCAL_VERSION, REMOTE_VERSION]
-# that actually has one — not just the final target version — so nothing
-# gets missed. Printed oldest → newest, matching the order changes would
-# have been applied in.
+# that actually has one — not just the final target version. Printed
+# oldest → newest, matching the order changes would have been applied in.
 
 echo ""
 echo "update.sh: checking for update instructions across all skipped releases..."
@@ -486,11 +515,11 @@ if [[ -n "${RELEASE_PAIRS}" ]]; then
     fi
 fi
 
-if [[ ${NOTES_FOUND} -eok q 0 ]]; then
+if [[ ${NOTES_FOUND} -eq 0 ]]; then
     echo "update.sh: no update instructions found for any version between ${LOCAL_VERSION} and ${REMOTE_VERSION}."
 else
-    echo "update.sh: ${NOTES_FOUND} update-notes file(s) found above — review in order for anything requiring manual steps."
+    echo "update.sh: ${NOTES_FOUND} update-notes link(s) printed above — review in order for anything requiring manual steps."
 fi
 
 echo ""
-echo "update.sh: update to ${REMOTE_VERSION} complete."
+echo "update.sh: update to ${REMOTE_VERSION} complete. Done."
