@@ -33,6 +33,7 @@ ADMIN/js/admin.js
 config/defaults.json
 config/libraries.json
 config/manifest.txt
+config/update-notes/26.8.1.md
 config/version.txt
 .gitignore
 lib/adminRoutes.js
