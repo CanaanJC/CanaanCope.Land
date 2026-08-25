@@ -51,7 +51,6 @@ lib/siteConfig.js
 lib/staticFile.js
 lib/utils.js
 node.js
-package.json
 public/404/404.css
 public/404/404.html
 public/404/404.js

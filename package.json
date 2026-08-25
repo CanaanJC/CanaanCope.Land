@@ -1,9 +1,0 @@
-{
-    "name": "canaancope.dev",
-    "version": "1.0.0",
-    "private": true,
-    "main": "node.js",
-    "scripts": {
-        "start": "node node.js"
-    }
-}

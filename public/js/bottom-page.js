@@ -8,7 +8,7 @@ if (window.location.pathname !== "/") {
 
 const THEME_URL   = "/config/theme.json";
 const VERSION_URL = "/config/version.txt";
-const DEFAULT_LOAD_DELAY_MS = 5000;
+const DEFAULT_LOAD_DELAY_MS = 2000;
 
 async function fetchTheme() {
     try {
