@@ -25,6 +25,13 @@
         calc((100% - var(--blog-sidebar-offset, 64px)) * 0.9)
     );
     margin: 0 auto;
+    /* Fixed, permanent clearance above the absolutely-positioned credit
+       line below — reserves enough room so the two never touch regardless
+       of how long/short the bottom-text is or how it wraps. Growing this
+       margin grows .bottom-page's own height (since .bottom-text drives it
+       in normal flow), which pushes the text upward relative to the
+       credit's fixed bottom:24px anchor. */
+    margin-bottom: calc(var(--icon-size, 36px) + 40px);
     padding: 0;
     box-sizing: border-box;
     text-align: center;

@@ -132,6 +132,23 @@ async function loadElementInto(panelEl, name) {
         });
         panelEl.innerHTML = html;
 
+        const elementConfig = await loadElementConfig(name);
+
+        // Shared core CSS/JS — always loaded, once each.
+        if (!document.querySelector('link[data-json-core-css]')) {
+            const coreLink = document.createElement("link");
+            coreLink.rel = "stylesheet";
+            coreLink.href = "/elements/lib/css/json.css";
+            coreLink.setAttribute("data-json-core-css", "1");
+            document.head.appendChild(coreLink);
+        }
+
+        const { default: initJsonEditor } = await import("/elements/lib/js/json.js");
+        const core = initJsonEditor(panelEl, elementConfig);
+
+        // Optional per-element extension — element.js/element.css. Absence
+        // of either is completely normal (master.json, topbar.json,
+        // admin-master.json ship with neither).
         const cssHref = `${base}.css`;
         const cssCheck = await fetch(cssHref, { method: "HEAD" }).catch(() => null);
         if (cssCheck && cssCheck.ok) {
@@ -141,17 +158,20 @@ async function loadElementInto(panelEl, name) {
             document.head.appendChild(link);
         }
 
-        const elementConfig = await loadElementConfig(name);
-
-        const mod = await import(`${base}.js`);
-        if (typeof mod.default === "function") {
-            mod.default(panelEl, elementConfig);
+        const jsHref = `${base}.js`;
+        const jsCheck = await fetch(jsHref, { method: "HEAD" }).catch(() => null);
+        if (jsCheck && jsCheck.ok) {
+            const mod = await import(jsHref);
+            if (typeof mod.default === "function") {
+                mod.default(panelEl, elementConfig, core);
+            }
         }
     } catch (e) {
         console.error(`Admin: failed to load element "${name}":`, e);
         panelEl.innerHTML = `<p class="admin-status admin-status--error">Failed to load element "${name}": ${e.message}</p>`;
     }
 }
+
 
 // ── Responsive column layout ─────────────────────────────────────────────────
 //

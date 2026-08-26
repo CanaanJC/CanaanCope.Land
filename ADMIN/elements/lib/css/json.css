@@ -1,0 +1,180 @@
+/* ── Shared JSON-editor core styles ──────────────────────────────────────────
+   Used by every element that goes through lib/js/json.js — both plain
+   object editors (master.json, topbar.json, admin-master.json) and
+   array/card editors (library-editor, sidebar.json). Per-element element.css
+   files should only contain something truly unique to that element. */
+
+.admin-field-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    margin: 8px 0;
+    min-width: 0;
+}
+
+.admin-field-label {
+    flex: 0 1 130px;
+    min-width: 70px;
+    font-size: 0.85rem;
+    color: #9a9a9a;
+    word-break: break-word;
+    align-self: flex-start;
+    padding-top: 6px;
+}
+
+.admin-field-input {
+    flex: 1 1 160px;
+    min-width: 0;
+    background: #141414;
+    border: 1px solid #333;
+    border-radius: 6px;
+    color: var(--admin-text);
+    padding: 6px 8px;
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    font-size: 0.85rem;
+}
+
+.admin-field-value-wrap {
+    display: flex;
+    gap: 8px;
+    flex: 1 1 160px;
+    min-width: 0;
+    flex-wrap: wrap;
+    align-items: flex-start;
+}
+
+.admin-field-input-text {
+    flex: 1 1 160px;
+    min-width: 0;
+    background: #141414;
+    border: 1px solid #333;
+    border-radius: 6px;
+    color: var(--admin-text);
+    padding: 6px 8px;
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    font-size: 0.85rem;
+    resize: none;
+    overflow: hidden;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.4;
+}
+
+.admin-field-input-text--error {
+    border-color: #6a2a2a;
+    background: #201414;
+}
+
+.admin-field-color {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid #333;
+    border-radius: 6px;
+    background: none;
+    cursor: pointer;
+    flex: 0 0 32px;
+}
+
+.admin-fieldset {
+    border: 1px solid #2a2a2a;
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin: 10px 0;
+    min-width: 0;
+}
+
+.admin-fieldset > legend {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #bbb;
+    padding: 0 6px;
+}
+
+/* ── Array/card mode ──────────────────────────────────────────────────── */
+
+.admin-lib-card {
+    border: 1px solid #2a2a2a;
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 12px;
+    min-width: 0;
+}
+
+.admin-lib-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.admin-lib-title {
+    font-weight: 700;
+}
+
+.admin-lib-title--link {
+    text-decoration: none;
+    color: var(--admin-text);
+    cursor: pointer;
+}
+
+.admin-lib-title--link:hover {
+    text-decoration: underline;
+    color: #7ab4f5;
+}
+
+.admin-lib-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.admin-lib-actions .admin-button {
+    padding: 4px 10px;
+    font-size: 0.8rem;
+}
+
+.admin-lib-fields {
+    margin-top: 12px;
+}
+
+/* ── Auto image-preview (compact mode) ───────────────────────────────────
+   Swapped in automatically by json.js for any string field whose value
+   resolves as a loadable image (local path or absolute URL). */
+
+.admin-icon-preview {
+    flex: 0 0 32px;
+    width: 32px;
+    height: 32px;
+    object-fit: cover;
+    border-radius: 6px;
+    background: #141414;
+    border: 1px solid #333;
+}
+
+.admin-icon-preview--fallback {
+    object-fit: contain;
+    padding: 4px;
+    background: #2a2a2a;
+}
+
+.admin-icon-upload-btn {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #2a2a2a;
+    border: 1px solid #3a3a3a;
+    border-radius: 6px;
+    color: var(--admin-text);
+    cursor: pointer;
+    font-size: 0.95rem;
+    line-height: 1;
+    padding: 0;
+}
+
+.admin-icon-upload-btn:hover {
+    background: #353535;
+}

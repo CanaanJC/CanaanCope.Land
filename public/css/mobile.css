@@ -181,15 +181,17 @@ body.mobile .mobile-menu::-webkit-scrollbar-thumb {
     -webkit-tap-highlight-color: transparent;
 }
 
+/* object-fit: cover — same zoom-to-fill behavior as the desktop topbar logo. */
 .mobile-menu__logo-img {
     width: calc(var(--mobile-menu-icon-size) * 2);
     height: calc(var(--mobile-menu-icon-size) * 2);
-    object-fit: contain;
+    object-fit: cover;
     border-radius: 8px;
     display: block;
 }
 
 .mobile-menu__logo-img.fallback {
+    object-fit: contain;
     background: #2a2a2a;
     padding: 2px;
 }
@@ -230,14 +232,16 @@ body.mobile .mobile-menu::-webkit-scrollbar-thumb {
     justify-content: center;
 }
 
+/* object-fit: cover — same zoom-to-fill behavior as the desktop dropdown icons. */
 .mobile-menu__icon {
     width: var(--mobile-menu-icon-size);
     height: var(--mobile-menu-icon-size);
-    object-fit: contain;
+    object-fit: cover;
     border-radius: 5px;
 }
 
 .mobile-menu__icon.fallback {
+    object-fit: contain;
     background: #2a2a2a;
     padding: 2px;
 }
@@ -378,11 +382,12 @@ body.mobile .mobile-menu::-webkit-scrollbar-thumb {
 .mobile-menu .topbar-dropdown__icon {
     width: 18px;
     height: 18px;
-    object-fit: contain;
+    object-fit: cover;
     border-radius: 3px;
 }
 
 .mobile-menu .topbar-dropdown__icon.fallback {
+    object-fit: contain;
     background: #2a2a2a;
     padding: 1px;
 }
@@ -550,9 +555,29 @@ body.mobile.mobile-menu-open {
     overflow: hidden;
 }
 
-/* ── Site credit — clear space for the floating mobile burger button ── */
+/* ── Bottom page (mobile) — credit line centered below bottom text, no
+      icon, version number centered above the "designed by" line ─────────── */
+
+body.mobile .bottom-page {
+    padding-left: var(--mobile-side-padding);
+    padding-right: var(--mobile-side-padding);
+}
 
 body.mobile .site-credit {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    text-align: center;
     margin: 16px var(--mobile-side-padding) calc(var(--mobile-burger-size) + 32px) var(--mobile-side-padding);
     font-size: 12px;
+}
+
+body.mobile .site-credit__icon {
+    display: none;
+}
+
+body.mobile .site-credit__text-wrap {
+    align-items: center;
+    text-align: center;
 }
