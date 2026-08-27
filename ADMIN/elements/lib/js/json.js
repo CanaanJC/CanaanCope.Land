@@ -4,12 +4,19 @@
 // admin.js always imports this module for every element and calls
 // initJsonEditor(root, elementConfig). By default it behaves exactly like the
 // old master.json/element.js (recursive object editor, Save button, status
-// line) PLUS: every string leaf field automatically shows a small square
-// image preview + compact single-line input instead of a full textarea
-// whenever its value resolves as a loadable image — either an absolute URL,
-// or a path relative to the public site (tried against both the configured
-// siteAddress AND the local LAN address, mirroring the "Public Page" /
-// "Local Page" fallback already used in admin.js's header).
+// line) PLUS:
+//   - every string leaf field automatically shows a small square image
+//     preview + compact single-line input instead of a full textarea
+//     whenever its value resolves as a loadable image — either an absolute
+//     URL, or a path relative to the public site (tried against both the
+//     configured siteAddress AND the local LAN address, mirroring the
+//     "Public Page" / "Local Page" fallback already used in admin.js's
+//     header).
+//   - any field whose KEY is literally "font" automatically gets a font
+//     upload button (⬆). Clicking it lets you pick a .ttf/.otf/.woff/.woff2
+//     file, uploads it to public/fonts/, and renders the resulting path in
+//     the actual uploaded font so it's easy to see what font is set. This
+//     does NOT work with plain URLs — uploads only. See attachFontUpload().
 //
 // Per-element element.js files (loaded AFTER this, if present) receive the
 // returned `core` handle and can opt into array/card mode and attach field
@@ -117,6 +124,177 @@ function getResolvedImageUrl(value) {
     const promise = resolveImageUrl(trimmed);
     _imageResolveCache.set(trimmed, promise);
     return promise;
+}
+
+// ── Font-link resolution + live @font-face preview ───────────────────────────
+// Deliberately does NOT support absolute URLs — fonts must be uploaded (see
+// attachFontUpload below), never linked. A value only ever previews in its
+// own font if it resolves as a real, existing public/fonts/-relative file.
+
+const FONT_EXT_FORMATS = {
+    ".otf":   "opentype",
+    ".ttf":   "truetype",
+    ".woff":  "woff",
+    ".woff2": "woff2",
+};
+
+function getFontFormat(value) {
+    const m = /\.([a-zA-Z0-9]+)$/.exec((value || "").trim());
+    if (!m) return null;
+    return FONT_EXT_FORMATS[`.${m[1].toLowerCase()}`] || null;
+}
+
+async function resolveFontUrl(trimmedValue) {
+    // Fonts are upload-only — never resolved as absolute URLs.
+    if (/^https?:\/\//i.test(trimmedValue)) return null;
+
+    const bases = await getBaseCandidates();
+    const relPath = trimmedValue.replace(/^\//, "");
+    for (const base of bases) {
+        const url = `${base}/${relPath}`;
+        try {
+            const res = await fetch(url, { method: "HEAD" });
+            if (res.ok) return url;
+        } catch {
+            // try next base
+        }
+    }
+    return null;
+}
+
+const _fontResolveCache = new Map(); // trimmed value -> Promise<string|null>
+
+function getResolvedFontUrl(value) {
+    const trimmed = (value || "").trim();
+    if (!trimmed) return Promise.resolve(null);
+    if (_fontResolveCache.has(trimmed)) return _fontResolveCache.get(trimmed);
+    const promise = resolveFontUrl(trimmed);
+    _fontResolveCache.set(trimmed, promise);
+    return promise;
+}
+
+let _fontFaceCounter = 0;
+const _injectedFontFaces = new Map(); // resolved url -> generated family name
+
+// Applies (or clears) a live @font-face preview on `textEl` (the textarea/
+// input actually displaying the font path) based on `value`. Injects one
+// <style> @font-face rule per distinct resolved URL, reused across fields.
+function applyFontPreview(textEl, value) {
+    const format = getFontFormat(value);
+    if (!format) {
+        textEl.style.fontFamily = "";
+        return;
+    }
+
+    getResolvedFontUrl(value).then((url) => {
+        if (!url) {
+            textEl.style.fontFamily = "";
+            return;
+        }
+
+        let family = _injectedFontFaces.get(url);
+        if (!family) {
+            family = `admin-custom-font-${_fontFaceCounter++}`;
+            const styleTag = document.createElement("style");
+            styleTag.textContent = `@font-face { font-family: "${family}"; src: url("${url}") format("${format}"); }`;
+            document.head.appendChild(styleTag);
+            _injectedFontFaces.set(url, family);
+        }
+
+        textEl.style.fontFamily = `"${family}", monospace`;
+    });
+}
+
+// Attaches the font-upload button + live preview wiring to a field row.
+// `field` is { el, getValue, setValue } — the same shape buildStringField
+// returns. Built directly into the core (not a per-element hook) so ANY
+// object-mode field whose key is literally "font" gets this automatically,
+// anywhere in the JSON structure (top-level or nested in a fieldset).
+function attachFontUpload(row, field) {
+    const getTextEl = () => row.querySelector(".admin-field-input-text");
+
+    function refreshPreview() {
+        const el = getTextEl();
+        if (el) applyFontPreview(el, field.getValue());
+    }
+
+    // Initial preview pass (value may already point at a valid font on load).
+    requestAnimationFrame(refreshPreview);
+    // Textarea "input" events bubble — re-check on every keystroke too, in
+    // case someone hand-types/pastes a path instead of using the uploader.
+    row.addEventListener("input", refreshPreview);
+
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = ".ttf,.otf,.woff,.woff2";
+    fileInput.hidden = true;
+
+    const uploadBtn = document.createElement("button");
+    uploadBtn.type = "button";
+    uploadBtn.className = "admin-font-upload-btn";
+    uploadBtn.title = "Upload font file (.ttf, .otf, .woff, .woff2)";
+    uploadBtn.textContent = "⬆";
+
+    uploadBtn.addEventListener("click", () => fileInput.click());
+
+    function doUpload(file, oldFilename, deleteOld) {
+        file.arrayBuffer()
+            .then((buf) => {
+                const params = new URLSearchParams({ filename: file.name, deleteOld: deleteOld ? "true" : "false" });
+                if (oldFilename) params.set("oldFilename", oldFilename);
+                return fetch(`/api/upload/font?${params.toString()}`, {
+                    method: "POST",
+                    headers: { "Content-Type": file.type || "application/octet-stream" },
+                    body: buf,
+                });
+            })
+            .then(async (res) => {
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+                field.setValue(data.path);
+                refreshPreview();
+            })
+            .catch((e) => alert(`Font upload failed: ${e.message}`));
+    }
+
+    fileInput.addEventListener("change", () => {
+        const file = fileInput.files[0];
+        fileInput.value = "";
+        if (!file) return;
+
+        const oldValue    = (field.getValue() || "").trim();
+        const oldFilename = oldValue ? oldValue.split(/[\\/]+/).pop() : "";
+        const newFilename = file.name;
+
+        // No previous font on this field at all — nothing to ask about.
+        if (!oldFilename) {
+            doUpload(file, "", false);
+            return;
+        }
+
+        // Same filename as what's already set — confirm an overwrite.
+        // Choosing "No" exits the dialog entirely: nothing is uploaded,
+        // nothing is deleted, the field is left completely untouched.
+        if (oldFilename.toLowerCase() === newFilename.toLowerCase()) {
+            if (confirm(`"${oldFilename}" already exists. Overwrite it?`)) {
+                doUpload(file, oldFilename, false);
+            }
+            return;
+        }
+
+        // Different filename — ask whether to delete the old font file.
+        // "Yes" deletes the old file before writing the new one. "No" keeps
+        // both files on disk (public/fonts/) and still switches this field
+        // to the newly uploaded font.
+        if (confirm(`A different font file already exists ("${oldFilename}"). Delete it?`)) {
+            doUpload(file, oldFilename, true);
+        } else {
+            doUpload(file, oldFilename, false);
+        }
+    });
+
+    row.appendChild(uploadBtn);
+    row.appendChild(fileInput);
 }
 
 // ── Compact (image-preview) row builder ─────────────────────────────────────
@@ -454,6 +632,12 @@ function renderObject(obj, container, pathPrefix, data, fieldHooks) {
         row.appendChild(field.el);
         container.appendChild(row);
 
+        // Built-in: any field literally named "font" gets a font-upload
+        // button + live font-family preview, regardless of nesting depth.
+        if (key === "font") {
+            attachFontUpload(row, field);
+        }
+
         const hooks = fieldHooks.get(key);
         if (hooks) {
             for (const hook of hooks) {
@@ -549,6 +733,12 @@ export default function initJsonEditor(root, elementConfig) {
         // text (string, image-preview aware)
         const field = buildStringField(item[fieldDef.key] ?? "", (v) => { item[fieldDef.key] = v; });
         row.appendChild(field.el);
+
+        // Built-in: array/card-mode fields named "font" also get the
+        // font-upload button, same as object mode.
+        if (fieldDef.key === "font") {
+            attachFontUpload(row, field);
+        }
 
         const hooks = fieldHooks.get(fieldDef.key);
         if (hooks) {

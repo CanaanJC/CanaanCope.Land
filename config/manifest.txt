@@ -70,8 +70,6 @@ public/css/main.css
 public/css/mobile.css
 public/css/sidebar.css
 public/css/topbar.css
-public/fonts/roboto.ttf
-public/fonts/twemoji.woff2
 public/index.html
 public/js/about-me.js
 public/js/bottom-page.js

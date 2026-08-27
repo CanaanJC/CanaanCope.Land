@@ -178,3 +178,28 @@
 .admin-icon-upload-btn:hover {
     background: #353535;
 }
+
+/* ── Font upload button ──────────────────────────────────────────────────
+   Attached automatically (see json.js: attachFontUpload) to any field
+   whose key is literally "font", both in object mode and array/card mode. */
+
+.admin-font-upload-btn {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #2a2a2a;
+    border: 1px solid #3a3a3a;
+    border-radius: 6px;
+    color: var(--admin-text);
+    cursor: pointer;
+    font-size: 0.95rem;
+    line-height: 1;
+    padding: 0;
+}
+
+.admin-font-upload-btn:hover {
+    background: #353535;
+}
