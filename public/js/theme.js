@@ -14,14 +14,15 @@ function setFavicon(href) {
 }
 
 // ── Custom font handling (theme.page.font / theme.topbar.slogan.font /
-// theme.bottomText.font) ─────────────────────────────────────────────────────
+// theme.bottomText.font, each falling back server-side to fonts.fallback if
+// unset/invalid) ─────────────────────────────────────────────────────────────
 //
 // Each field is resolved server-side (lib/routes.js: resolveThemeFonts) to
 // either null ("off" — no font-family CSS variable is set at all, so the
 // matching CSS falls through to pure browser default) or
 // { family, url, format } ("on" — inject a @font-face rule and set the CSS
 // variable to exactly that one font + a "sans-serif" safety net, in case the
-// file fails to decode at runtime). No large fallback stacks — ever.
+// file fails to decode at runtime).
 
 const FONT_VAR_MAP = {
     page:       "--page-font-family",
@@ -45,12 +46,12 @@ function fontFaceRule(font) {
 
 function applyThemeFonts(fonts) {
     const root  = document.documentElement.style;
-    const rules = [];
+    const rules = new Set(); // dedupe — fonts.fallback can be reused by 2-3 fields at once
 
     for (const [key, varName] of Object.entries(FONT_VAR_MAP)) {
         const font = fonts && fonts[key];
         if (font && font.family && font.url) {
-            rules.push(fontFaceRule(font));
+            rules.add(fontFaceRule(font));
             root.setProperty(varName, `"${font.family}", sans-serif`);
         } else {
             // "Off" — explicitly clear any previously-set value (theme.json
@@ -61,7 +62,7 @@ function applyThemeFonts(fonts) {
     }
 
     const styleEl  = getFontStyleEl();
-    const combined = rules.join("\n");
+    const combined = [...rules].join("\n");
     if (styleEl.textContent !== combined) styleEl.textContent = combined;
 }
 
@@ -69,10 +70,10 @@ function applyThemeFonts(fonts) {
 //
 // Windows' built-in emoji font (Segoe UI Emoji) ships with zero flag
 // glyphs. If /config/theme.json reports a resolved flagFont (i.e.
-// public/fonts/twemoji.woff2 actually exists on the server) AND this
-// browser is running on Windows, register a @font-face scoped via
-// unicode-range to *only* the flag emoji codepoints, then layer it in
-// front of the page/slogan/bottom-text/chrome font stacks. If either
+// config/master.json's fonts.flag path resolves to a real file on the
+// server) AND this browser is running on Windows, register a @font-face
+// scoped via unicode-range to *only* the flag emoji codepoints, then layer
+// it in front of the page/slogan/bottom-text/chrome font stacks. If either
 // condition isn't met, nothing is added — Windows renders flags exactly as
 // it does today, no error, no visual change.
 
@@ -108,12 +109,7 @@ function applyFlagFontFix(flagFont) {
    AND the fixed chrome fonts (topbar/sidebar/mobile-menu). Safe to prepend
    everywhere because unicode-range means this font is only ever actually
    used for the handful of flag codepoints above — every other character
-   transparently falls through to whatever font would otherwise apply.
-   Note: the ", sans-serif"/", var(--page-font-family, sans-serif)" fallback
-   chains below are required so the property stays valid even when the
-   corresponding custom-font variable is unset ("off") — see the comments
-   in base.css/topbar.css/bottom-page.css for why a bare unset var() would
-   otherwise invalidate the whole rule. */
+   transparently falls through to whatever font would otherwise apply. */
 html.os-windows-flags body {
     font-family: "${flagFont.family}", var(--page-font-family, sans-serif);
 }

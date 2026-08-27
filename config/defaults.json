@@ -57,5 +57,10 @@
             "fontSize": 15,
             "color": "#eaeaea"
         }
+    },
+    "fonts": {
+    "fallback": "",
+    "flag": "fonts/flags.ttf"
     }
+
 }
