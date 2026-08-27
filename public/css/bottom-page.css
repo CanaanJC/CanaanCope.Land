@@ -36,7 +36,7 @@
     box-sizing: border-box;
     text-align: center;
     color: var(--bottom-text-color, var(--page-text-color, var(--text)));
-    font-family: var(--bottom-text-font-family, var(--page-font-family));
+    font-family: var(--bottom-text-font-family, var(--page-font-family, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"));
     font-size: var(--bottom-text-font-size, 15px);
     line-height: 1.75;
 }

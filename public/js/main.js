@@ -5,5 +5,6 @@ import './topbar.js';
 import './about-me.js';
 import './featured.js';
 import './bottom-page.js';
+import './twemoji-init.js';
 
 console.log("Main script loaded");

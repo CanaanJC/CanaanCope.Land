@@ -2,6 +2,11 @@ console.log("Theme module loaded");
 
 const THEME_URL = "/config/theme.json";
 
+// Shared fallback stack — matches the var() fallback baked directly into
+// base.css/topbar.css/bottom-page.css, so JS-applied custom fonts degrade
+// into the exact same stack instead of a bare "sans-serif" safety net.
+const SYSTEM_FONT_STACK = 'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"';
+
 function setFavicon(href) {
     if (!href) return;
     let link = document.querySelector('link[rel="icon"]');
@@ -19,9 +24,10 @@ function setFavicon(href) {
 //
 // Each field is resolved server-side (lib/routes.js: resolveThemeFonts) to
 // either null ("off" — no font-family CSS variable is set at all, so the
-// matching CSS falls through to pure browser default) or
-// { family, url, format } ("on" — inject a @font-face rule and set the CSS
-// variable to exactly that one font + a "sans-serif" safety net, in case the
+// matching CSS's own var() fallback — the system-ui stack, see base.css —
+// applies instantly with zero flash) or { family, url, format } ("on" —
+// inject a @font-face rule and set the CSS variable to that one font,
+// chained in front of the same system-ui stack as a safety net in case the
 // file fails to decode at runtime).
 
 const FONT_VAR_MAP = {
@@ -52,11 +58,11 @@ function applyThemeFonts(fonts) {
         const font = fonts && fonts[key];
         if (font && font.family && font.url) {
             rules.add(fontFaceRule(font));
-            root.setProperty(varName, `"${font.family}", sans-serif`);
+            root.setProperty(varName, `"${font.family}", ${SYSTEM_FONT_STACK}`);
         } else {
             // "Off" — explicitly clear any previously-set value (theme.json
-            // is fetched fresh with no-store every load) so the matching CSS
-            // falls through to pure browser default.
+            // is fetched fresh with no-store every load) so the matching
+            // CSS's own var() fallback (system-ui stack) applies instead.
             root.removeProperty(varName);
         }
     }
@@ -64,73 +70,6 @@ function applyThemeFonts(fonts) {
     const styleEl  = getFontStyleEl();
     const combined = [...rules].join("\n");
     if (styleEl.textContent !== combined) styleEl.textContent = combined;
-}
-
-// ── Windows flag-emoji fix ────────────────────────────────────────────────
-//
-// Windows' built-in emoji font (Segoe UI Emoji) ships with zero flag
-// glyphs. If /config/theme.json reports a resolved flagFont (i.e.
-// config/master.json's fonts.flag path resolves to a real file on the
-// server) AND this browser is running on Windows, register a @font-face
-// scoped via unicode-range to *only* the flag emoji codepoints, then layer
-// it in front of the page/slogan/bottom-text/chrome font stacks. If either
-// condition isn't met, nothing is added — Windows renders flags exactly as
-// it does today, no error, no visual change.
-
-const FLAG_UNICODE_RANGE = "U+1F1E6-1F1FF, U+1F3F4, U+E0020-E007F, U+200D";
-
-function isWindows() {
-    return /Windows/i.test(navigator.userAgent || "");
-}
-
-let _flagStyleEl = null;
-
-function getFlagStyleEl() {
-    if (_flagStyleEl) return _flagStyleEl;
-    _flagStyleEl = document.createElement("style");
-    _flagStyleEl.id = "theme-flag-emoji-fix";
-    document.head.appendChild(_flagStyleEl);
-    return _flagStyleEl;
-}
-
-function applyFlagFontFix(flagFont) {
-    if (!flagFont || !isWindows()) return;
-
-    const styleEl = getFlagStyleEl();
-    styleEl.textContent = `
-@font-face {
-    font-family: "${flagFont.family}";
-    src: url("${flagFont.url}") format("${flagFont.format}");
-    unicode-range: ${FLAG_UNICODE_RANGE};
-    font-display: swap;
-}
-
-/* Layered in front of every existing font stack — page/slogan/bottom-text
-   AND the fixed chrome fonts (topbar/sidebar/mobile-menu). Safe to prepend
-   everywhere because unicode-range means this font is only ever actually
-   used for the handful of flag codepoints above — every other character
-   transparently falls through to whatever font would otherwise apply. */
-html.os-windows-flags body {
-    font-family: "${flagFont.family}", var(--page-font-family, sans-serif);
-}
-html.os-windows-flags .topbar-slogan {
-    font-family: "${flagFont.family}", var(--slogan-font-family, sans-serif);
-}
-html.os-windows-flags .bottom-text {
-    font-family: "${flagFont.family}", var(--bottom-text-font-family, var(--page-font-family, sans-serif));
-}
-html.os-windows-flags .topbar {
-    font-family: "${flagFont.family}", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-}
-html.os-windows-flags .sidebar {
-    font-family: "${flagFont.family}", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-}
-html.os-windows-flags .mobile-menu {
-    font-family: "${flagFont.family}", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-}
-`;
-
-    document.documentElement.classList.add("os-windows-flags");
 }
 
 function applyThemeVars(theme) {
@@ -185,7 +124,6 @@ async function loadTheme() {
         setFavicon(data.favicon);
         applyThemeVars(data.theme);
         applyThemeFonts(data.fonts);
-        applyFlagFontFix(data.flagFont);
 
         // Exposed for other modules (e.g. topbar.js) that also need favicon/
         // slogan/theme data without a second fetch.
@@ -195,4 +133,11 @@ async function loadTheme() {
     }
 }
 
-document.addEventListener("DOMContentLoaded", loadTheme);
+// Runs immediately rather than waiting for DOMContentLoaded — fetching and
+// setting a style property on document.documentElement doesn't require the
+// full DOM tree, just <html> itself, which exists as soon as parsing
+// starts. This shaves a bit more time off the window during which a
+// configured custom font hasn't loaded yet (the "flash" for that case).
+// The "no custom font configured" case no longer flashes at all — see the
+// var() fallback chains added in base.css/topbar.css/bottom-page.css.
+loadTheme();

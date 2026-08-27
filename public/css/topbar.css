@@ -3,9 +3,10 @@
     --topbar-bg: #202020;
     --slogan-font-size: 20px;
     --slogan-color: var(--muted);
-    /* --slogan-font-family is intentionally NOT declared here — same
-       reasoning as --page-font-family in base.css. Only set at runtime by
-       theme.js when theme.topbar.slogan.font resolves to a real file. */
+    /* --slogan-font-family is only ever set at runtime by theme.js (see
+       base.css comment above for the same reasoning). When unset, the
+       var() fallback on .topbar-slogan below applies the system-ui stack
+       immediately at first paint. */
 }
 
 .topbar {
@@ -176,7 +177,7 @@
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
-    font-family: var(--slogan-font-family);
+    font-family: var(--slogan-font-family, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji");
     font-size: var(--slogan-font-size);
     color: var(--slogan-color);
     white-space: pre;

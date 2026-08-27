@@ -5,8 +5,8 @@
     "bottomText": "",
     "hosting": {
         "host": "0.0.0.0",
-        "port": 9138,
-        "adminPort": 9832
+        "port": 2138,
+        "adminPort": 1832
     },
     "webhooks": {
         "notFound": "",
@@ -23,6 +23,9 @@
         "maxConcurrentInstances": 3,
         "idleTimeoutMinutes": 10,
         "maxRuntimeMinutes": 60
+    },
+    "fonts": {
+        "master": ""
     },
     "theme": {
         "backgroundColor": "#181818",
@@ -57,10 +60,5 @@
             "fontSize": 15,
             "color": "#eaeaea"
         }
-    },
-    "fonts": {
-    "fallback": "",
-    "flag": "fonts/flags.ttf"
     }
-
 }

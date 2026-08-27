@@ -4,13 +4,13 @@
     --muted: #bdbdbd;
     --topbar-depth: 56px;
     --page-text-color: #eaeaea;
-    /* --page-font-family is intentionally NOT declared here — see
-       theme.js: it's only ever set at runtime when theme.page.font
-       resolves to a real font file. Left unset, body's
-       `font-family: var(--page-font-family)` below computes as invalid
-       (no fallback given) and — since font-family is an inherited
-       property — falls through to whatever html's own font-family is
-       (nothing, by default), i.e. the plain browser default. */
+    /* --page-font-family is only ever set at runtime by theme.js, and only
+       when theme.page.font (or the site-wide fonts.fallback) resolves to a
+       real font file. When unset, the var() fallback below kicks in
+       immediately at first paint — system-ui stack, zero flash, zero JS
+       delay. (Previously this had no fallback at all, which made the whole
+       declaration invalid and fell through to the browser's ugly default
+       serif font — this is the fix for that.) */
 }
 
 *, *::before, *::after { 
@@ -25,10 +25,24 @@ body {
     margin: 0;
     background: var(--bg);
     color: var(--page-text-color);
-    font-family: var(--page-font-family);
+    font-family: var(--page-font-family, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji");
 }
 
 main#content { 
     min-height: 100vh;
     padding-top: var(--topbar-depth);
+}
+
+/* ── Twemoji inline SVG emoji — sized to match surrounding text, with a
+      small nudge so it sits on the baseline instead of floating above it.
+      Applied by public/js/twemoji-init.js. If Twemoji never loads/parses
+      (CDN unreachable, disabled, etc.) this rule simply never matches
+      anything and native glyphs are shown exactly as before. ── */
+
+img.twemoji-emoji {
+    height: 1em;
+    width: 1em;
+    margin: 0 0.05em 0 0.1em;
+    vertical-align: -0.1em;
+    display: inline-block;
 }
