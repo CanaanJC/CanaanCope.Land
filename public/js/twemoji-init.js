@@ -21,7 +21,7 @@
 
 console.log("Twemoji module loaded");
 
-const WINDOWS_ONLY = true; // ← flip to false to test on macOS locally
+const WINDOWS_ONLY = false; // ← flip to false to test on macOS locally
 
 function isWindows() {
     return /Windows/i.test(navigator.userAgent || "");

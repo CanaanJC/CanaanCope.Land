@@ -1,0 +1,27 @@
+{
+    "siteName": "canaancope.dev",
+    "siteAddress": "https://canaancope.dev",
+    "slogan": "Aspiring Engineer    |    Proudly Canadian  🇨🇦   |    Forever Curious",
+    "bottomText": "This is my amazing bottom [text](https://canaancope.land/bottom_text)!",
+    "hosting": {
+        "host": "0.0.0.0",
+        "port": 9138,
+        "adminPort": 9832
+    },
+    "webhooks": {
+        "notFound": "",
+        "backup": ""
+    },
+    "backup": {
+        "path": "/mnt/raidb",
+        "interval": "monthly",
+        "time": "00:00",
+        "enabled": false,
+        "lanIp": ""
+    },
+    "archive": {
+        "maxConcurrentInstances": 3,
+        "idleTimeoutMinutes": 10,
+        "maxRuntimeMinutes": 60
+    }
+}

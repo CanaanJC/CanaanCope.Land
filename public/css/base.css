@@ -4,13 +4,10 @@
     --muted: #bdbdbd;
     --topbar-depth: 56px;
     --page-text-color: #eaeaea;
-    /* --page-font-family is only ever set at runtime by theme.js, and only
-       when theme.page.font (or the site-wide fonts.fallback) resolves to a
-       real font file. When unset, the var() fallback below kicks in
-       immediately at first paint — system-ui stack, zero flash, zero JS
-       delay. (Previously this had no fallback at all, which made the whole
-       declaration invalid and fell through to the browser's ugly default
-       serif font — this is the fix for that.) */
+    /* --page-font-family / --page-font-size are only ever set at runtime by
+       theme.js (theme.body), and only when a real value resolves. When
+       unset, the var() fallbacks below kick in immediately at first paint —
+       system-ui stack / 16px, zero flash, zero JS delay. */
 }
 
 *, *::before, *::after { 
@@ -26,6 +23,7 @@ body {
     background: var(--bg);
     color: var(--page-text-color);
     font-family: var(--page-font-family, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji");
+    font-size: var(--page-font-size, 16px);
 }
 
 main#content { 

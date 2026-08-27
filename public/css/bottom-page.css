@@ -1,9 +1,14 @@
 /* ── Bottom page group (homepage only) — bottom-text + site credit, loaded
       in together as one unit after a configurable delay (config/master.json's
-      "bottomPageLoadDelayMs", themed via config/theme.json's theme.bottomText),
+      "bottomPageLoadDelayMs", themed via theme.json's theme.bottomText),
       then permanently pinned to the true bottom of the page as more content
       lazy-loads in below it. Intentionally NOT overridden in mobile.css —
-      same layout in both modes. ── */
+      same layout in both modes.
+
+      The version text (.site-credit__version) and "Site designed by…"
+      credit line (.site-credit__text) are NEVER themed — they're fixed,
+      always follow --muted/--text, exactly as before. Only #bottom-text
+      (the configurable bottomText content) is themeable. ── */
 
 .bottom-page {
     position: relative;
@@ -32,9 +37,11 @@
        in normal flow), which pushes the text upward relative to the
        credit's fixed bottom:24px anchor. */
     margin-bottom: calc(var(--icon-size, 36px) + 40px);
-    padding: 0;
+    padding: 12px 16px;
     box-sizing: border-box;
     text-align: center;
+    background: var(--bottom-text-bg, transparent);
+    border-radius: 10px;
     color: var(--bottom-text-color, var(--page-text-color, var(--text)));
     font-family: var(--bottom-text-font-family, var(--page-font-family, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"));
     font-size: var(--bottom-text-font-size, 15px);

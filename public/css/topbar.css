@@ -3,10 +3,10 @@
     --topbar-bg: #202020;
     --slogan-font-size: 20px;
     --slogan-color: var(--muted);
-    /* --slogan-font-family is only ever set at runtime by theme.js (see
-       base.css comment above for the same reasoning). When unset, the
-       var() fallback on .topbar-slogan below applies the system-ui stack
-       immediately at first paint. */
+    /* --topbar-font-family / --slogan-font-family / --topbar-text-color are
+       only ever set at runtime by theme.js (theme.topbar / theme.topbar.slogan).
+       When unset, the var() fallbacks below apply immediately at first
+       paint — system-ui stack / var(--text) — zero flash. */
 }
 
 .topbar {
@@ -21,8 +21,9 @@
     z-index: 900;
     display: flex;
     align-items: center;
-    /* Fixed chrome font — independent from the page font control */
-    font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    /* Full font control (theme.topbar.font), falls back to the system-ui
+       stack if no custom topbar font is configured. */
+    font-family: var(--topbar-font-family, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji");
 }
 
 .topbar-inner {
@@ -86,7 +87,7 @@
     height: 36px;
     padding: 0 12px;
     border-radius: 8px;
-    color: var(--text);
+    color: var(--topbar-text-color, var(--text));
     font-size: var(--topbar-font-size);
     white-space: nowrap;
     cursor: pointer;
@@ -134,7 +135,7 @@
     align-items: center;
     gap: 8px;
     padding: 8px 12px;
-    color: var(--text);
+    color: var(--topbar-text-color, var(--text));
     text-decoration: none;
     font-size: var(--topbar-font-size);
     transition: background-color 140ms ease;

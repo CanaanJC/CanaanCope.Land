@@ -121,11 +121,16 @@ body.blog-gallery-open {
 .blog-cell        { min-width: 0; }
 .blog-cell--empty { /* blank */ }
 
-/* ── Markdown content ── */
+/* ── Markdown content ──
+   font-size now follows --page-font-size (theme.body.fontSize, itself
+   falling back to theme.master.fontSize per the master-override rule) —
+   this is the actual "main page body" text size control. Previously this
+   was hardcoded to 15px, which silently overrode whatever was set on
+   <body> since px values don't inherit/scale from a parent's font-size. ── */
 
 .blog-md-content {
     color: var(--page-text-color, var(--text));
-    font-size: 15px;
+    font-size: var(--page-font-size, 15px);
     line-height: 1.75;
 }
 
@@ -147,9 +152,12 @@ body.blog-gallery-open {
     padding-top: 0 !important;
 }
 
-.blog-md-content h1 { font-size: 1.5rem; }
-.blog-md-content h2 { font-size: 1.25rem; }
-.blog-md-content h3 { font-size: 1.1rem; }
+/* Headings stay relative (em) to the body content's own font-size, so they
+   scale proportionally whenever --page-font-size changes rather than
+   staying fixed while the surrounding paragraph text grows/shrinks. */
+.blog-md-content h1 { font-size: 1.5em; }
+.blog-md-content h2 { font-size: 1.25em; }
+.blog-md-content h3 { font-size: 1.1em; }
 .blog-md-content p  { margin: 0 0 1em 0; }
 
 .blog-md-content ul,
@@ -171,9 +179,9 @@ body.blog-gallery-open {
     border: 1px solid var(--md-code-border, #333);
     border-radius: 4px;
     padding: 1px 5px;
-    font-size: 0.875em;
+    font-size: var(--md-code-font-size, 0.875em);
     color: var(--md-code-text, var(--page-text-color, var(--text)));
-    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
+    font-family: var(--md-code-font-family, "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace);
 }
 
 .blog-md-content pre {
@@ -190,10 +198,10 @@ body.blog-gallery-open {
     border: none;
     border-radius: 0;
     padding: 16px 20px;
-    font-size: 0.875em;
+    font-size: var(--md-code-font-size, 0.875em);
     overflow-x: auto;
     color: var(--md-code-text, var(--page-text-color, var(--text)));
-    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
+    font-family: var(--md-code-font-family, "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace);
     line-height: 1.6;
 }
 
