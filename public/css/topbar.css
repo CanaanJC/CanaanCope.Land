@@ -1,9 +1,11 @@
 :root {
     --topbar-font-size: 20px;
     --topbar-bg: #202020;
-    --slogan-font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
     --slogan-font-size: 20px;
     --slogan-color: var(--muted);
+    /* --slogan-font-family is intentionally NOT declared here — same
+       reasoning as --page-font-family in base.css. Only set at runtime by
+       theme.js when theme.topbar.slogan.font resolves to a real file. */
 }
 
 .topbar {
