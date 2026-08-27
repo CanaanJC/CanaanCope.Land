@@ -63,7 +63,6 @@ const INNER_M_BLOCK_REGEX = /\[M([^\]]+)\]([\s\S]*?)\[\/M\1\]/g;
 let _isMobile       = false;
 let _menuBuilt      = false;
 let _menuOpen       = false;
-let _topbarObserver = null;
 
 // ── Mobile blog renderer ─────────────────────────────────────────────────────
 
@@ -548,37 +547,6 @@ function toggleMenu() {
     else openMenu();
 }
 
-// ── Slogan: collapse runs of spaces into single spaces on mobile ─────────────
-
-function fixSloganSpacing() {
-    if (!_isMobile) return;
-    const slogan = document.querySelector(".topbar-slogan");
-    if (!slogan) return;
-    const text = slogan.textContent.replace(/\s+/g, " ").trim();
-    if (slogan.textContent !== text) slogan.textContent = text;
-}
-
-// ── Topbar observer (slogan spacing only — nav content is built directly
-//    from libraries.json / manifest.json in populateMenu(), not relocated
-//    from the live desktop DOM) ────────────────────────────────────────────
-
-function startTopbarObserver() {
-    if (_topbarObserver) return;
-    const topbar = document.getElementById("topbarList");
-    if (!topbar) return;
-
-    _topbarObserver = new MutationObserver(() => {
-        fixSloganSpacing();
-    });
-    _topbarObserver.observe(topbar, { childList: true, subtree: false });
-}
-
-function stopTopbarObserver() {
-    if (!_topbarObserver) return;
-    _topbarObserver.disconnect();
-    _topbarObserver = null;
-}
-
 // ── Activate / deactivate mobile mode ────────────────────────────────────────
 
 async function activateMobile() {
@@ -593,15 +561,10 @@ async function activateMobile() {
     buildBurger();
     buildMenuShell();
 
-    startTopbarObserver();
-    fixSloganSpacing();
-
     if (!_menuBuilt) {
         await populateMenu();
         _menuBuilt = true;
     }
-
-    fixSloganSpacing();
 }
 
 function deactivateMobile() {
@@ -612,8 +575,6 @@ function deactivateMobile() {
 
     // Re-render blog content back to desktop layout
     rerenderAllBlogContent();
-
-    stopTopbarObserver();
 }
 
 // ── Resize handler ───────────────────────────────────────────────────────────
