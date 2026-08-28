@@ -1,7 +1,8 @@
+// ADMIN/elements/logo-uploader/element.js
+
 // Inline fallback icon — same shape used on the public site (topbar.js /
-// sidebar.js) for missing images. Shown here whenever no logo.png exists yet
-// at the live site's /media/logo.png (a fresh checkout of this repo ships
-// without a media/ folder at all, since it's gitignored).
+// sidebar.js) for missing images. Shown only if NEITHER the public site
+// address NOR the local hosting address can actually load media/logo.png.
 const FALLBACK_ICON =
     'data:image/svg+xml;charset=UTF-8,' +
     encodeURIComponent(`
@@ -11,37 +12,81 @@ const FALLBACK_ICON =
   <circle cx="9" cy="9" r="1.25" fill="#cfcfcf"/>
 </svg>`);
 
+// Off-DOM probe — never touches the visible <img>, so a failed candidate
+// can never leave the preview in a broken/placeholder state by accident.
+function tryLoadImage(url) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        let done = false;
+        const finish = (ok) => { if (!done) { done = true; resolve(ok); } };
+        img.onload = () => finish(true);
+        img.onerror = () => finish(false);
+        img.src = url;
+        // Generous timeout — slow DNS/first-hit AVIF-variant builds on the
+        // server shouldn't be mistaken for "logo doesn't exist".
+        setTimeout(() => finish(false), 8000);
+    });
+}
+
 export default function init(root) {
     const preview   = root.querySelector("#lu-preview");
     const fileIn    = root.querySelector("#lu-file");
     const chooseBtn = root.querySelector("#lu-choose");
     const statusEl  = root.querySelector("#lu-status");
 
-    let siteAddress = "";
+    // Populated once from /api/site-info + /api/config, then reused for
+    // every refresh (including after a fresh upload).
+    let baseCandidates = [];
 
-    // Show the fallback icon immediately, before anything has loaded, so
-    // there's never a moment showing a broken-image icon.
-    preview.src = FALLBACK_ICON;
-    preview.classList.add("admin-logo-preview--fallback");
-
-    preview.addEventListener("error", () => {
-        if (preview.src !== FALLBACK_ICON) {
-            preview.src = FALLBACK_ICON;
-            preview.classList.add("admin-logo-preview--fallback");
-        }
-    });
-
-    function refreshPreview() {
-        if (!siteAddress) return;
-        preview.classList.remove("admin-logo-preview--fallback");
-        preview.src = `${siteAddress.replace(/\/$/, "")}/media/logo.png?t=${Date.now()}`;
+    function showFallback() {
+        preview.src = FALLBACK_ICON;
+        preview.classList.add("admin-logo-preview--fallback");
     }
 
-    fetch("/api/site-info")
-        .then(r => r.json())
-        .then((info) => {
-            siteAddress = info.siteAddress || "";
-            refreshPreview();
+    function showReal(url) {
+        preview.classList.remove("admin-logo-preview--fallback");
+        preview.src = url;
+    }
+
+    // Show the fallback immediately so there's never a broken-image icon
+    // while candidates are still being probed.
+    showFallback();
+
+    // Tries every known base (public siteAddress, then the local
+    // hostname:port this admin page is itself being served alongside) in
+    // order, cache-busted so an upload is never masked by browser/HTTP
+    // caching. Only falls back to the placeholder if NONE of them load —
+    // a single unreachable domain can no longer permanently hide a real,
+    // successfully-uploaded logo.
+    async function refreshPreview() {
+        const bust = Date.now();
+        for (const base of baseCandidates) {
+            if (!base) continue;
+            const url = `${base}/media/logo.png?t=${bust}`;
+            const ok = await tryLoadImage(url);
+            if (ok) {
+                showReal(url);
+                return;
+            }
+        }
+        showFallback();
+    }
+
+    Promise.all([
+        fetch("/api/site-info").then(r => r.json()).catch(() => ({})),
+        fetch("/api/config").then(r => r.json()).catch(() => ({})),
+    ])
+        .then(([siteInfo, config]) => {
+            const candidates = [];
+            if (siteInfo && siteInfo.siteAddress) {
+                candidates.push(siteInfo.siteAddress.replace(/\/$/, ""));
+            }
+            const port = config && config.hosting && config.hosting.port;
+            if (port) {
+                candidates.push(`http://${window.location.hostname}:${port}`);
+            }
+            baseCandidates = candidates;
+            return refreshPreview();
         })
         .catch((e) => {
             statusEl.textContent = `Failed to load site info: ${e.message}`;
@@ -71,7 +116,7 @@ export default function init(root) {
                 if (res.error) throw new Error(res.error);
                 statusEl.textContent = "Logo updated.";
                 statusEl.className = "admin-status admin-status--ok";
-                refreshPreview();
+                return refreshPreview();
             })
             .catch((e) => {
                 statusEl.textContent = `Upload failed: ${e.message}`;

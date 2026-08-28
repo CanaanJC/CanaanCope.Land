@@ -1,265 +1,306 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Generic JSON-file field editor.
+// Panel Layout editor — replaces the old generic json.js-based raw "columns"
+// array editor. Lets you pick how many columns the admin page has (1-5) and
+// drag elements (folder names from ADMIN/elements/) into them, in any order,
+// with duplicates allowed.
 //
-// This element edits whatever file its sibling config.json points to (the
-// "target" path, relative to node.js's project root — e.g. "config/master.json").
-// Its sibling config.json can also set a "name" — if non-empty, that string
-// is displayed as the panel's title (and therefore in the admin panel-nav
-// menu too, since that reads the rendered <h2>) instead of the raw target
-// path. Leave "name" blank to keep showing the path.
+// Talks directly to /api/layout (GET/PUT) and /api/element-list —
+// completely independent of the shared json.js engine. This element's HTML
+// deliberately has no #ej-container/#ej-save/etc., so json.js's
+// initJsonEditor() just no-ops on it (see its own early-return guard for
+// elements that don't have that shape) and this file's own init() does all
+// the real work.
 //
-// To make a new editor for another JSON file: copy this whole folder, give
-// it a new name, and edit its config.json's "target" (and optionally
-// "name"). No JS edits needed.
+// Every mutation (column count change, drag/drop insert/move, chip removal)
+// always ends by calling render() — so that's also the single choke point
+// used to clear a stale "Saved." status message the moment anything changes
+// after a save (see the top of render() below).
 // ─────────────────────────────────────────────────────────────────────────────
 
-const HEX_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+const MIN_COLUMNS = 1;
+const MAX_COLUMNS = 5;
 
-// Auto-grows a textarea's height to fit its content (wraps instead of
-// scrolling/truncating), so long values push the box taller rather than
-// overflowing or hiding text.
-function autoGrow(textarea) {
-    textarea.style.height = "auto";
-    textarea.style.height = `${textarea.scrollHeight}px`;
-}
+let nextId = 1;
 
-// Sizes the textarea now AND keeps re-sizing it whenever its actual
-// rendered width changes. This matters because admin.js builds columns one
-// at a time — a textarea can get its initial height measured while its
-// column is still temporarily full-width (before sibling columns exist),
-// then get squeezed narrower afterward, needing more wrapped lines than
-// the already-fixed height allows. Watching width (not height) avoids a
-// feedback loop, since only a width change ever requires a re-measure.
-function attachAutoGrow(textarea) {
-    let lastWidth = null;
+export default function init(root) {
+    const columnCountEl   = root.querySelector("#le-column-count");
+    const availableListEl = root.querySelector("#le-available-list");
+    const columnsEl       = root.querySelector("#le-columns");
+    const saveBtn         = root.querySelector("#le-save");
+    const statusEl        = root.querySelector("#le-status");
 
-    const resize = () => autoGrow(textarea);
+    let availableNames = [];       // ["archive", "topbar.json", ...]
+    let columns = [[]];            // [[{id,name}, ...], ...]
 
-    requestAnimationFrame(resize);
+    function setStatus(text, kind) {
+        statusEl.textContent = text;
+        statusEl.className = kind ? `admin-status admin-status--${kind}` : "admin-status";
+    }
 
-    const observer = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-            const width = entry.contentRect.width;
-            if (width !== lastWidth) {
-                lastWidth = width;
-                resize();
+    // Clears the status line the moment ANY edit happens, but only if it's
+    // currently showing the "Saved." (ok) message — mirrors json.js's
+    // notifyEdit(). Called at the top of render() rather than being
+    // threaded through every individual mutation function, since every
+    // mutation in this file always ends in a render() call anyway.
+    function clearSavedStatusIfEditing() {
+        if (statusEl.classList.contains("admin-status--ok")) {
+            setStatus("");
+        }
+    }
+
+    // ── Column-count normalization ──────────────────────────────────────────
+    // Clamps to [MIN_COLUMNS, MAX_COLUMNS]. Shrinking never deletes items —
+    // anything in a column beyond the new count is appended, in order, onto
+    // the new last column. Growing just appends empty columns.
+    function resizeColumns(newCount) {
+        const clamped = Math.max(MIN_COLUMNS, Math.min(MAX_COLUMNS, newCount));
+
+        if (clamped < columns.length) {
+            const overflow = columns.slice(clamped).flat();
+            columns = columns.slice(0, clamped);
+            columns[clamped - 1] = columns[clamped - 1].concat(overflow);
+        } else {
+            while (columns.length < clamped) columns.push([]);
+        }
+
+        columnCountEl.value = String(clamped);
+        render();
+    }
+
+    // ── Locate an item anywhere in `columns` by its generated id ────────────
+    function findById(id) {
+        for (let colIndex = 0; colIndex < columns.length; colIndex++) {
+            const itemIndex = columns[colIndex].findIndex((item) => item.id === id);
+            if (itemIndex !== -1) {
+                return { colIndex, itemIndex, item: columns[colIndex][itemIndex] };
             }
         }
-    });
-    observer.observe(textarea);
-}
-
-function makeLeafInput(value, onChange) {
-    if (typeof value === "boolean") {
-        const input = document.createElement("input");
-        input.type = "checkbox";
-        input.checked = value;
-        input.className = "admin-field-input";
-        input.style.flex = "0 0 auto";
-        input.addEventListener("change", () => onChange(input.checked));
-        return input;
+        return null;
     }
 
-    if (typeof value === "number") {
-        const input = document.createElement("input");
-        input.type = "number";
-        input.className = "admin-field-input";
-        input.value = value;
-        input.addEventListener("input", () => onChange(input.valueAsNumber));
-        return input;
+    // ── Drop-position math — which index, inside a column, does this drag
+    // currently sit above? Based on the vertical midpoint of each existing
+    // chip — the standard approach for a simple vertical reorder list.
+    function getDropIndex(containerEl, clientY) {
+        const chips = [...containerEl.querySelectorAll(":scope > .le-chip")];
+        for (let i = 0; i < chips.length; i++) {
+            const rect = chips[i].getBoundingClientRect();
+            const midpoint = rect.top + rect.height / 2;
+            if (clientY < midpoint) return i;
+        }
+        return chips.length;
     }
 
-    // String (default) — a wrapping, auto-growing textarea instead of a
-    // single-line input, so long text wraps onto additional lines /
-    // increases box height instead of being clipped. Hex colors still get
-    // a paired native color picker alongside it. Uses .admin-field-value-wrap
-    // (min-width: 0 + flex-wrap) so it collapses onto its own line rather
-    // than forcing the column wider than the viewport.
-    const wrap = document.createElement("div");
-    wrap.className = "admin-field-value-wrap";
-
-    const text = document.createElement("textarea");
-    text.className = "admin-field-input-text";
-    text.rows = 1;
-    text.value = value ?? "";
-
-    const handleResize = () => autoGrow(text);
-
-    if (HEX_RE.test(value || "")) {
-        const color = document.createElement("input");
-        color.type = "color";
-        color.className = "admin-field-color";
-        color.value = value.length === 4
-            ? `#${[...value.slice(1)].map(c => c + c).join("")}`
-            : value;
-
-        color.addEventListener("input", () => {
-            text.value = color.value;
-            onChange(color.value);
-        });
-        text.addEventListener("input", () => {
-            onChange(text.value);
-            if (HEX_RE.test(text.value)) color.value = text.value;
-            handleResize();
-        });
-
-        wrap.appendChild(color);
-        wrap.appendChild(text);
-    } else {
-        text.addEventListener("input", () => {
-            onChange(text.value);
-            handleResize();
-        });
-        wrap.appendChild(text);
+    function insertNew(name, targetColIndex, dropIndex) {
+        columns[targetColIndex].splice(dropIndex, 0, { id: nextId++, name });
     }
 
-    // Initial sizing + ongoing re-sizing whenever the textarea's own width
-    // changes (see attachAutoGrow's comment for why this is necessary).
-    attachAutoGrow(text);
+    function moveExisting(id, targetColIndex, dropIndex) {
+        const loc = findById(id);
+        if (!loc) return;
 
-    return wrap;
-}
+        columns[loc.colIndex].splice(loc.itemIndex, 1);
 
-// Array editor — one line per top-level array item (each rendered as
-// compact JSON via JSON.stringify), in a wrapping/auto-growing textarea so
-// long items wrap onto extra lines instead of scrolling off-screen or
-// getting clipped to a single line. Re-parses on every keystroke; a line
-// that isn't valid JSON just flags the box red (via .admin-field-input-text--error)
-// without losing what you typed or touching the underlying data until it's
-// valid again.
-function makeArrayInput(value, onChange) {
-    const wrap = document.createElement("div");
-    wrap.className = "admin-field-value-wrap";
+        let insertIndex = dropIndex;
+        if (loc.colIndex === targetColIndex && loc.itemIndex < dropIndex) {
+            insertIndex -= 1;
+        }
+        columns[targetColIndex].splice(insertIndex, 0, loc.item);
+    }
 
-    const text = document.createElement("textarea");
-    text.className = "admin-field-input-text";
-    text.rows = 1;
-    text.value = value.map(item => JSON.stringify(item)).join("\n");
+    function removeById(id) {
+        const loc = findById(id);
+        if (!loc) return;
+        columns[loc.colIndex].splice(loc.itemIndex, 1);
+    }
 
-    const handleResize = () => autoGrow(text);
-
-    text.addEventListener("input", () => {
-        const lines = text.value.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+    function parseDragPayload(e) {
         try {
-            const parsed = lines.map(l => JSON.parse(l));
-            onChange(parsed);
-            text.classList.remove("admin-field-input-text--error");
-            text.title = "";
-        } catch (e) {
-            text.classList.add("admin-field-input-text--error");
-            text.title = `Invalid JSON on one of the lines: ${e.message}`;
+            return JSON.parse(e.dataTransfer.getData("application/json"));
+        } catch {
+            return null;
         }
-        handleResize();
+    }
+
+    // ── Rendering ────────────────────────────────────────────────────────────
+
+    function renderAvailableList() {
+        availableListEl.innerHTML = "";
+
+        if (availableNames.length === 0) {
+            const empty = document.createElement("div");
+            empty.className = "le-empty";
+            empty.textContent = "No elements found in ADMIN/elements/.";
+            availableListEl.appendChild(empty);
+            return;
+        }
+
+        for (const name of availableNames) {
+            const item = document.createElement("div");
+            item.className = "le-avail-item";
+            item.draggable = true;
+            item.textContent = name;
+
+            item.addEventListener("dragstart", (e) => {
+                e.dataTransfer.effectAllowed = "copy";
+                e.dataTransfer.setData("application/json", JSON.stringify({ type: "new", name }));
+            });
+
+            availableListEl.appendChild(item);
+        }
+    }
+
+    // Dropping a dragged-from-a-column chip back onto the available pane
+    // removes it (a quick way to delete without hunting for the × button).
+    // Dragging a fresh "new" item here is a no-op — it's already available.
+    // Wired once, not per-render, since availableListEl itself never gets
+    // replaced (only its children do).
+    availableListEl.addEventListener("dragover", (e) => e.preventDefault());
+    availableListEl.addEventListener("drop", (e) => {
+        e.preventDefault();
+        const payload = parseDragPayload(e);
+        if (payload && payload.type === "move") {
+            removeById(payload.id);
+            render();
+        }
     });
 
-    attachAutoGrow(text);
+    function buildChip(item) {
+        const chip = document.createElement("div");
+        chip.className = "le-chip";
+        chip.draggable = true;
+        chip.dataset.id = String(item.id);
 
-    wrap.appendChild(text);
-    return wrap;
-}
+        const label = document.createElement("span");
+        label.className = "le-chip-label";
+        label.textContent = item.name;
+        chip.appendChild(label);
 
-function renderObject(obj, container, pathPrefix, data) {
-    for (const key of Object.keys(obj)) {
-        const value = obj[key];
-        const fullPath = pathPrefix ? `${pathPrefix}.${key}` : key;
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "le-chip-remove";
+        removeBtn.title = "Remove from this column";
+        removeBtn.textContent = "×";
+        removeBtn.addEventListener("click", () => {
+            removeById(item.id);
+            render();
+        });
+        chip.appendChild(removeBtn);
 
-        if (value && typeof value === "object" && !Array.isArray(value)) {
-            const fieldset = document.createElement("fieldset");
-            fieldset.className = "admin-fieldset";
-            const legend = document.createElement("legend");
-            legend.textContent = key;
-            fieldset.appendChild(legend);
-            container.appendChild(fieldset);
-            renderObject(value, fieldset, fullPath, data);
-            continue;
-        }
+        chip.addEventListener("dragstart", (e) => {
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("application/json", JSON.stringify({ type: "move", id: item.id }));
+        });
 
-        const row = document.createElement("div");
-        row.className = "admin-field-row";
-
-        const label = document.createElement("label");
-        label.className = "admin-field-label";
-        label.textContent = key;
-        row.appendChild(label);
-
-        const setAtPath = (v) => {
-            const segments = fullPath.split(".");
-            let node = data;
-            for (let i = 0; i < segments.length - 1; i++) node = node[segments[i]];
-            node[segments[segments.length - 1]] = v;
-        };
-
-        if (Array.isArray(value)) {
-            row.appendChild(makeArrayInput(value, setAtPath));
-            container.appendChild(row);
-            continue;
-        }
-
-        row.appendChild(makeLeafInput(value, setAtPath));
-        container.appendChild(row);
-    }
-}
-
-// `elementConfig` is this element's own sibling config.json, loaded and
-// passed in by admin.js — { "target": "config/master.json", "name": "" }.
-export default function init(root, elementConfig) {
-    const fieldsEl = root.querySelector("#cfe-fields");
-    const saveBtn  = root.querySelector("#cfe-save");
-    const statusEl = root.querySelector("#cfe-status");
-    const titleEl  = root.querySelector("#cfe-title");
-
-    const targetPath = elementConfig && elementConfig.target;
-
-    if (!targetPath) {
-        statusEl.textContent = "Missing \"target\" in this element's config.json.";
-        statusEl.className = "admin-status admin-status--error";
-        return;
+        return chip;
     }
 
-    // "name" overrides the displayed title; blank/missing falls back to the
-    // target path, exactly as before.
-    const displayName = elementConfig && typeof elementConfig.name === "string" && elementConfig.name.trim()
-        ? elementConfig.name.trim()
-        : targetPath;
+    function renderColumns() {
+        columnsEl.innerHTML = "";
 
-    if (titleEl) titleEl.textContent = displayName;
+        columns.forEach((colItems, colIndex) => {
+            const colEl = document.createElement("div");
+            colEl.className = "le-column";
+            colEl.dataset.colIndex = String(colIndex);
 
-    let data = null;
+            const heading = document.createElement("div");
+            heading.className = "le-column-heading";
+            heading.textContent = `Column ${colIndex + 1}`;
+            colEl.appendChild(heading);
+
+            const dropZone = document.createElement("div");
+            dropZone.className = "le-column-dropzone";
+
+            for (const item of colItems) {
+                dropZone.appendChild(buildChip(item));
+            }
+
+            colEl.appendChild(dropZone);
+
+            dropZone.addEventListener("dragover", (e) => {
+                e.preventDefault();
+                colEl.classList.add("le-column--dragover");
+            });
+            dropZone.addEventListener("dragleave", () => {
+                colEl.classList.remove("le-column--dragover");
+            });
+            dropZone.addEventListener("drop", (e) => {
+                e.preventDefault();
+                colEl.classList.remove("le-column--dragover");
+
+                const payload = parseDragPayload(e);
+                if (!payload) return;
+
+                const dropIndex = getDropIndex(dropZone, e.clientY);
+
+                if (payload.type === "new") {
+                    insertNew(payload.name, colIndex, dropIndex);
+                } else if (payload.type === "move") {
+                    moveExisting(payload.id, colIndex, dropIndex);
+                }
+                render();
+            });
+
+            columnsEl.appendChild(colEl);
+        });
+    }
 
     function render() {
-        fieldsEl.innerHTML = "";
-        renderObject(data, fieldsEl, "", data);
+        // Any call to render() means something changed (or the initial
+        // load just finished, when the status is empty anyway) — clear a
+        // stale "Saved." message before repainting.
+        clearSavedStatusIfEditing();
+        renderAvailableList();
+        renderColumns();
     }
 
-    fetch(`/api/file?path=${encodeURIComponent(targetPath)}`)
-        .then(r => r.json())
-        .then((config) => {
-            if (config && config.error) throw new Error(config.error);
-            data = config;
-            render();
+    // ── Load current state ──────────────────────────────────────────────────
+
+    Promise.all([
+        fetch("/api/element-list").then(r => r.json()),
+        fetch("/api/layout").then(r => r.json()),
+    ])
+        .then(([elementListRes, layout]) => {
+            if (elementListRes && elementListRes.error) throw new Error(elementListRes.error);
+            if (layout && layout.error) throw new Error(layout.error);
+
+            availableNames = Array.isArray(elementListRes.elements) ? elementListRes.elements : [];
+
+            const rawColumns = Array.isArray(layout.columns) ? layout.columns : [];
+            columns = rawColumns.length > 0
+                ? rawColumns.map((col) => (Array.isArray(col) ? col : [])
+                    .filter((name) => typeof name === "string" && name.trim() !== "")
+                    .map((name) => ({ id: nextId++, name })))
+                : [[]];
+
+            resizeColumns(columns.length); // clamps into [1,5], sets the <select>, then renders
         })
         .catch((e) => {
-            statusEl.textContent = `Failed to load ${targetPath}: ${e.message}`;
-            statusEl.className = "admin-status admin-status--error";
+            setStatus(`Failed to load: ${e.message}`, "error");
         });
 
+    columnCountEl.addEventListener("change", () => {
+        resizeColumns(parseInt(columnCountEl.value, 10) || MIN_COLUMNS);
+    });
+
     saveBtn.addEventListener("click", () => {
-        statusEl.textContent = "Saving…";
-        statusEl.className = "admin-status";
-        fetch(`/api/file?path=${encodeURIComponent(targetPath)}`, {
+        setStatus("Saving…");
+        const payload = {
+            columns: columns.map((col) => col.map((item) => item.name)),
+        };
+
+        fetch("/api/layout", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(data),
+            body: JSON.stringify(payload),
         })
             .then(r => r.json())
             .then((res) => {
                 if (res.error) throw new Error(res.error);
-                statusEl.textContent = "Saved.";
-                statusEl.className = "admin-status admin-status--ok";
+                setStatus("Saved. Reload the admin page to see the new layout take effect.", "ok");
             })
             .catch((e) => {
-                statusEl.textContent = `Save failed: ${e.message}`;
-                statusEl.className = "admin-status admin-status--error";
+                setStatus(`Save failed: ${e.message}`, "error");
             });
     });
 }

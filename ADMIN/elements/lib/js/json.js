@@ -17,6 +17,11 @@
 //     file, uploads it to public/fonts/, and renders the resulting path in
 //     the actual uploaded font so it's easy to see what font is set. This
 //     does NOT work with plain URLs — uploads only. See attachFontUpload().
+//   - the "Saved." status message is automatically cleared the moment any
+//     further edit is made (typing, checkbox/number/color change, add,
+//     delete, or an upload hook setting a field's value) — see notifyEdit()
+//     below — so it can never keep claiming something is saved when it's
+//     since been changed again.
 //
 // Per-element element.js files (loaded AFTER this, if present) receive the
 // returned `core` handle and can opt into array/card mode and attach field
@@ -350,7 +355,16 @@ function buildCompactRow(initialValue, onInput) {
         el: holder,
         img,
         input,
-        setValue(v) { input.value = v ?? ""; refreshPreview(); },
+        setValue(v) {
+            input.value = v ?? "";
+            refreshPreview();
+            // Programmatic value changes (e.g. an upload hook calling
+            // api.setValue()) don't naturally fire an "input" event —
+            // dispatch one so the shared edit-tracking listener on the
+            // container (see initJsonEditor's notifyEdit) still notices
+            // and clears any stale "Saved." status.
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+        },
         refreshPreview,
     };
 }
@@ -402,7 +416,15 @@ function buildTextareaRow(initialValue, onInput) {
     return {
         el: holder,
         text,
-        setValue(v) { text.value = v ?? ""; wireColorPairing(); autoGrow(text); },
+        setValue(v) {
+            text.value = v ?? "";
+            wireColorPairing();
+            autoGrow(text);
+            // See buildCompactRow.setValue's comment — programmatic
+            // updates need a manually-dispatched "input" event so the
+            // shared edit-tracking listener notices.
+            text.dispatchEvent(new Event("input", { bubbles: true }));
+        },
     };
 }
 
@@ -657,8 +679,9 @@ export default function initJsonEditor(root, elementConfig) {
     const statusEl    = root.querySelector("#ej-status");
 
     // Elements that don't use this core's HTML shape (e.g. archive,
-    // logo-uploader) simply have no #ej-container — bail out quietly so
-    // their own bespoke element.js can take over completely.
+    // logo-uploader, admin-master.json's Panel Layout editor) simply have
+    // no #ej-container — bail out quietly so their own bespoke element.js
+    // can take over completely.
     if (!containerEl) {
         return {
             getData: () => null,
@@ -694,6 +717,25 @@ export default function initJsonEditor(root, elementConfig) {
         statusEl.textContent = text;
         statusEl.className = kind ? `admin-status admin-status--${kind}` : "admin-status";
     }
+
+    // Clears the status line the moment ANY edit happens, but only if it's
+    // currently showing the "Saved." (ok) message — so it never keeps
+    // claiming the data is saved once it's been changed again since. Left
+    // alone if the status is empty, an in-progress "Saving…", or an error.
+    function notifyEdit() {
+        if (statusEl && statusEl.classList.contains("admin-status--ok")) {
+            setStatus("");
+        }
+    }
+
+    // Delegated listener on the container catches virtually every edit
+    // automatically: typing in a textarea/text input, checkbox toggles,
+    // number inputs, the color-picker's paired <input type="color">, and
+    // the JSON-lines array textarea. "input" events bubble by default and
+    // nothing in this file calls stopPropagation, so this single pair of
+    // listeners is enough — no need to instrument every field individually.
+    containerEl.addEventListener("input", notifyEdit);
+    containerEl.addEventListener("change", notifyEdit);
 
     // ── Object mode render ──
     function renderObjectMode() {
@@ -800,6 +842,7 @@ export default function initJsonEditor(root, elementConfig) {
             const card = buildCard(item, () => {
                 data.splice(index, 1);
                 renderArrayMode();
+                notifyEdit(); // deleting a card is an edit — clear any "Saved." message
             });
             containerEl.appendChild(card);
         });
@@ -828,6 +871,7 @@ export default function initJsonEditor(root, elementConfig) {
             const newItem = arrayConfig.newItemFactory ? arrayConfig.newItemFactory() : {};
             data.push(newItem);
             renderArrayMode();
+            notifyEdit(); // adding a card is an edit — clear any "Saved." message
         });
     }
 
