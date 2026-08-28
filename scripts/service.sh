@@ -1,29 +1,38 @@
 #!/usr/bin/env bash
 #
-# scripts/service.sh — interactive control menu for the systemd service
-# created by scripts/run.sh. Run from anywhere; always operates on the
+# scripts/service.sh — interactive systemd service control for this repo's
+# `node node.js`. Run from anywhere; always operates relative to the
 # project root (one level up from this script). Must be run with sudo
-# (systemctl start/stop/restart require root).
+# (systemctl start/stop/enable/disable/generating the unit file all need
+# root).
 #
-# Menu:
-#   1) Status         — systemctl status
-#   2) Start           — systemctl start
-#   3) Stop            — systemctl stop
-#   4) Restart         — systemctl restart
-#   5) Live logs       — journalctl -f for this unit. Plain read-only tail,
-#                        Ctrl+C returns to this menu (does NOT stop the
-#                        service — only journalctl itself is killed).
-#   6) Enable on boot   — systemctl enable
-#   7) Disable on boot  — systemctl disable
-#   8) Uninstall        — stop, disable, and remove the unit file entirely
-#                         (asks for confirmation first — this is destructive
-#                         to the *service*, never to the project files).
-#   0) Exit
+# Unlike a config-file-driven version of this script, everything here is
+# derived directly from the project itself — no conf.json, no path
+# argument:
+#   - project path  → always this script's own parent directory
+#   - command       → always "node node.js"
+#   - service name  → config/master.json's "siteName" if present, else
+#                      package.json's "name", else the project folder's
+#                      own name — slugified into a systemd-safe unit name
+#
+# Menu (same 6 options as before):
+#   1) Stop
+#   2) Disable
+#   3) Start
+#   4) Enable
+#   5) View live logs
+#   6) Status
+#
+# The systemd unit itself always runs as YOUR normal invoking user (via
+# SUDO_USER), never as root — only this script's own systemctl/unit-file
+# management needs sudo, matching scripts/run.sh's existing security
+# posture.
 #
 set -euo pipefail
 
-cd "$(dirname "${BASH_SOURCE[0]}")/.."
-SERVICE_NAME_FILE="scripts/.service-name"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJ_PATH="$(cd "${SCRIPT_DIR}/.." && pwd)"
+CMD="node node.js"
 
 # ── Require root/sudo ─────────────────────────────────────────────────────────
 
@@ -33,91 +42,197 @@ if [[ "${EUID}" -ne 0 ]]; then
     exit 1
 fi
 
-# ── Resolve the service name ──────────────────────────────────────────────────
-
-if [[ ! -f "${SERVICE_NAME_FILE}" ]]; then
-    echo "service.sh: ${SERVICE_NAME_FILE} not found — run ./scripts/run.sh first to set up the service." >&2
+if ! command -v node >/dev/null 2>&1; then
+    echo "service.sh: node is required (used to read siteName from config/master.json)." >&2
     exit 1
 fi
 
-SERVICE_NAME="$(tr -d '[:space:]' < "${SERVICE_NAME_FILE}")"
-
-if [[ -z "${SERVICE_NAME}" ]]; then
-    echo "service.sh: ${SERVICE_NAME_FILE} is empty — run ./scripts/run.sh again to reconfigure." >&2
+if ! command -v systemctl >/dev/null 2>&1; then
+    echo "service.sh: systemctl not found — this script only supports systemd-based systems." >&2
     exit 1
 fi
 
-UNIT_PATH="/etc/systemd/system/${SERVICE_NAME}.service"
-
-if [[ ! -f "${UNIT_PATH}" ]]; then
-    echo "service.sh: no unit file found at ${UNIT_PATH} for service \"${SERVICE_NAME}\"."
-    echo "            run ./scripts/run.sh to (re)install it."
-    exit 1
-fi
-
-# ── Live logs (menu option 5) ─────────────────────────────────────────────────
+# ── Derive the service name ───────────────────────────────────────────────────
 #
-# Plain read-only tail of this unit's journal. Ctrl+C just interrupts
-# journalctl (SIGINT) and returns control to this script's menu loop below —
-# it has no effect whatsoever on the actual running service.
-live_logs() {
-    echo ""
-    echo "── Live logs for \"${SERVICE_NAME}\" (Ctrl+C to return to menu) ──"
-    echo ""
-    journalctl -u "${SERVICE_NAME}" -f --no-pager || true
-    echo ""
-    echo "── returned to menu ──"
-}
+# Preference order: config/master.json's "siteName" → package.json's
+# "name" → the project folder's own name. Never fails outright — falls all
+# the way back to "node-project" if literally nothing usable is found,
+# rather than erroring out.
+derive_name() {
+    local master_json="${PROJ_PATH}/config/master.json"
+    local package_json="${PROJ_PATH}/package.json"
+    local name=""
 
-# ── Uninstall (menu option 8) ─────────────────────────────────────────────────
-
-uninstall_service() {
-    echo ""
-    read -rp "This will stop, disable, and permanently remove the \"${SERVICE_NAME}\" service. Continue? [y/N]: " confirm
-    if [[ ! "${confirm}" =~ ^[Yy]$ ]]; then
-        echo "service.sh: uninstall cancelled."
-        return
+    if [[ -f "${master_json}" ]]; then
+        name="$(node -e "
+            try {
+                const c = JSON.parse(require('fs').readFileSync('${master_json}', 'utf-8'));
+                if (c && typeof c.siteName === 'string' && c.siteName.trim()) {
+                    process.stdout.write(c.siteName.trim());
+                }
+            } catch {}
+        " 2>/dev/null || true)"
     fi
 
-    systemctl stop "${SERVICE_NAME}" 2>/dev/null || true
-    systemctl disable "${SERVICE_NAME}" 2>/dev/null || true
-    rm -f "${UNIT_PATH}"
-    systemctl daemon-reload
+    if [[ -z "${name}" && -f "${package_json}" ]]; then
+        name="$(node -e "
+            try {
+                const p = JSON.parse(require('fs').readFileSync('${package_json}', 'utf-8'));
+                if (p && typeof p.name === 'string' && p.name.trim()) {
+                    process.stdout.write(p.name.trim());
+                }
+            } catch {}
+        " 2>/dev/null || true)"
+    fi
 
-    echo "service.sh: \"${SERVICE_NAME}\" uninstalled (project files on disk are untouched)."
-    echo "service.sh: note — ${SERVICE_NAME_FILE} still remembers this name; run ./scripts/run.sh to reinstall it later."
+    if [[ -z "${name}" ]]; then
+        name="$(basename "${PROJ_PATH}")"
+    fi
+
+    if [[ -z "${name}" ]]; then
+        name="node-project"
+    fi
+
+    echo "${name}"
 }
 
-# ── Menu ───────────────────────────────────────────────────────────────────────
+NAME="$(derive_name)"
+SLUG="$(echo "${NAME}" | tr '[:upper:]' '[:lower:]' | tr -c '[:alnum:]' '-' | sed 's/-\+/-/g; s/^-//; s/-$//')"
+[[ -z "${SLUG}" ]] && SLUG="node-project"
+SERVICE_NAME="${SLUG}"
+UNIT_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
-print_menu() {
-    echo ""
-    echo "── ${SERVICE_NAME} — service control ──"
-    echo "  1) Status"
-    echo "  2) Start"
-    echo "  3) Stop"
-    echo "  4) Restart"
-    echo "  5) Live logs"
-    echo "  6) Enable on boot"
-    echo "  7) Disable on boot"
-    echo "  8) Uninstall service"
-    echo "  0) Exit"
-}
+RUN_AS_USER="${SUDO_USER:-$(logname 2>/dev/null || echo "$USER")}"
 
-while true; do
-    print_menu
-    read -rp "Choose an option [0-8]: " choice
+# Resolve ExecStart to an absolute path (systemd requires this). CMD is
+# always "node node.js" here, so this just resolves the "node" binary via
+# PATH — kept as a general-purpose resolver (rather than hardcoding the
+# node path) in case CMD is ever extended in the future.
+resolve_cmd() {
+    local first_word rest resolved
+    first_word="$(echo "${CMD}" | awk '{print $1}')"
+    rest="$(echo "${CMD}" | cut -d' ' -f2-)"
+    if [[ "${rest}" == "${first_word}" ]]; then rest=""; fi
 
-    case "${choice}" in
-        1) systemctl status "${SERVICE_NAME}" --no-pager || true ;;
-        2) systemctl start "${SERVICE_NAME}" && echo "service.sh: started." ;;
-        3) systemctl stop "${SERVICE_NAME}" && echo "service.sh: stopped." ;;
-        4) systemctl restart "${SERVICE_NAME}" && echo "service.sh: restarted." ;;
-        5) live_logs ;;
-        6) systemctl enable "${SERVICE_NAME}" && echo "service.sh: enabled on boot." ;;
-        7) systemctl disable "${SERVICE_NAME}" && echo "service.sh: disabled on boot." ;;
-        8) uninstall_service ;;
-        0) echo "service.sh: bye."; exit 0 ;;
-        *) echo "service.sh: invalid option." ;;
+    case "${first_word}" in
+        /*)
+            resolved="${first_word}"
+            ;;
+        ./*|../*)
+            resolved="$(cd "${PROJ_PATH}" && realpath -m "${first_word}")"
+            ;;
+        *)
+            # bare command (e.g. "node") — try PATH first
+            if command -v "${first_word}" >/dev/null 2>&1; then
+                resolved="$(command -v "${first_word}")"
+            else
+                resolved="$(cd "${PROJ_PATH}" && realpath -m "./${first_word}")"
+            fi
+            ;;
     esac
-done
+
+    if [[ -n "${rest}" ]]; then
+        echo "${resolved} ${rest}"
+    else
+        echo "${resolved}"
+    fi
+}
+
+generate_unit() {
+    local exec_cmd
+    exec_cmd="$(resolve_cmd)"
+
+    tee "${UNIT_FILE}" > /dev/null <<EOF
+[Unit]
+Description=${NAME} service
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=${PROJ_PATH}
+ExecStart=${exec_cmd}
+Restart=on-failure
+RestartSec=3
+KillMode=control-group
+KillSignal=SIGTERM
+TimeoutStopSec=5
+SendSIGKILL=yes
+User=${RUN_AS_USER}
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+}
+
+do_start() {
+    generate_unit
+    echo "Starting ${SERVICE_NAME}..."
+    systemctl start "${SERVICE_NAME}"
+    systemctl status "${SERVICE_NAME}" --no-pager -l || true
+}
+
+do_stop() {
+    echo "Stopping ${SERVICE_NAME}..."
+    systemctl stop "${SERVICE_NAME}" 2>/dev/null || true
+    if systemctl is-active --quiet "${SERVICE_NAME}" 2>/dev/null; then
+        echo "Still running, force killing..."
+        systemctl kill --signal=SIGKILL "${SERVICE_NAME}"
+    fi
+    pkill -9 -f "$(basename "${CMD}")" 2>/dev/null || true
+    echo "Stopped."
+}
+
+do_enable() {
+    generate_unit
+    systemctl enable "${SERVICE_NAME}"
+    echo "Enabled ${SERVICE_NAME} on boot."
+}
+
+do_disable() {
+    systemctl disable "${SERVICE_NAME}" 2>/dev/null || true
+    echo "Disabled ${SERVICE_NAME} from starting on boot."
+}
+
+do_logs() {
+    echo "Tailing logs for ${SERVICE_NAME} (Ctrl+C to exit)..."
+    journalctl -u "${SERVICE_NAME}" -f -n 100
+}
+
+do_status() {
+    local active_state enabled_state
+    active_state="$(systemctl is-active "${SERVICE_NAME}" 2>/dev/null || echo "unknown")"
+    enabled_state="$(systemctl is-enabled "${SERVICE_NAME}" 2>/dev/null || echo "not enabled")"
+
+    case "${active_state}" in
+        active) echo "Status: RUNNING" ;;
+        *) echo "Status: NOT RUNNING (${active_state})" ;;
+    esac
+
+    case "${enabled_state}" in
+        enabled) echo "Boot:   ENABLED" ;;
+        *) echo "Boot:   DISABLED (${enabled_state})" ;;
+    esac
+}
+
+echo "Service: ${NAME}"
+echo "Project: ${PROJ_PATH}"
+echo "Command: ${CMD}"
+echo
+echo "1) Stop"
+echo "2) Disable"
+echo "3) Start"
+echo "4) Enable"
+echo "5) View live logs"
+echo "6) Status"
+read -rp "Choose an option [1-6]: " choice
+
+case "${choice}" in
+    1) do_stop ;;
+    2) do_disable ;;
+    3) do_start ;;
+    4) do_enable ;;
+    5) do_logs ;;
+    6) do_status ;;
+    *) echo "Invalid option" ;;
+esac

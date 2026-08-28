@@ -18,12 +18,35 @@
 #                            .gitignore. If the path doesn't exist on disk,
 #                            the script exits without changing anything.
 #
+# NOTE: this script must NEVER be run with sudo/as root — see the check
+# immediately below for why.
+#
 set -euo pipefail
 
 BRANCH="main"
 MANIFEST_PATH="config/manifest.txt"
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+# ── Refuse to run as root/sudo ────────────────────────────────────────────────
+#
+# git operations here (committing, pushing, reading/writing .gitignore) are
+# tied to YOUR normal user account — SSH keys/credentials in ~/.ssh or the
+# credential helper, git's own user.name/user.email config, and file
+# ownership of everything this script touches or creates (config/manifest.txt,
+# .gitignore, any new commits). Running this under sudo would either silently
+# use root's (probably nonexistent) git identity/SSH keys and fail, or worse,
+# leave root-owned files behind in what's supposed to be your normal
+# checkout. There's nothing in this script that legitimately needs elevated
+# privileges, so it simply refuses to run as root at all.
+if [[ "${EUID}" -eq 0 ]]; then
+    echo "git.sh: this script must NOT be run with sudo/as root." >&2
+    echo "        git commits/pushes and .gitignore edits need to run as your" >&2
+    echo "        normal user account (SSH keys, git identity, file ownership" >&2
+    echo "        all live there, not root's)." >&2
+    echo "        run it as: ./scripts/git.sh" >&2
+    exit 1
+fi
 
 if [[ ! -d .git ]]; then
     echo "git.sh: no .git repo found in $(pwd)." >&2

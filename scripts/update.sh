@@ -5,6 +5,12 @@
 # Run from anywhere; always operates on the project root (one level up from
 # this script, i.e. this script must live at scripts/update.sh).
 #
+# NOTE: this script requires bash specifically (arrays, [[ ]], BASH_SOURCE,
+# etc. are used throughout) — see the guard immediately below. Running it
+# via `sh scripts/update.sh` (which on many systems is dash, not bash) will
+# now fail fast with a clear message instead of a confusing mid-script
+# syntax error.
+#
 # ── What it does, in order ───────────────────────────────────────────────
 #   1. Checks dependencies (curl, jq, tar, node) — offers to apt-get install
 #      anything missing.
@@ -77,6 +83,23 @@
 # Hardcoded to this project's public GitHub repo. No auth, no env vars,
 # no per-machine setup required.
 #
+
+# ── Require bash ───────────────────────────────────────────────────────────
+#
+# This must be the very first executable statement, before `set -euo
+# pipefail` and before anything else — so that running this script under a
+# non-bash shell (e.g. `sh scripts/update.sh`, where `sh` is often dash)
+# fails immediately with a clear, actionable message instead of an opaque
+# "syntax error near unexpected token" partway through (dash chokes on
+# `[[ ]]`, arrays, and BASH_SOURCE, all used extensively below).
+# `${BASH_VERSION:-}` is safe to reference even under `set -u` / non-bash
+# shells since the default-value form never triggers "unbound variable".
+if [ -z "${BASH_VERSION:-}" ]; then
+    echo "update.sh: this script requires bash — it won't run correctly under sh/dash." >&2
+    echo "           run it as: bash scripts/update.sh   (or: ./scripts/update.sh)" >&2
+    exit 1
+fi
+
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
