@@ -1,7 +1,7 @@
-// ADMIN/blog-editor/js/toolbar.js
 // ─────────────────────────────────────────────────────────────────────────────
-// Right-panel toolbar — [Paragraph] / [Mobile] / <link embed> buttons, plus
-// the Tags Help / Media Help buttons (bottom-right of the editor page).
+// Right-panel toolbar — [Paragraph] / [Mobile] / <link embed> / <STL> /
+// <image> / <video> / <audio> / <folder> buttons, plus the Tags Help /
+// Media Help buttons (bottom-right of the editor page).
 //
 // The main buttons insert text directly into the currently mounted
 // content.md textarea. They are ALWAYS visible/enabled regardless of edit
@@ -9,9 +9,17 @@
 // actually do anything while content.md is the active mode. Clicking them
 // while editing config.json is a silent no-op, per spec.
 //
-// Tag colors are NEVER hardcoded here — they're pulled live from
-// tags-config.js's getTagColors(), which is populated from
-// ADMIN/blog-editor/tags.json.
+// Tag colors / STL defaults are NEVER hardcoded here — they're pulled live
+// from blog-config.js's getTagColors()/getStlDefaults(), which are
+// populated from ADMIN/blog-editor/blog.json.
+//
+// <STL>, <image>, <video>, <audio>, and <folder> are all consumers of the
+// generic selection-mode framework (selection-mode.js) — clicking one puts
+// the media manager into "pick a matching item" mode (matching tiles
+// highlight in that tag's color); picking one inserts the appropriate tag
+// at the last cursor position in content.md. Any future media-selection
+// tag follows the exact same pattern without this file (or
+// media-manager.js) needing any new type-specific branching elsewhere.
 //
 // Tags Help and Media Help both open the exact same kind of markdown
 // overlay (openMarkdownHelp), just pointed at different .md files —
@@ -19,9 +27,11 @@
 // the rendering/open/close code is shared between the two buttons.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { getTagColors } from "./tags-config.js";
+import { getTagColors, getStlDefaults } from "./blog-config.js";
+import { toggleSelection, onSelectionChange } from "./selection-mode.js";
+import { IMAGE_EXTS, VIDEO_EXTS, AUDIO_EXTS, getExt } from "./media-manager.js";
 
-// ── Small reusable input modal (Paragraph / Link dialogs) ────────────────────
+// ── Small reusable input modal (Paragraph / Link / Video dialogs) ────────────
 
 function createSmallModal({ title, bodyBuilder, onSubmit }) {
     const overlay = document.createElement("div");
@@ -269,6 +279,35 @@ function openLinkDialog(getTextarea) {
     });
 }
 
+// ── Video options dialog ────────────────────────────────────────────────────
+// Shown BEFORE entering selection mode for <video>. Defaults to not
+// looping. If the user checks the box, the picked video is tagged to
+// autoplay/loop/mute (no audio) GIF-style; otherwise it plays normally
+// with controls.
+
+function openVideoDialog(onConfirm) {
+    createSmallModal({
+        title: "Insert Video Tag",
+        bodyBuilder(body) {
+            const row = document.createElement("div");
+            row.className = "be-toolbar-modal-row";
+            const label = document.createElement("label");
+            label.textContent = "Loop (autoplay, muted, no audio):";
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.checked = false;
+            row.appendChild(label);
+            row.appendChild(checkbox);
+            body.appendChild(row);
+            return { checkbox };
+        },
+        onSubmit({ checkbox }) {
+            onConfirm(checkbox.checked);
+            return true;
+        },
+    });
+}
+
 // ── Generic markdown-help modal — fetches any given .md URL and renders it
 // as markdown inside a large overlay covering most of the screen. Clicking
 // the × button or clicking off (outside the box) closes it. Shared by both
@@ -375,7 +414,7 @@ function openMarkdownHelp(mdUrl) {
 //
 // Buttons use the exact same visual style as the top bar's buttons
 // (.admin-button) — only their TEXT is colored, pulled live from
-// tags.json via getTagColors() (never hardcoded).
+// blog.json via getTagColors() (never hardcoded).
 //
 // `tagsHelpBtnEl` / `mediaHelpBtnEl` (the two help buttons, bottom-right of
 // the page) are wired here to open tags.md / media.md respectively — both
@@ -384,6 +423,35 @@ function openMarkdownHelp(mdUrl) {
 
 export function initToolbar({ toolbarEl, tagsHelpBtnEl, mediaHelpBtnEl, getTextarea, isMarkdownMode }) {
     const colors = getTagColors();
+    const stl    = getStlDefaults();
+
+    // Wires a "selection type" button (image/video/audio/folder/stl) so
+    // it: colors its own text from tags.json, toggles the given selection
+    // type on click, and reflects active/inactive state visually. Kept
+    // generic so adding another media-selection tag later is just another
+    // call to this same helper.
+        // Wires a "selection type" button (image/video/audio/folder/stl) so
+    // it: colors its own text from tags.json, toggles the given selection
+    // type on click, and reflects active/inactive state visually. Kept
+    // generic so adding another media-selection tag later is just another
+    // call to this same helper.
+    function makeSelectionButton({ text, colorKey, buildType }) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "admin-button be-tool-btn";
+        btn.textContent = text;
+        btn.style.setProperty("--tool-color", colors[colorKey] || "inherit");
+        const type = buildType();
+        btn.addEventListener("click", () => {
+            if (!isMarkdownMode()) return;
+            toggleSelection(type);
+        });
+        onSelectionChange((active) => {
+            btn.classList.toggle("be-tool-btn--selecting", !!(active && active.key === type.key));
+        });
+        return btn;
+    }
+
 
     const paragraphBtn = document.createElement("button");
     paragraphBtn.type = "button";
@@ -419,10 +487,108 @@ export function initToolbar({ toolbarEl, tagsHelpBtnEl, mediaHelpBtnEl, getTexta
         openLinkDialog(getTextarea);
     });
 
+    // <STL> — pick an .stl file; inserts <stl:relPath|bgHex|modelHex>
+    // using the bg/model defaults from blog.json's stlDefaults section.
+    const stlBtn = makeSelectionButton({
+        text: "<STL>",
+        colorKey: "stl",
+        buildType: () => ({
+            key: "stl",
+            color: colors.stl || "#ceb8ff",
+            matches: (item) => !item.isFolder && getExt(item.name) === "stl",
+            onPick: (item, relPath) => {
+                const textarea = getTextarea();
+                if (!textarea) return;
+                const bg    = stl.background || "#1E1E1E";
+                const model = stl.model      || "#932E2F";
+                insertAtCursor(textarea, `<stl:${relPath}|${bg}|${model}>`);
+            },
+        }),
+    });
+
+    // <image> — pick any supported image (.png, .jpg, .jpeg, .webp, .svg,
+    // .avif, .gif); inserts <relPath>.
+    const imageBtn = makeSelectionButton({
+        text: "<image>",
+        colorKey: "image",
+        buildType: () => ({
+            key: "image",
+            color: colors.image || "#ff0000",
+            matches: (item) => !item.isFolder && IMAGE_EXTS.has(getExt(item.name)),
+            onPick: (item, relPath) => {
+                const textarea = getTextarea();
+                if (!textarea) return;
+                insertAtCursor(textarea, `<${relPath}>`);
+            },
+        }),
+    });
+
+        // <video> — enters selection mode immediately for .mp4/.webm files.
+    // Once a matching file is CLICKED, a dialog pops up asking whether it
+    // should loop (autoplay, muted, no audio, GIF-style) or play normally
+    // with controls. Inserts <relPath> normally, or <relPath loop> if the
+    // dialog's checkbox was checked.
+    const videoBtn = makeSelectionButton({
+        text: "<video>",
+        colorKey: "video",
+        buildType: () => ({
+            key: "video",
+            color: colors.video || "#3347ff",
+            matches: (item) => !item.isFolder && VIDEO_EXTS.has(getExt(item.name)),
+            onPick: (item, relPath) => {
+                openVideoDialog((loop) => {
+                    const textarea = getTextarea();
+                    if (!textarea) return;
+                    insertAtCursor(textarea, loop ? `<${relPath} loop>` : `<${relPath}>`);
+                });
+            },
+        }),
+    });
+
+
+    // <audio> — pick any supported audio file (.mp3, .wav); inserts
+    // <relPath>.
+    const audioBtn = makeSelectionButton({
+        text: "<audio>",
+        colorKey: "audio",
+        buildType: () => ({
+            key: "audio",
+            color: colors.audio || "#ff00c8",
+            matches: (item) => !item.isFolder && AUDIO_EXTS.has(getExt(item.name)),
+            onPick: (item, relPath) => {
+                const textarea = getTextarea();
+                if (!textarea) return;
+                insertAtCursor(textarea, `<${relPath}>`);
+            },
+        }),
+    });
+
+    // <folder> — pick a FOLDER (matches() targets isFolder, not an
+    // extension) instead of navigating into it; inserts <./relPath>.
+    const folderBtn = makeSelectionButton({
+        text: "<folder>",
+        colorKey: "folder",
+        buildType: () => ({
+            key: "folder",
+            color: colors.folder || "#cbb8ff",
+            matches: (item) => !!item.isFolder,
+            onPick: (item, relPath) => {
+                const textarea = getTextarea();
+                if (!textarea) return;
+                insertAtCursor(textarea, `<./${relPath}>`);
+            },
+        }),
+    });
+
     toolbarEl.innerHTML = "";
     toolbarEl.appendChild(paragraphBtn);
     toolbarEl.appendChild(mobileBtn);
     toolbarEl.appendChild(linkBtn);
+    toolbarEl.appendChild(stlBtn);
+    toolbarEl.appendChild(imageBtn);
+    toolbarEl.appendChild(videoBtn);
+    toolbarEl.appendChild(audioBtn);
+    toolbarEl.appendChild(folderBtn);
 
     if (tagsHelpBtnEl) {
         tagsHelpBtnEl.addEventListener("click", () => openMarkdownHelp("/blog-editor/tags.md"));

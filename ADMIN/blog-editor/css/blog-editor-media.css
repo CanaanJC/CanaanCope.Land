@@ -1,8 +1,9 @@
 /* ─────────────────────────────────────────────────────────────────────────────
    Blog Editor — media manager: divider, upload/new-folder action row,
    breadcrumb, the Finder-style icon grid, the right-click context menu,
-   and the full-screen media viewer (lightbox) opened by clicking a file
-   tile.
+   the full-screen media viewer (lightbox) opened by clicking a file
+   tile, and the generic "media selection mode" tile highlight (see
+   js/selection-mode.js).
    ───────────────────────────────────────────────────────────────────────── */
 
 /* Faint separator between the tag toolbar and the media manager below it */
@@ -111,6 +112,7 @@
     cursor: pointer;
     user-select: none;
     -webkit-user-select: none;
+    transition: box-shadow 120ms ease, background-color 120ms ease;
 }
 
 .be-media-tile:hover {
@@ -124,6 +126,19 @@
 .be-media-tile--dragover {
     background: #22281f;
     box-shadow: 0 0 0 1px #4a6a3a;
+}
+
+/* ── Media-selection-mode highlight — generic, driven purely by
+   --select-color (set inline by media-manager.js from the active
+   selection type's own `color`, whatever that type turns out to be). ── */
+
+.be-media-tile--selectable {
+    box-shadow: 0 0 0 2px var(--select-color, #fff);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.be-media-tile--selectable:hover {
+    background: rgba(255, 255, 255, 0.08);
 }
 
 .be-media-icon-wrap {

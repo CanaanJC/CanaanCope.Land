@@ -1,4 +1,3 @@
-// ADMIN/blog-editor/js/media-manager.js
 // ─────────────────────────────────────────────────────────────────────────────
 // Blog Editor — per-article media manager. Sits below the tag toolbar, in
 // the right panel. Always scoped to the CURRENTLY SELECTED blog's own
@@ -25,17 +24,44 @@
 //     player, and audio gets an <audio controls> player. Folders are
 //     unaffected — clicking one still navigates into it. Click anywhere
 //     outside the media element itself (or press Escape) to close.
+//   - Media selection mode (see selection-mode.js) — when a toolbar
+//     button (<STL>, <image>, <video>, <audio>, <folder>) has an active
+//     selection type, matching tiles (files OR folders, depending on the
+//     type's own matches() rule) highlight in that type's color; clicking
+//     one hands off to the type's onPick() instead of the normal
+//     click behavior (opening the viewer / navigating into a folder).
+//     This file has NO hardcoded knowledge of which types exist — it
+//     only ever asks the active type "does this item match?".
+//
+// Icon size and label text size are both driven live by the
+// --media-icon-size / --media-text-size CSS variables (see
+// js/blog-config.js, sourced from blog.json's "mediaDisplay" section) —
+// nothing here is hardcoded to 64px/12px.
 //
 // Anything sitting in a "cmpsd" folder, or not matching the supported
 // media whitelist, is never listed here at all — filtered server-side by
 // /api/blog-media (see lib/adminRoutes.js).
 // ─────────────────────────────────────────────────────────────────────────────
 
-const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "webp", "svg", "avif", "gif"]);
-const VIDEO_EXTS = new Set(["mp4", "webm"]);
-const AUDIO_EXTS = new Set(["mp3", "wav"]);
+import { getActiveSelection, onSelectionChange, stopSelection } from "./selection-mode.js";
+
+export const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "webp", "svg", "avif", "gif"]);
+export const VIDEO_EXTS = new Set(["mp4", "webm"]);
+export const AUDIO_EXTS = new Set(["mp3", "wav"]);
+
+export function getExt(name) {
+    return (String(name || "").split(".").pop() || "").toLowerCase();
+}
 
 const UPLOAD_ACCEPT = ".png,.jpg,.jpeg,.webp,.svg,.avif,.gif,.mp4,.webm,.mp3,.wav,.stl";
+
+// Tracks the unsubscribe function for the PREVIOUS mountMediaManager()
+// call's selection-change listener — mountMediaManager() fully rebuilds
+// its container's innerHTML each time a blog is (re)selected, so without
+// this the module-level listener Set in selection-mode.js would keep
+// accumulating one stale listener (pointing at a detached gridEl) per
+// blog switch.
+let _prevSelectionUnsub = null;
 
 // ── Media viewer (lightbox) ─────────────────────────────────────────────
 // Opens a near-fullscreen overlay showing the given file according to its
@@ -46,7 +72,7 @@ const UPLOAD_ACCEPT = ".png,.jpg,.jpeg,.webp,.svg,.avif,.gif,.mp4,.webm,.mp3,.wa
 // element itself (overlay background OR the box around it) closes the
 // viewer, as does pressing Escape.
 function openMediaViewer(name, url) {
-    const ext = (name.split(".").pop() || "").toLowerCase();
+    const ext = getExt(name);
 
     let mediaEl;
 
@@ -174,6 +200,10 @@ export function mountMediaManager(container, blog) {
     let currentSub = ""; // "" = media/ root; otherwise e.g. "figs2" or "figs2/nested"
     let dragData = null; // { name, type, fromSub } while a drag is in progress
 
+    // Drop any listener registered by a previous mount (see comment on
+    // _prevSelectionUnsub above) before wiring this instance's own.
+    if (_prevSelectionUnsub) _prevSelectionUnsub();
+
     container.innerHTML = `
         <div class="be-media-actions">
             <button id="be-media-upload-btn" class="admin-button" type="button">Upload</button>
@@ -202,6 +232,13 @@ export function mountMediaManager(container, blog) {
         const encoded = subPath.split("/").filter(Boolean).map(encodeURIComponent).join("/");
         const prefix  = encoded ? `${encoded}/` : "";
         return `/${blog.urlPath}/media/${prefix}${encodeURIComponent(name)}`;
+    }
+
+    // Path relative to the media root — what actually gets embedded in an
+    // inline tag (e.g. <stl:relPath|...|...>, <relPath>, <./relPath>),
+    // NOT URL-encoded.
+    function relPathFor(name) {
+        return currentSub ? `${currentSub}/${name}` : name;
     }
 
     // ── Breadcrumb ───────────────────────────────────────────────────────────
@@ -283,7 +320,7 @@ export function mountMediaManager(container, blog) {
             return icon;
         }
 
-        const ext = (item.name.split(".").pop() || "").toLowerCase();
+        const ext = getExt(item.name);
         const url = fileUrl(item.name);
 
         if (IMAGE_EXTS.has(ext)) {
@@ -311,6 +348,36 @@ export function mountMediaManager(container, blog) {
         return blankCard("");
     }
 
+    // Applies (or clears) the generic selection-mode highlight on a single
+    // tile, based on whatever selection type (if any) is currently active.
+    // Completely type-agnostic — just asks active.matches(item) (which may
+    // match FILES or FOLDERS depending on the type) and uses active.color;
+    // has no idea "stl"/"image"/"folder" etc. exist as concepts.
+    function applyTileHighlight(tile, item) {
+        const active = getActiveSelection();
+        if (active && active.matches(item)) {
+            tile.classList.add("be-media-tile--selectable");
+            tile.style.setProperty("--select-color", active.color || "#fff");
+        } else {
+            tile.classList.remove("be-media-tile--selectable");
+            tile.style.removeProperty("--select-color");
+        }
+    }
+
+    // Re-applies highlight state to every currently-rendered tile —
+    // called once right after a fresh render, and again any time the
+    // active selection type changes (so toggling a button on/off updates
+    // the grid live, without needing to reload from the server).
+    function refreshAllHighlights() {
+        for (const tile of gridEl.querySelectorAll(".be-media-tile")) {
+            const item = {
+                name: tile.dataset.name,
+                isFolder: tile.dataset.type === "folder",
+            };
+            applyTileHighlight(tile, item);
+        }
+    }
+
     function buildTile(item) {
         const tile = document.createElement("div");
         tile.className = "be-media-tile";
@@ -332,17 +399,30 @@ export function mountMediaManager(container, blog) {
         label.title = item.name;
         tile.appendChild(label);
 
-        // Single click on a folder navigates into it. Single click on a
-        // file opens the near-fullscreen media viewer. Rename/Delete are
-        // via the right-click context menu (see contextmenu listener
-        // below).
+        applyTileHighlight(tile, item);
+
+        // Single click:
+        //   - if a selection type is active AND matches this item (file
+        //     OR folder — up to that type's own matches() rule): hands
+        //     off to its onPick(item, relPath) and ends selection mode,
+        //     instead of the normal click behavior below.
+        //   - otherwise, on a folder: navigates into it as usual.
+        //   - otherwise, on a file: opens the near-fullscreen viewer.
         tile.addEventListener("click", () => {
+            const active = getActiveSelection();
+            if (active && active.matches(item)) {
+                active.onPick(item, relPathFor(item.name));
+                stopSelection();
+                return;
+            }
+
             if (item.isFolder) {
                 currentSub = currentSub ? `${currentSub}/${item.name}` : item.name;
                 load();
-            } else {
-                openMediaViewer(item.name, fileUrl(item.name));
+                return;
             }
+
+            openMediaViewer(item.name, fileUrl(item.name));
         });
 
         // Right-click → context menu with "Rename" and "Delete" (works
@@ -483,6 +563,7 @@ export function mountMediaManager(container, blog) {
                     for (const item of items) gridEl.appendChild(buildTile(item));
                 }
 
+                refreshAllHighlights();
                 setStatus("");
             })
             .catch((e) => setStatus(`Failed to load: ${e.message}`, "error"));
@@ -611,6 +692,12 @@ export function mountMediaManager(container, blog) {
             })
             .catch((e) => setStatus(`Failed to create folder: ${e.message}`, "error"));
     });
+
+    // Live-update every tile's highlight the moment selection mode is
+    // toggled on/off/switched — no reload needed, and this listener is
+    // cleaned up (see _prevSelectionUnsub above) the next time a blog is
+    // selected and this function runs again.
+    _prevSelectionUnsub = onSelectionChange(refreshAllHighlights);
 
     load();
 }

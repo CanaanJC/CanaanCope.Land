@@ -1,9 +1,8 @@
-// ADMIN/blog-editor/js/blog-editor.js
 // ─────────────────────────────────────────────────────────────────────────────
 // Blog Editor — main orchestrator. See css/blog-editor-*.css for
 // layout/styling, and the sibling js/ modules for the individual pieces
 // (dropdown, preview, config editor, markdown editor + tag syntax
-// highlighting, right-panel toolbar, media manager).
+// highlighting, right-panel toolbar, media manager, media selection mode).
 //
 // Unsaved-changes protection: any edit in either mounted editor marks the
 // page dirty; switching blogs / leaving the page warns before discarding.
@@ -11,15 +10,21 @@
 // anything — both editors stay mounted the whole time. The media manager
 // is independent of dirty-tracking — every media action (upload, new
 // folder, rename, move) writes to disk immediately on its own.
+//
+// Any active media-selection mode (e.g. <STL>/<image>/<video>/<audio>/
+// <folder> picking) is cancelled whenever the edit mode is switched away
+// from content.md, or a different blog is selected — it should never
+// persist across either.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { loadTagColors } from "./tags-config.js";
+import { loadBlogConfig } from "./blog-config.js";
 import { mountMarkdownEditor } from "./markdown-editor.js";
 import { mountConfigEditor } from "./config-editor.js";
 import { createDropdown } from "./dropdown.js";
 import { createPreview } from "./preview.js";
 import { initToolbar } from "./toolbar.js";
 import { mountMediaManager } from "./media-manager.js";
+import { stopSelection } from "./selection-mode.js";
 
 const mainBtn          = document.getElementById("be-main-btn");
 const modeToggleGroup  = document.getElementById("be-mode-toggle-group");
@@ -138,6 +143,10 @@ function applyModeVisibility() {
 
 function switchMode(mode) {
     if (!selectedBlog || mode === currentMode) return;
+    // A media-selection pick (e.g. <STL>/<image>/etc.) only ever makes
+    // sense while content.md is the active mode — cancel it on any mode
+    // switch so it can never linger while editing config.json.
+    stopSelection();
     currentMode = mode;
     setModeButtons();
     applyModeVisibility();
@@ -226,6 +235,10 @@ async function updateCurrentPathLink(blog) {
 // ── Blog selection ───────────────────────────────────────────────────────────
 
 async function selectBlog(blog, { pushUrl = false } = {}) {
+    // Any active media-selection pick is scoped to a single blog's media
+    // manager — cancel it before switching to a different one.
+    stopSelection();
+
     selectedBlog = blog;
     document.getElementById("be-dropdown-btn").textContent = `${blog.name} ▾`;
     modeContentBtn.disabled = false;
@@ -276,10 +289,10 @@ mainBtn.addEventListener("click", () => {
 // ── Boot ─────────────────────────────────────────────────────────────────────
 
 async function boot() {
-    // Tag colors must be loaded BEFORE the toolbar is initialized, since
-    // toolbar.js's button text colors are pulled live from tags.json
-    // rather than ever being hardcoded.
-    await loadTagColors();
+    // blog.json must be loaded BEFORE the toolbar is initialized, since
+    // toolbar.js's button text colors / STL defaults are pulled live from
+    // it rather than ever being hardcoded.
+    await loadBlogConfig();
 
     initToolbar({
         toolbarEl,

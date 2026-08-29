@@ -2,8 +2,7 @@
     "columns": [
         [
             "master.json",
-            "update-checker",
-            "tag-colors"
+            "update-checker"
         ],
         [
             "blog-editor",
@@ -12,7 +11,8 @@
             "library-editor",
             "topbar.json",
             "admin-master.json",
-            "logo-uploader"
+            "logo-uploader",
+            "blog-editor-config"
         ]
     ]
 }

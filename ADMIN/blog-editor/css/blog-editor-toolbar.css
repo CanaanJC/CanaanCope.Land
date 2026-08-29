@@ -1,11 +1,12 @@
 /* ─────────────────────────────────────────────────────────────────────────────
-   Blog Editor — right-panel toolbar ([Paragraph] / <link embed>) and the
-   Tags Help / Media Help buttons (bottom-right of the page).
+   Blog Editor — right-panel toolbar ([Paragraph] / [Mobile] / <link embed> /
+   <STL> / <image> / <video> / <audio> / <folder>) and the Tags Help /
+   Media Help buttons (bottom-right of the page).
 
    Toolbar buttons reuse the exact same visual style as the top bar's
    buttons (.admin-button) — only the button TEXT is colored, via
    --tool-color (set inline per-button in js/toolbar.js, pulled live from
-   tags.json). They are never hidden/disabled based on edit mode.
+   blog.json). They are never hidden/disabled based on edit mode.
    ───────────────────────────────────────────────────────────────────────── */
 
 .be-toolbar {
@@ -20,6 +21,18 @@
 .be-tool-btn {
     --tool-color: inherit;
     color: var(--tool-color);
+}
+
+/* ── Active "media selection" state — shown on a toolbar button (e.g.
+   <STL>, <image>, <video>, <audio>, <folder>) while its selection type is
+   the one currently active in the media manager (see selection-mode.js).
+   Generic: any future selection-type button gets this exact same
+   treatment automatically, just by toggling this class based on its own
+   key. ── */
+.be-tool-btn--selecting {
+    outline: 2px solid var(--tool-color);
+    outline-offset: 2px;
+    background: #2f2f22;
 }
 
 /* ── Help buttons (bottom-right of the editor page) — Media Help sits to

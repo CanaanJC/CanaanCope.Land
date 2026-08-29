@@ -1,0 +1,21 @@
+{
+    "tags": {
+        "paragraph": "#ffdd00",
+        "mobile": "#21a300",
+        "image": "#ff0000",
+        "video": "#5797ff",
+        "loop": "#00b573",
+        "folder": "#D8B04B",
+        "link": "#3de617",
+        "stl": "#f18aff",
+        "audio": "#ff00bb"
+    },
+    "stlDefaults": {
+        "background": "#1E1E1E",
+        "model": "#932E2F"
+    },
+    "mediaDisplay": {
+        "iconSize": 64,
+        "textSize": 12
+    }
+}
