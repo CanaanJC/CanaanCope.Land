@@ -41,6 +41,18 @@ async function resolveLibrary() {
     return libraries.find(l => l.path === _pathParts[0]) || null;
 }
 
+// ── Page title injection ──────────────────────────────────────────────────────
+//
+// Every library page's static index.html ships with a placeholder
+// <title>Library</title>. As soon as the library is resolved, overwrite the
+// browser tab title with that library's own name (falling back to its path
+// if `name` is empty) — no per-library HTML edits needed, this covers every
+// library index.html (and the blocked/embed shell) automatically.
+function applyLibraryTitle(library) {
+    if (!library) return;
+    document.title = library.name || library.path || document.title;
+}
+
 // ── Fetch helpers ─────────────────────────────────────────────────────────────
 
 function entryId(slugPath) {
@@ -438,6 +450,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         console.error("Library: could not resolve a library for this page.");
         return;
     }
+    applyLibraryTitle(library);
     if (IS_BLOCKED) loadBlockedEntry(library);
     else loadLibrary(library);
 });
