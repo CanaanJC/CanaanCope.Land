@@ -37,6 +37,7 @@ config/manifest.txt
 config/update-notes/26.8.1.md
 config/update-notes/26.8.3.md
 config/update-notes/26.8.4.md
+config/update-notes/26.8.5.md
 config/version.txt
 .gitignore
 lib/adminRoutes.js
