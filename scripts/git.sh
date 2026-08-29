@@ -10,7 +10,12 @@
 #                            — used by the update system to detect files that
 #                            were removed between two releases), then stages
 #                            everything, commits with a message you type, and
-#                            pushes.
+#                            pushes. If the push is rejected because the
+#                            remote has commits you don't have locally (e.g.
+#                            someone edited a file via the GitHub web UI),
+#                            you're asked whether to abort (default) or force
+#                            the local commit history over the remote,
+#                            discarding whatever changes exist there.
 #   Option 2: .gitignore   — type a path (relative to repo root). If it's not
 #                            already ignored, it gets added. If it's already
 #                            ignored, it gets removed (toggle). Leave the
@@ -86,6 +91,35 @@ regenerate_manifest() {
     git add "${MANIFEST_PATH}"
 }
 
+# Handles a rejected push. This happens when the remote branch has commits
+# that don't exist locally — e.g. a file was edited directly on the GitHub
+# web UI, which creates a commit on the remote that your local checkout
+# never fetched. Default behavior is to abort and leave everything exactly
+# as committed locally (nothing is lost — your commit still exists locally,
+# it's just not pushed yet). Opting to override force-pushes your local
+# history over the remote, permanently discarding whatever changes exist
+# there that you don't have locally.
+handle_push_rejection() {
+    echo
+    echo "git.sh: push was rejected — the remote has commits you don't have" >&2
+    echo "        locally (e.g. a file was edited on the GitHub web UI)." >&2
+    echo
+    read -rp "Abort and keep remote as-is, or override remote with your local history? [A(bort)/o(verride)] (default: abort): " resolution
+
+    case "${resolution}" in
+        [Oo]|[Oo][Vv][Ee][Rr][Rr][Ii][Dd][Ee])
+            echo "git.sh: force-pushing local history over remote — remote-only changes will be lost."
+            git push --force-with-lease origin "${BRANCH}"
+            ;;
+        *)
+            echo "git.sh: aborted. Your commit is still saved locally — it just wasn't pushed." >&2
+            echo "        Remote is untouched. Re-run this script and choose to override once" >&2
+            echo "        you're ready, or resolve manually with 'git pull'." >&2
+            exit 1
+            ;;
+    esac
+}
+
 echo "canaancope.dev — git helper"
 echo "  1) Push changes"
 echo "  2) Add/remove a path in .gitignore"
@@ -108,7 +142,10 @@ case "${choice}" in
         fi
 
         git commit -m "${msg}"
-        git push origin "${BRANCH}"
+
+        if ! git push origin "${BRANCH}"; then
+            handle_push_rejection
+        fi
         ;;
 
     2)
