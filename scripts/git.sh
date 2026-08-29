@@ -99,6 +99,13 @@ regenerate_manifest() {
 # it's just not pushed yet). Opting to override force-pushes your local
 # history over the remote, permanently discarding whatever changes exist
 # there that you don't have locally.
+#
+# Plain --force (not --force-with-lease) is used deliberately: the whole
+# point of choosing "override" is to replace the remote's state with local
+# history unconditionally. --force-with-lease would refuse here since this
+# repo never fetched the remote's rejected commit, so it has no local
+# tracking ref to safely compare against — it would report "stale info" on
+# every single override, which defeats the purpose of the prompt.
 handle_push_rejection() {
     echo
     echo "git.sh: push was rejected — the remote has commits you don't have" >&2
@@ -109,7 +116,7 @@ handle_push_rejection() {
     case "${resolution}" in
         [Oo]|[Oo][Vv][Ee][Rr][Rr][Ii][Dd][Ee])
             echo "git.sh: force-pushing local history over remote — remote-only changes will be lost."
-            git push --force-with-lease origin "${BRANCH}"
+            git push --force origin "${BRANCH}"
             ;;
         *)
             echo "git.sh: aborted. Your commit is still saved locally — it just wasn't pushed." >&2
@@ -119,6 +126,7 @@ handle_push_rejection() {
             ;;
     esac
 }
+
 
 echo "canaancope.dev — git helper"
 echo "  1) Push changes"
