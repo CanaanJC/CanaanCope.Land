@@ -455,11 +455,15 @@ body.mobile .blog-cell--empty {
     display: none !important;
 }
 
-/* Center images at 95% width for slight side indent */
+/* Center images/embeds/models at 95% width for slight side indent.
+   Applies to all card wraps, including link embeds and STL viewers, so
+   every tag type gets the same consistent mobile treatment. */
 body.mobile .blog-image-wrap,
 body.mobile .blog-folder-outer,
 body.mobile .blog-audio-wrap,
-body.mobile .blog-video-wrap {
+body.mobile .blog-video-wrap,
+body.mobile .blog-link-wrap,
+body.mobile .blog-stl-wrap {
     width: 95% !important;
     margin-left: auto !important;
     margin-right: auto !important;
@@ -485,20 +489,30 @@ body.mobile .blog-cell--text-beside-image {
     display: block !important;
 }
 
-/* Typography scaling */
+/* ── Link embed (mobile) — same static/interactive behavior as desktop,
+      just narrower (95%, inherited above). No extra overrides needed:
+      .blog-link-wrap--static / --interactive and the open button /
+      static anchor all work identically at any width. ── */
+
+/* ── Typography scaling ───────────────────────────────────────────────── */
+
+/* Blog titles are centered on mobile (desktop keeps them left-aligned). */
 body.mobile .blog-title {
     font-size: 1.5rem !important;
-    padding-left: 4px !important;
+    padding-left: 0 !important;
+    text-align: center !important;
 }
 
 body.mobile .blog-date {
     font-size: 0.85rem !important;
-    padding-left: 4px !important;
+    padding-left: 0 !important;
+    text-align: center !important;
 }
 
 body.mobile .blog-section-title {
     font-size: 1.5rem !important;
-    padding-left: 4px !important;
+    padding-left: 0 !important;
+    text-align: center !important;
 }
 
 body.mobile .blog-divider {
@@ -518,7 +532,6 @@ body.mobile .blog-md-content {
     font-size: var(--page-font-size, 14.5px);
     line-height: 1.7;
 }
-
 
 /* Folder badge — slightly smaller on mobile */
 body.mobile .blog-folder-badge {

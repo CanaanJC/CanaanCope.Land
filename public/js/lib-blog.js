@@ -4,15 +4,40 @@
 // Provides parsing, rendering, gallery, and lazy-loading utilities for
 // project entries (about-me, featured projects, project listings).
 //
-// Media rules:
-//   - Filenames keep their real extensions (e.g. fig1.png, clip.mp4).
-//   - Any .gif is rendered as a looping, muted, autoplay <video> (no controls),
-//     matching a GIF's behaviour. The server transparently serves the MP4
-//     variant for the .gif URL; while the variant is still building the raw
-//     .gif is served and a bulletproof fallback swaps in an animated <img>.
-//   - A trailing "loop" keyword on a video token (e.g. "clip.mp4 loop" or
-//     "<clip.mp4 loop>") renders that video as a looping, muted, autoplay clip
-//     with no controls. The loop keyword is ignored on non-video files.
+// ── Tag syntax ────────────────────────────────────────────────────────────────
+//
+//   [P1] ... [/P1]        Full-width content row (number selects row order)
+//   [P1a] ... [/P1a]      Left half of row 1 (pairs with P1b)
+//   [P1b] ... [/P1b]      Right half of row 1 (pairs with P1a)
+//   [M1] ... [/M1]        Mobile-only row — nested inside a [P..] block, or
+//                         standalone at the top level. Invisible on desktop.
+//
+// All media references are INLINE-ONLY, wrapped in angle brackets:
+//
+//   <fig1.png>                          image
+//   <fig1.png loop>                     video forced to loop/mute/autoplay
+//                                       (the "loop" keyword only affects video
+//                                       files — .gif is always loop-video)
+//   <clip.mp4>                          video with normal controls
+//   <sound.mp3>                         audio with normal controls
+//   <./gallery>                         folder → thumbnail + gallery modal
+//   <link:https://example.com>          16:9 STATIC link preview — the whole
+//                                       card is a plain link; clicking it
+//                                       (anywhere) opens the page in a new
+//                                       tab. The embedded preview itself is
+//                                       NOT interactive/scrollable/clickable.
+//   <link:https://example.com|click>    16:9 INTERACTIVE embedded link
+//                                       preview — the iframe itself is fully
+//                                       usable (scroll/click/type inside it),
+//                                       with a small "open in new tab" button
+//                                       floating in the corner.
+//   <stl:model.stl|#bgHex|#modelHex>    1:1 drag-to-orbit 3D model viewer
+//
+// There is no more "bare"/standalone media syntax — a tag used alone as the
+// entire content of a [P..]/[M..] side renders full-size (the old
+// "standalone" behavior); a tag used mid-sentence renders inline with the
+// surrounding text split around it. Putting 2+ tags, one per line, alone in
+// a [P..]/[M..] side renders them as a vertical stack in one cell.
 //
 // Mobile vs desktop rendering:
 //   - parseContentMd extracts [P…] blocks AND strips any nested [M…]…[/M…]
@@ -25,6 +50,12 @@
 //     that stores its render inputs, enabling rerenderAllBlogContent() to
 //     rebuild every rendered block in place when the viewport toggles
 //     between mobile and desktop.
+//
+// NOTE: renderMediaToken / renderCell below are the SINGLE shared rendering
+// path used by both the desktop renderer (_buildDesktopRowsFragment) and
+// the mobile renderer (mobile.js's buildMobileRows). Any tag — link, stl,
+// folder, image, video, audio — behaves identically on both, since both
+// paths call into this same file for the actual tag handling.
 // ─────────────────────────────────────────────────────────────────────────────
 
 console.log("lib-blog module loaded");
@@ -47,9 +78,11 @@ export async function loadMarked() {
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
 
+// The "end date" used for chronological sorting is always the LAST entry in
+// the date array, regardless of how many entries it has (1, 2, 3, 4, …).
 export function getEndDate(date) {
     if (!date) return null;
-    if (Array.isArray(date)) return date.length >= 2 ? date[1] : date[0];
+    if (Array.isArray(date)) return date.length > 0 ? date[date.length - 1] : null;
     return date;
 }
 
@@ -71,29 +104,45 @@ export function sortByEndDate(list) {
     });
 }
 
-// ── Loop keyword + gif helpers ───────────────────────────────────────────────
-
-// Parse a trailing "loop" keyword off a single media token. Only triggers when
-// the token before " loop" looks like a filename (has an extension), so prose
-// that happens to end with the word "loop" is never affected.
-function parseLoopToken(raw) {
-    const trimmed = String(raw).trim();
-    const m = trimmed.match(/^([\w\-./]+\.[a-z0-9]+)\s+loop$/i);
-    if (m) return { value: m[1], loop: true };
-    return { value: trimmed, loop: false };
+// Pairs consecutive dates into ranges joined by an en dash. An odd date left
+// over at the end (no partner) is shown on its own. Works for any array
+// length: [d1] → "d1"; [d1,d2] → "d1 – d2"; [d1,d2,d3] → "d1 – d2, d3";
+// [d1,d2,d3,d4] → "d1 – d2, d3 – d4"; and so on.
+export function formatDateRanges(dateArr) {
+    if (!Array.isArray(dateArr)) return String(dateArr);
+    const parts = [];
+    let i = 0;
+    while (i < dateArr.length) {
+        if (i + 1 < dateArr.length) {
+            parts.push(`${dateArr[i]} – ${dateArr[i + 1]}`);
+            i += 2;
+        } else {
+            parts.push(dateArr[i]);
+            i += 1;
+        }
+    }
+    return parts.join(", ");
 }
 
-// Strip a trailing "loop" keyword for block-type classification only.
-function stripLoop(content) {
-    const m = String(content).trim().match(/^([\w\-./]+\.[a-z0-9]+)\s+loop$/i);
-    return m ? m[1] : String(content).trim();
-}
+// ── File-type helpers ────────────────────────────────────────────────────────
 
 function isGifFile(filename) {
     return /\.gif$/i.test(filename);
 }
 
-// ── Content parsing ──────────────────────────────────────────────────────────
+function isImageFile(filename) {
+    return /\.(png|jpg|jpeg|gif|webp|svg|avif)$/i.test(filename);
+}
+
+function isVideoFile(filename) {
+    return /\.(mp4|webm)$/i.test(filename);
+}
+
+function isAudioFile(filename) {
+    return /\.(mp3|wav)$/i.test(filename);
+}
+
+// ── Content parsing (block level: [P..] / [M..]) ─────────────────────────────
 
 // Desktop parser. Strips nested [M…]…[/M…] blocks from P content so they
 // never appear on desktop.
@@ -126,24 +175,6 @@ export function parseAllBlocks(raw) {
     return blocks;
 }
 
-// Block classifiers are loop-aware: a trailing "loop" keyword is stripped
-// before testing so "clip.mp4 loop" still classifies as a video block.
-export function isImageBlock(content) {
-    return /^[\w\-]+\.(png|jpg|jpeg|gif|webp|svg|avif)$/i.test(stripLoop(content));
-}
-
-export function isVideoBlock(content) {
-    return /^[\w\-]+\.(mp4|webm)$/i.test(stripLoop(content));
-}
-
-export function isAudioBlock(content) {
-    return /^[\w\-]+\.(mp3|wav)$/i.test(stripLoop(content));
-}
-
-export function isFolderBlock(content) {
-    return /^\.\/[\w\-]+$/.test(content.trim());
-}
-
 export function groupIntoRows(blocks) {
     const rowMap = new Map();
     for (const block of blocks) {
@@ -159,46 +190,111 @@ export function groupIntoRows(blocks) {
         .map(([num, sides]) => ({ num, sides }));
 }
 
-// ── Inline media detection ───────────────────────────────────────────────────
+// ── Inline token parsing (the <...> syntax) ──────────────────────────────────
 
-function isInlineMediaReference(text) {
-    return /<[\w\-]+\.(png|jpg|jpeg|gif|webp|svg|avif|mp4|webm|mp3|wav)(?:\s+loop)?>/i.test(text) ||
-           /<\.\/[\w\-]+>/i.test(text);
+// Matches every <...> occurrence in a string. A fresh RegExp is constructed
+// per call site rather than sharing one module-level instance, so lastIndex
+// never leaks between unrelated calls.
+function inlineTokenRegex() {
+    return /<([^<>]+)>/g;
 }
 
-function extractInlineMedia(text) {
-    const regex = /<(\.\/[\w\-]+|[\w\-]+\.(?:png|jpg|jpeg|gif|webp|svg|avif|mp4|webm|mp3|wav)(?:\s+loop)?)>/gi;
+// Classifies the raw text INSIDE a pair of angle brackets. Returns a typed
+// token object, or null if it doesn't match any known tag — in which case
+// the original "<...>" text is left as literal text by callers.
+export function parseInlineToken(raw) {
+    const value = String(raw).trim();
+    if (!value) return null;
+
+    if (/^\.\/[\w\-]+$/.test(value)) {
+        return { type: "folder", folder: value.slice(2) };
+    }
+
+    // link:URL              → static (whole card is a plain link, preview
+    //                         itself is non-interactive)
+    // link:URL|click        → interactive (fully usable embedded iframe)
+    if (/^link:/i.test(value)) {
+        let rest = value.slice(5).trim();
+        let interactive = false;
+        if (/\|click$/i.test(rest)) {
+            interactive = true;
+            rest = rest.replace(/\|click$/i, "").trim();
+        }
+        const url = rest;
+        if (!url) return null;
+        return { type: "link", url, interactive };
+    }
+
+    if (/^stl:/i.test(value)) {
+        const rest  = value.slice(4).trim();
+        const parts = rest.split("|").map(p => p.trim());
+        if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) return null;
+        return { type: "stl", file: parts[0], bgColor: parts[1], modelColor: parts[2] };
+    }
+
+    const loopMatch = value.match(/^([\w\-./]+\.[a-z0-9]+)\s+loop$/i);
+    const filename  = loopMatch ? loopMatch[1] : value;
+    const loop      = !!loopMatch;
+
+    if (isImageFile(filename)) return { type: "image", file: filename };
+    if (isVideoFile(filename)) return { type: "video", file: filename, loop };
+    if (isAudioFile(filename)) return { type: "audio", file: filename };
+
+    return null;
+}
+
+// Splits arbitrary text into an ordered list of { type: "text", value } and
+// { type: "token", token } segments. Unrecognized "<...>" sequences are left
+// embedded in the surrounding text (not treated as a token, not stripped).
+export function extractInlineSegments(text) {
+    const regex = inlineTokenRegex();
     const segments = [];
     let lastIndex = 0;
-    let match;
+    let m;
 
-    while ((match = regex.exec(text)) !== null) {
-        if (match.index > lastIndex) {
-            segments.push({ type: "text", content: text.substring(lastIndex, match.index) });
+    while ((m = regex.exec(text)) !== null) {
+        const token = parseInlineToken(m[1]);
+        if (!token) continue; // leave unrecognized bracket text embedded in the surrounding text
+
+        if (m.index > lastIndex) {
+            segments.push({ type: "text", value: text.substring(lastIndex, m.index) });
         }
-        const value = match[1];
-        const isFolder = value.startsWith("./");
-        segments.push({ type: isFolder ? "folder" : "media", content: value });
+        segments.push({ type: "token", token });
         lastIndex = regex.lastIndex;
     }
 
     if (lastIndex < text.length) {
-        segments.push({ type: "text", content: text.substring(lastIndex) });
+        segments.push({ type: "text", value: text.substring(lastIndex) });
     }
 
     return segments;
 }
 
-function isImageFile(filename) {
-    return /\.(png|jpg|jpeg|gif|webp|svg|avif)$/i.test(filename);
+// True/token if `content`, once trimmed, is EXACTLY one "<...>" token and
+// nothing else. This is what makes a tag used alone in a [P..]/[M..] side
+// render full-size instead of inline with text.
+export function isSoleToken(content) {
+    const trimmed = String(content).trim();
+    const m = trimmed.match(/^<([^<>]+)>$/);
+    if (!m) return null;
+    return parseInlineToken(m[1]);
 }
 
-function isVideoFile(filename) {
-    return /\.(mp4|webm)$/i.test(filename);
+// A "stack": 2+ non-empty lines, each independently a sole token. Returns an
+// array of tokens (same order as the lines), or null if it doesn't qualify.
+export function parseMultiMediaBlock(content) {
+    const lines = content.split("\n").map(l => l.trim()).filter(Boolean);
+    if (lines.length < 2) return null;
+    const tokens = lines.map(isSoleToken);
+    if (tokens.some(t => !t)) return null;
+    return tokens;
 }
 
-function isAudioFile(filename) {
-    return /\.(mp3|wav)$/i.test(filename);
+// True if a block should be treated as "pure media" for layout purposes
+// (gets the image-left/right positioning classes instead of text-flow
+// classes) — either a sole token or a multi-token stack.
+export function isMediaOnlyBlock(content) {
+    return !!isSoleToken(content) || !!parseMultiMediaBlock(content);
 }
 
 // ── Loop / gif video element ─────────────────────────────────────────────────
@@ -276,36 +372,241 @@ function makeLoopWrap(src, file, isGif) {
     return wrap;
 }
 
-// ── Multi-media block parsing ────────────────────────────────────────────────
+// ── Link embed ────────────────────────────────────────────────────────────────
+//
+// Two modes, selected by the `|click` suffix on the tag:
+//
+//   STATIC (default, no |click):
+//     Renders a 16:9 card with a non-interactive preview iframe
+//     (pointer-events: none) and a transparent anchor covering the ENTIRE
+//     card. Clicking anywhere on the card opens the target page in a new
+//     tab — nothing inside the card itself is scrollable/clickable.
+//
+//   INTERACTIVE (|click):
+//     Renders a 16:9 card with a FULLY INTERACTIVE iframe — can be
+//     scrolled/clicked/used directly. A small "open in new tab" button
+//     floats in the corner on top of it for convenience.
+//
+// In both modes, a no-cors fetch probes reachability FIRST: no-cors
+// resolves for ANY response the server actually sends back (regardless of
+// status code — 200, 404, 500, whatever), and only rejects on a genuine
+// network-level failure (DNS failure, connection refused, timeout, etc.).
+// Only that genuine failure case shows an inline error card instead of the
+// iframe/link — there is no redirect to this site's own /404 page.
+//
+// Note: this probe can't detect a page that actively refuses to be framed
+// (X-Frame-Options / CSP frame-ancestors) — those still show as a blank/
+// blocked iframe, same limitation any embed has. The error card only covers
+// genuine unreachability.
 
-function parseMediaLine(line) {
-    const trimmed = line.trim();
-    if (!trimmed) return null;
+function buildLinkErrorCard(url) {
+    const card = document.createElement("div");
+    card.className = "blog-link-error";
 
-    if (/^<\.\/[\w\-]+>$/.test(trimmed)) {
-        return { kind: "folder", value: trimmed.slice(1, -1) };
-    }
-    const inlineFile = trimmed.match(/^<([\w\-]+\.(?:png|jpg|jpeg|gif|webp|svg|avif|mp4|webm|mp3|wav)(?:\s+loop)?)>$/i);
-    if (inlineFile) {
-        return { kind: "file", value: inlineFile[1] };
-    }
-    if (/^\.\/[\w\-]+$/.test(trimmed)) {
-        return { kind: "folder", value: trimmed };
-    }
-    if (/^[\w\-]+\.(?:png|jpg|jpeg|gif|webp|svg|avif|mp4|webm|mp3|wav)(?:\s+loop)?$/i.test(trimmed)) {
-        return { kind: "file", value: trimmed };
-    }
+    const text = document.createElement("div");
+    text.className = "blog-link-error__text";
+    text.textContent = "This page couldn't be loaded";
+    card.appendChild(text);
 
-    return null;
+    const link = document.createElement("a");
+    link.className = "blog-link-error__link";
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = url;
+    card.appendChild(link);
+
+    return card;
 }
 
-export function parseMultiMediaBlock(content) {
-    const lines  = content.split("\n").map(l => l.trim()).filter(Boolean);
-    if (lines.length < 2) return null;
-    const parsed = lines.map(parseMediaLine);
-    if (parsed.some(p => p === null)) return null;
-    return parsed;
+function buildOpenInNewTabButton(url) {
+    const btn = document.createElement("a");
+    btn.className = "blog-link-open-btn";
+    btn.href = url;
+    btn.target = "_blank";
+    btn.rel = "noopener noreferrer";
+    btn.title = "Open in new tab";
+    btn.setAttribute("aria-label", "Open in new tab");
+    btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none">
+        <path d="M14 5h5v5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M19 5L10 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M18 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`;
+    return btn;
 }
+
+function renderLinkEmbed(url, interactive) {
+    const wrap = document.createElement("span");
+    wrap.className = "blog-link-wrap" + (interactive ? " blog-link-wrap--interactive" : " blog-link-wrap--static");
+
+    const iframe = document.createElement("iframe");
+    iframe.className = "blog-link-iframe";
+    iframe.loading = "lazy";
+    iframe.referrerPolicy = "no-referrer-when-downgrade";
+    if (!interactive) {
+        // Non-interactive preview — the overlay anchor (added below) is what
+        // actually handles clicks for the static mode.
+        iframe.tabIndex = -1;
+        iframe.setAttribute("aria-hidden", "true");
+    }
+    wrap.appendChild(iframe);
+
+    if (interactive) {
+        wrap.appendChild(buildOpenInNewTabButton(url));
+    } else {
+        const overlay = document.createElement("a");
+        overlay.className = "blog-link-static-anchor";
+        overlay.href = url;
+        overlay.target = "_blank";
+        overlay.rel = "noopener noreferrer";
+        overlay.setAttribute("aria-label", `Open ${url} in new tab`);
+        wrap.appendChild(overlay);
+    }
+
+    fetch(url, { mode: "no-cors" })
+        .then(() => { iframe.src = url; })
+        .catch(() => {
+            wrap.innerHTML = "";
+            wrap.appendChild(buildLinkErrorCard(url));
+        });
+
+    return wrap;
+}
+
+// ── STL viewer ────────────────────────────────────────────────────────────────
+//
+// Renders as a 1:1 card. Lazily loads three.js + STLLoader + OrbitControls
+// from a CDN (only once — shared across every STL viewer on the page) the
+// first time an <stl:...> tag is actually encountered. No visible UI beyond
+// the model itself — click-and-drag to orbit, no zoom, no pan, styled after
+// macOS Finder/Quick Look's STL preview.
+//
+// NOTE: STLLoader.js / OrbitControls.js internally do `import * as THREE
+// from "three"` — a bare specifier the browser can't resolve on its own
+// without an import map. jsdelivr's "/+esm" endpoint rewrites those bare
+// imports into real URLs automatically, so we load everything through that
+// endpoint instead of the raw file paths.
+//
+// FILL_FRACTION below controls how much of the viewport the model's
+// bounding sphere occupies — 0.9 means the model's outer extremes touch
+// ~90% of the frame (tight zoom, small margin). Lower it (e.g. 0.7) for
+// more breathing room, raise it (closer to 1.0) to zoom in further.
+
+let _threePromise = null;
+
+const STL_FILL_FRACTION = 0.9; // ← model's diameter fills this fraction of the viewport
+
+function loadThreeStack() {
+    if (_threePromise) return _threePromise;
+    _threePromise = Promise.all([
+        import("https://cdn.jsdelivr.net/npm/three@0.160.0/+esm"),
+        import("https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/STLLoader.js/+esm"),
+        import("https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js/+esm"),
+    ]).then(([THREE, STLLoaderMod, OrbitControlsMod]) => ({
+        THREE,
+        STLLoader: STLLoaderMod.STLLoader,
+        OrbitControls: OrbitControlsMod.OrbitControls,
+    }));
+    return _threePromise;
+}
+
+function renderStlViewer(url, bgColor, modelColor) {
+    const wrap = document.createElement("div");
+    wrap.className = "blog-stl-wrap";
+
+    loadThreeStack().then(({ THREE, STLLoader, OrbitControls }) => {
+        const width  = wrap.clientWidth  || 300;
+        const height = wrap.clientHeight || 300;
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(bgColor);
+
+        const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 2000);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(width, height);
+        renderer.setPixelRatio(window.devicePixelRatio || 1);
+        wrap.appendChild(renderer.domElement);
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(1, 1, 1);
+        scene.add(dirLight);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.enableZoom = false;
+        controls.enablePan = false;
+
+        const loader = new STLLoader();
+        loader.load(
+            url,
+            (geometry) => {
+                // STL files store "up" as +Z (matches a 3D printer's build
+                // plate orientation), but three.js treats +Y as up — without
+                // this the model loads in tipped over on its side. Rotating
+                // the GEOMETRY itself (not the mesh) -90° around X converts
+                // Z-up to Y-up, and doing it before computeBoundingSphere()
+                // means centering/framing below is computed against the
+                // already-corrected orientation.
+                geometry.rotateX(-Math.PI / 2);
+
+                geometry.computeVertexNormals();
+                geometry.computeBoundingSphere();
+
+                const material = new THREE.MeshStandardMaterial({ color: modelColor });
+                const mesh = new THREE.Mesh(geometry, material);
+
+                const sphere = geometry.boundingSphere;
+                if (sphere) {
+                    mesh.position.set(-sphere.center.x, -sphere.center.y, -sphere.center.z);
+                }
+                scene.add(mesh);
+
+                // ── Zoomed-in framing ──
+                // Solve for the camera distance where the bounding sphere's
+                // diameter fills STL_FILL_FRACTION of the vertical frustum,
+                // using the camera's actual vertical FOV — this is exact,
+                // not a rough multiplier guess. The camera sits on the
+                // (1,1,1) diagonal, so the true distance-from-origin D is
+                // split evenly across x/y/z (each = D / sqrt(3)).
+                const radius = (sphere && sphere.radius) || 1;
+                const halfFovRad = THREE.MathUtils.degToRad(camera.fov / 2);
+                const dist = radius / (STL_FILL_FRACTION * Math.tan(halfFovRad));
+                const axis = dist / Math.sqrt(3);
+
+                camera.position.set(axis, axis, axis);
+                camera.lookAt(0, 0, 0);
+                controls.update();
+            },
+            undefined,
+            (err) => {
+                console.error("STL: failed to load model:", err);
+            }
+        );
+
+        const resizeObserver = new ResizeObserver(() => {
+            const w = wrap.clientWidth  || 300;
+            const h = wrap.clientHeight || 300;
+            renderer.setSize(w, h);
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+        });
+        resizeObserver.observe(wrap);
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+    }).catch((err) => {
+        console.error("STL: failed to load three.js:", err);
+    });
+
+    return wrap;
+}
+
 
 // ── Gallery modal ────────────────────────────────────────────────────────────
 
@@ -480,146 +781,42 @@ export function renderFolderCell(folderName, mediaBaseUrl, listingUrl) {
     return cell;
 }
 
-// ── Inline media renderer ────────────────────────────────────────────────────
+// ── Media token renderer (dispatches by token.type) ──────────────────────────
+//
+// This is the SINGLE shared entry point used by both the desktop renderer
+// and the mobile renderer (mobile.js) — any tag behaves identically in both
+// modes because both call through here.
 
-function renderInlineMedia(rawToken, mediaBaseUrl, listingBaseUrl) {
-    if (rawToken.startsWith("./")) {
-        const folderName = rawToken.slice(2);
-        return renderFolderCell(folderName, mediaBaseUrl, `${listingBaseUrl}/${folderName}`);
-    }
+export function renderMediaToken(token, mediaBaseUrl, listingBaseUrl) {
+    switch (token.type) {
+        case "folder":
+            return renderFolderCell(token.folder, mediaBaseUrl, `${listingBaseUrl}/${token.folder}`);
 
-    const { value: filename, loop } = parseLoopToken(rawToken);
+        case "link":
+            return renderLinkEmbed(token.url, !!token.interactive);
 
-    // GIFs always render as looping muted video (served as MP4 by the server).
-    if (isGifFile(filename)) {
-        return makeLoopWrap(`${mediaBaseUrl}/${filename}`, filename, true);
-    }
+        case "stl":
+            return renderStlViewer(`${mediaBaseUrl}/${token.file}`, token.bgColor, token.modelColor);
 
-    if (isImageFile(filename)) {
-        const wrap = document.createElement("span");
-        wrap.className = "blog-image-wrap";
-        const img = document.createElement("img");
-        img.className = "blog-image";
-        img.src = `${mediaBaseUrl}/${filename}`;
-        img.alt = filename;
-        img.loading = "lazy";
-        img.addEventListener("error", () => {
-            const textNode = document.createTextNode(`<${filename}>`);
-            wrap.replaceWith(textNode);
-        });
-        wrap.appendChild(img);
-        return wrap;
-
-    } else if (isVideoFile(filename)) {
-        if (loop) {
-            return makeLoopWrap(`${mediaBaseUrl}/${filename}`, filename, false);
-        }
-        const wrap = document.createElement("span");
-        wrap.className = "blog-image-wrap blog-video-wrap";
-        const video = document.createElement("video");
-        video.className = "blog-video";
-        video.controls = true;
-        video.preload = "auto";
-        video.playsInline = true;
-        const source = document.createElement("source");
-        source.src  = `${mediaBaseUrl}/${filename}`;
-        source.type = /\.webm$/i.test(filename) ? "video/webm" : "video/mp4";
-        video.addEventListener("error", () => {
-            const textNode = document.createTextNode(`<${filename}>`);
-            wrap.replaceWith(textNode);
-        });
-        video.appendChild(source);
-        wrap.appendChild(video);
-        return wrap;
-
-    } else if (isAudioFile(filename)) {
-        const wrap = document.createElement("div");
-        wrap.className = "blog-audio-wrap";
-        const audio = document.createElement("audio");
-        audio.className = "blog-audio";
-        audio.controls = true;
-        audio.preload = "metadata";
-        const source = document.createElement("source");
-        source.src  = `${mediaBaseUrl}/${filename}`;
-        source.type = /\.wav$/i.test(filename) ? "audio/wav" : "audio/mpeg";
-        audio.addEventListener("error", () => {
-            const textNode = document.createTextNode(`<${filename}>`);
-            wrap.replaceWith(textNode);
-        });
-        audio.appendChild(source);
-        wrap.appendChild(audio);
-        return wrap;
-    }
-
-    return document.createTextNode(`<${rawToken}>`);
-}
-
-// ── Cell renderer ────────────────────────────────────────────────────────────
-
-export function renderCell(content, mediaBaseUrl, listingBaseUrl, isImage, isVideo, isAudio, isFolder) {
-    if (isFolder) {
-        const folderName = content.trim().slice(2);
-        return renderFolderCell(folderName, mediaBaseUrl, `${listingBaseUrl}/${folderName}`);
-    }
-
-    const cell = document.createElement("div");
-    cell.className = "blog-cell";
-
-    const multiMedia = parseMultiMediaBlock(content);
-    if (multiMedia) {
-        cell.classList.add("blog-cell--image-left", "blog-media-stack");
-        for (const entry of multiMedia) {
-            const item = document.createElement("div");
-            item.className = "blog-media-stack-item";
-            item.appendChild(renderInlineMedia(entry.value, mediaBaseUrl, listingBaseUrl));
-            cell.appendChild(item);
-        }
-        return cell;
-    }
-
-    if (!isImage && !isVideo && !isAudio && isInlineMediaReference(content)) {
-        const segments  = extractInlineMedia(content);
-        const container = document.createElement("div");
-        container.className = "blog-md-content";
-
-        for (const segment of segments) {
-            if (segment.type === "text") {
-                const textDiv = document.createElement("div");
-                textDiv.innerHTML = window.marked.parse(segment.content);
-                while (textDiv.firstChild) container.appendChild(textDiv.firstChild);
-            } else if (segment.type === "media" || segment.type === "folder") {
-                container.appendChild(renderInlineMedia(segment.content, mediaBaseUrl, listingBaseUrl));
+        case "image": {
+            if (isGifFile(token.file)) {
+                return makeLoopWrap(`${mediaBaseUrl}/${token.file}`, token.file, true);
             }
-        }
-
-        cell.appendChild(container);
-        return cell;
-    }
-
-    if (isImage) {
-        const { value: file } = parseLoopToken(content);
-
-        // GIFs render as looping muted video.
-        if (isGifFile(file)) {
-            cell.appendChild(makeLoopWrap(`${mediaBaseUrl}/${file}`, file, true));
-        } else {
             const wrap = document.createElement("span");
             wrap.className = "blog-image-wrap";
             const img = document.createElement("img");
             img.className = "blog-image";
-            img.src = `${mediaBaseUrl}/${file}`;
-            img.alt = file;
+            img.src = `${mediaBaseUrl}/${token.file}`;
+            img.alt = token.file;
             img.loading = "lazy";
             wrap.appendChild(img);
-            cell.appendChild(wrap);
+            return wrap;
         }
 
-    } else if (isVideo) {
-        const { value: file, loop } = parseLoopToken(content);
-
-        if (loop) {
-            cell.appendChild(makeLoopWrap(`${mediaBaseUrl}/${file}`, file, false));
-        } else {
+        case "video": {
+            if (token.loop) {
+                return makeLoopWrap(`${mediaBaseUrl}/${token.file}`, token.file, false);
+            }
             const wrap = document.createElement("span");
             wrap.className = "blog-image-wrap blog-video-wrap";
             const video = document.createElement("video");
@@ -628,34 +825,90 @@ export function renderCell(content, mediaBaseUrl, listingBaseUrl, isImage, isVid
             video.preload = "auto";
             video.playsInline = true;
             const source = document.createElement("source");
-            source.src  = `${mediaBaseUrl}/${file}`;
-            source.type = /\.webm$/i.test(file) ? "video/webm" : "video/mp4";
+            source.src  = `${mediaBaseUrl}/${token.file}`;
+            source.type = /\.webm$/i.test(token.file) ? "video/webm" : "video/mp4";
             video.appendChild(source);
             wrap.appendChild(video);
-            cell.appendChild(wrap);
+            return wrap;
         }
 
-    } else if (isAudio) {
-        const wrap = document.createElement("div");
-        wrap.className = "blog-audio-wrap";
-        const audio = document.createElement("audio");
-        audio.className = "blog-audio";
-        audio.controls = true;
-        audio.preload = "metadata";
-        const source = document.createElement("source");
-        source.src  = `${mediaBaseUrl}/${content.trim()}`;
-        source.type = /\.wav$/i.test(content) ? "audio/wav" : "audio/mpeg";
-        audio.appendChild(source);
-        wrap.appendChild(audio);
-        cell.appendChild(wrap);
+        case "audio": {
+            const wrap = document.createElement("div");
+            wrap.className = "blog-audio-wrap";
+            const audio = document.createElement("audio");
+            audio.className = "blog-audio";
+            audio.controls = true;
+            audio.preload = "metadata";
+            const source = document.createElement("source");
+            source.src  = `${mediaBaseUrl}/${token.file}`;
+            source.type = /\.wav$/i.test(token.file) ? "audio/wav" : "audio/mpeg";
+            audio.appendChild(source);
+            wrap.appendChild(audio);
+            return wrap;
+        }
 
-    } else {
-        const div = document.createElement("div");
-        div.className = "blog-md-content";
-        div.innerHTML = window.marked.parse(content);
-        cell.appendChild(div);
+        default:
+            return document.createTextNode("");
+    }
+}
+
+// ── Cell renderer ────────────────────────────────────────────────────────────
+
+export function renderCell(content, mediaBaseUrl, listingBaseUrl) {
+    const cell = document.createElement("div");
+    cell.className = "blog-cell";
+
+    // Multi-token stack — 2+ lines, each a sole token.
+    const stack = parseMultiMediaBlock(content);
+    if (stack) {
+        cell.classList.add("blog-cell--image-left", "blog-media-stack");
+        for (const token of stack) {
+            const item = document.createElement("div");
+            item.className = "blog-media-stack-item";
+            item.appendChild(renderMediaToken(token, mediaBaseUrl, listingBaseUrl));
+            cell.appendChild(item);
+        }
+        return cell;
     }
 
+    // Sole token — the whole side is exactly one tag, render full-size.
+    const sole = isSoleToken(content);
+    if (sole) {
+        if (sole.type === "folder") {
+            return renderFolderCell(sole.folder, mediaBaseUrl, `${listingBaseUrl}/${sole.folder}`);
+        }
+        cell.classList.add("blog-cell--image-left");
+        cell.appendChild(renderMediaToken(sole, mediaBaseUrl, listingBaseUrl));
+        return cell;
+    }
+
+    // Mixed text + inline token(s) — split and render each segment in place.
+    const segments = extractInlineSegments(content);
+    const hasToken = segments.some(s => s.type === "token");
+
+    if (hasToken) {
+        const container = document.createElement("div");
+        container.className = "blog-md-content";
+
+        for (const seg of segments) {
+            if (seg.type === "text") {
+                const textDiv = document.createElement("div");
+                textDiv.innerHTML = window.marked.parse(seg.value);
+                while (textDiv.firstChild) container.appendChild(textDiv.firstChild);
+            } else {
+                container.appendChild(renderMediaToken(seg.token, mediaBaseUrl, listingBaseUrl));
+            }
+        }
+
+        cell.appendChild(container);
+        return cell;
+    }
+
+    // Plain markdown, no media at all.
+    const div = document.createElement("div");
+    div.className = "blog-md-content";
+    div.innerHTML = window.marked.parse(content);
+    cell.appendChild(div);
     return cell;
 }
 
@@ -687,32 +940,20 @@ function _buildDesktopRowsFragment(rawMd, mediaBaseUrl, listingBaseUrl) {
 
         if (sides.full !== undefined) {
             rowEl.classList.add("blog-row--full");
-            const isImg = isImageBlock(sides.full);
-            const isVid = isVideoBlock(sides.full);
-            const isAud = isAudioBlock(sides.full);
-            const isDir = isFolderBlock(sides.full);
-            const cell  = renderCell(sides.full, mediaBaseUrl, listingBaseUrl, isImg, isVid, isAud, isDir);
-            if (isImg || isVid || isDir) cell.classList.add("blog-cell--image-left");
+            const cell = renderCell(sides.full, mediaBaseUrl, listingBaseUrl);
+            if (isMediaOnlyBlock(sides.full)) cell.classList.add("blog-cell--image-left");
             rowEl.appendChild(cell);
 
         } else {
             rowEl.classList.add("blog-row--half");
 
-            const hasA     = sides.a !== undefined;
-            const hasB     = sides.b !== undefined;
-            const aIsImg   = hasA && isImageBlock(sides.a);
-            const aIsVid   = hasA && isVideoBlock(sides.a);
-            const aIsAud   = hasA && isAudioBlock(sides.a);
-            const aIsDir   = hasA && isFolderBlock(sides.a);
-            const bIsImg   = hasB && isImageBlock(sides.b);
-            const bIsVid   = hasB && isVideoBlock(sides.b);
-            const bIsAud   = hasB && isAudioBlock(sides.b);
-            const bIsDir   = hasB && isFolderBlock(sides.b);
-            const aIsMedia = aIsImg || aIsVid || aIsAud || aIsDir;
-            const bIsMedia = bIsImg || bIsVid || bIsAud || bIsDir;
+            const hasA = sides.a !== undefined;
+            const hasB = sides.b !== undefined;
+            const aIsMedia = hasA && isMediaOnlyBlock(sides.a);
+            const bIsMedia = hasB && isMediaOnlyBlock(sides.b);
 
             if (hasA) {
-                const cellA = renderCell(sides.a, mediaBaseUrl, listingBaseUrl, aIsImg, aIsVid, aIsAud, aIsDir);
+                const cellA = renderCell(sides.a, mediaBaseUrl, listingBaseUrl);
                 if (aIsMedia)              cellA.classList.add("blog-cell--image-left");
                 else if (hasB && bIsMedia) cellA.classList.add("blog-cell--text-beside-image");
                 rowEl.appendChild(cellA);
@@ -723,7 +964,7 @@ function _buildDesktopRowsFragment(rawMd, mediaBaseUrl, listingBaseUrl) {
             }
 
             if (hasB) {
-                const cellB = renderCell(sides.b, mediaBaseUrl, listingBaseUrl, bIsImg, bIsVid, bIsAud, bIsDir);
+                const cellB = renderCell(sides.b, mediaBaseUrl, listingBaseUrl);
                 if (bIsMedia)              cellB.classList.add("blog-cell--image-right");
                 else if (hasA && aIsMedia) cellB.classList.add("blog-cell--text-beside-image");
                 rowEl.appendChild(cellB);
@@ -794,11 +1035,7 @@ export function buildProjectBlock(options) {
     if (date) {
         const dateEl = document.createElement("div");
         dateEl.className = "blog-date";
-        if (Array.isArray(date) && date.length === 2) {
-            dateEl.textContent = `${date[0]} – ${date[1]}`;
-        } else {
-            dateEl.textContent = Array.isArray(date) ? date[0] : date;
-        }
+        dateEl.textContent = Array.isArray(date) ? formatDateRanges(date) : date;
         header.appendChild(dateEl);
     }
 

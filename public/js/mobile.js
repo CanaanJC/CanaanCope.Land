@@ -19,22 +19,22 @@
 //   - re-render of all blog content when the viewport mode toggles
 //
 // Mobile blog rendering rules:
-//   - [P…] blocks: pure-media P blocks are skipped, otherwise their text
-//     is split on any nested [M…] tags, with text segments rendered as
-//     markdown (inline <file> / <./folder> refs stripped) and media
-//     segments rendered as full-width media cells inline.
-//   - [M…] blocks (top-level): rendered as full-width media. Loop videos and
-//     .gif (looping muted video) are handled by lib-blog's renderCell.
+//   - [P…] blocks: pure-media P blocks (a sole token, or a multi-token
+//     stack) are skipped here — that content belongs in a [M…] block
+//     instead. Otherwise, the block's nested [M…]…[/M…] sub-blocks are
+//     split out first, then each remaining text run is further split on
+//     any inline <...> tokens — text segments render as markdown, token
+//     segments render as full-width media cells, all in original order.
+//   - [M…] blocks (top-level, or extracted from inside a [P…]): rendered as
+//     full-width media via the shared renderCell.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import {
     setMobileRowsBuilder,
     parseAllBlocks,
-    parseMultiMediaBlock,
-    isImageBlock,
-    isVideoBlock,
-    isAudioBlock,
-    isFolderBlock,
+    isMediaOnlyBlock,
+    extractInlineSegments,
+    renderMediaToken,
     renderCell,
     rerenderAllBlogContent,
     getEndDate,
@@ -57,7 +57,6 @@ const FALLBACK_ICON =
   <circle cx="9" cy="9" r="1.25" fill="#cfcfcf"/>
 </svg>`);
 
-const INLINE_MEDIA_REGEX = /<(\.\/[\w\-]+|[\w\-]+\.[a-z0-9]+(?:\s+loop)?)>/gi;
 const INNER_M_BLOCK_REGEX = /\[M([^\]]+)\]([\s\S]*?)\[\/M\1\]/g;
 
 let _isMobile       = false;
@@ -81,23 +80,69 @@ function buildMobileRows(rawMd, mediaBaseUrl, listingBaseUrl) {
     return frag;
 }
 
+// Renders one markdown-with-possible-inline-tokens text run as one or more
+// full-width rows: consecutive plain text collapses into a single markdown
+// row, and each inline token becomes its own full-width media row.
+function renderMobileTextRun(text, mediaBaseUrl, listingBaseUrl, frag) {
+    const inlineSegments = extractInlineSegments(text);
+    const hasToken = inlineSegments.some(s => s.type === "token");
+
+    if (!hasToken) {
+        const clean = text.trim();
+        if (!clean) return;
+        const row = document.createElement("div");
+        row.className = "blog-row blog-row--full";
+        const cell = document.createElement("div");
+        cell.className = "blog-cell";
+        const md = document.createElement("div");
+        md.className = "blog-md-content";
+        md.innerHTML = window.marked.parse(clean);
+        cell.appendChild(md);
+        row.appendChild(cell);
+        frag.appendChild(row);
+        return;
+    }
+
+    for (const seg of inlineSegments) {
+        if (seg.type === "text") {
+            const clean = seg.value.trim();
+            if (!clean) continue;
+            const row = document.createElement("div");
+            row.className = "blog-row blog-row--full";
+            const cell = document.createElement("div");
+            cell.className = "blog-cell";
+            const md = document.createElement("div");
+            md.className = "blog-md-content";
+            md.innerHTML = window.marked.parse(clean);
+            cell.appendChild(md);
+            row.appendChild(cell);
+            frag.appendChild(row);
+        } else {
+            const row = document.createElement("div");
+            row.className = "blog-row blog-row--full";
+            const cell = document.createElement("div");
+            cell.className = "blog-cell blog-cell--image-left";
+            cell.appendChild(renderMediaToken(seg.token, mediaBaseUrl, listingBaseUrl));
+            row.appendChild(cell);
+            frag.appendChild(row);
+        }
+    }
+}
+
 // Render a single P block on mobile. The content may contain nested
-// [M…]…[/M…] sub-blocks — split on those, alternating text and media
-// segments, each rendered as its own full-width row.
+// [M…]…[/M…] sub-blocks — split on those first, alternating text and media
+// segments; each text segment is then further split on inline <...> tokens.
 function renderMobilePBlock(content, mediaBaseUrl, listingBaseUrl, frag) {
     const trimmed = content.trim();
     if (!trimmed) return;
 
-    // Skip entirely if the whole block is a single pure-media payload
-    // (rare on mobile since pure media should live in [M…] instead).
-    if (isImageBlock(trimmed) || isVideoBlock(trimmed) ||
-        isAudioBlock(trimmed)  || isFolderBlock(trimmed)) return;
-    if (parseMultiMediaBlock(trimmed)) return;
+    // Skip entirely if the whole block is pure media (a sole token or a
+    // stack) — that content belongs in an [M…] block instead on mobile.
+    if (isMediaOnlyBlock(trimmed)) return;
 
     // Split content on nested [M…]…[/M…] blocks
     const segments = [];
     let lastIndex  = 0;
-    // Fresh regex (don't share lastIndex across calls)
     const regex = new RegExp(INNER_M_BLOCK_REGEX.source, INNER_M_BLOCK_REGEX.flags);
     let m;
     while ((m = regex.exec(trimmed)) !== null) {
@@ -110,30 +155,11 @@ function renderMobilePBlock(content, mediaBaseUrl, listingBaseUrl, frag) {
     if (lastIndex < trimmed.length) {
         segments.push({ type: "text", value: trimmed.substring(lastIndex) });
     }
-
-    // If no inner M tags, segments will be one text entry — fast path
-    if (segments.length === 0) return;
+    if (segments.length === 0) segments.push({ type: "text", value: trimmed });
 
     for (const seg of segments) {
         if (seg.type === "text") {
-            // Strip inline <file> refs — media on mobile only comes from [M…]
-            const clean = seg.value.replace(INLINE_MEDIA_REGEX, "").trim();
-            if (!clean) continue;
-
-            const row = document.createElement("div");
-            row.className = "blog-row blog-row--full";
-
-            const cell = document.createElement("div");
-            cell.className = "blog-cell";
-
-            const md = document.createElement("div");
-            md.className = "blog-md-content";
-            md.innerHTML = window.marked.parse(clean);
-            cell.appendChild(md);
-
-            row.appendChild(cell);
-            frag.appendChild(row);
-
+            renderMobileTextRun(seg.value, mediaBaseUrl, listingBaseUrl, frag);
         } else {
             renderMobileMediaRow(seg.value, mediaBaseUrl, listingBaseUrl, frag);
         }
@@ -146,16 +172,11 @@ function renderMobileMediaRow(content, mediaBaseUrl, listingBaseUrl, frag) {
     const c = content.trim();
     if (!c) return;
 
-    const isImg = isImageBlock(c);
-    const isVid = isVideoBlock(c);
-    const isAud = isAudioBlock(c);
-    const isDir = isFolderBlock(c);
-
     const row = document.createElement("div");
     row.className = "blog-row blog-row--full";
 
-    const cell = renderCell(c, mediaBaseUrl, listingBaseUrl, isImg, isVid, isAud, isDir);
-    if (isImg || isVid || isDir) cell.classList.add("blog-cell--image-left");
+    const cell = renderCell(c, mediaBaseUrl, listingBaseUrl);
+    if (isMediaOnlyBlock(c)) cell.classList.add("blog-cell--image-left");
 
     row.appendChild(cell);
     frag.appendChild(row);

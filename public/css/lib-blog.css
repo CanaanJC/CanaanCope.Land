@@ -276,6 +276,134 @@ body.blog-gallery-open {
     accent-color: #7ab4f5;
 }
 
+/* ── Link embed card (16:9) ──
+   Two variants, both scoped by modifier class:
+     .blog-link-wrap--interactive — the iframe is fully interactive
+       (scrollable/clickable/usable directly), plus a floating "open in
+       new tab" button in the corner.
+     .blog-link-wrap--static — the iframe is a non-interactive preview
+       (pointer-events: none) and a transparent full-card anchor sits on
+       top, so clicking ANYWHERE on the card opens the link in a new tab. ── */
+
+.blog-link-wrap {
+    position: relative;
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border-radius: 10px;
+    border: 1px solid #2e2e2e;
+    overflow: hidden;
+    background: #1e1e1e;
+}
+
+.blog-link-iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: #1e1e1e;
+}
+
+.blog-link-wrap--static .blog-link-iframe {
+    pointer-events: none;
+}
+
+.blog-link-static-anchor {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: block;
+    cursor: pointer;
+    /* transparent — purely a click target over the static preview */
+    background: transparent;
+}
+
+.blog-link-open-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 2;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 7px;
+    color: #eaeaea;
+    backdrop-filter: blur(4px);
+    transition: background 140ms ease, transform 140ms ease;
+}
+
+.blog-link-open-btn:hover {
+    background: rgba(0, 0, 0, 0.85);
+    transform: scale(1.06);
+}
+
+/* ── Link embed — unreachable error card (replaces the iframe/anchor
+      entirely when the no-cors reachability probe genuinely fails — no
+      more redirect to this site's own /404 page). No icon — text + link
+      only. ── */
+
+.blog-link-error {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 24px;
+    box-sizing: border-box;
+    text-align: center;
+    background: #1e1e1e;
+}
+
+.blog-link-error__text {
+    color: var(--page-text-color, var(--text));
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.blog-link-error__link {
+    color: var(--muted);
+    font-size: 0.85rem;
+    text-decoration: none;
+    word-break: break-all;
+    max-width: 100%;
+}
+
+.blog-link-error__link:hover {
+    color: #7ab4f5;
+    text-decoration: underline;
+}
+
+/* ── STL viewer card (1:1) ── */
+
+.blog-stl-wrap {
+    position: relative;
+    display: block;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 10px;
+    border: 1px solid #2e2e2e;
+    overflow: hidden;
+    background: #1e1e1e;
+}
+
+.blog-stl-wrap canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+    cursor: grab;
+}
+
+.blog-stl-wrap canvas:active {
+    cursor: grabbing;
+}
+
 /* ── Folder outer wrapper ── */
 
 .blog-folder-outer {
