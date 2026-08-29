@@ -25,6 +25,10 @@ ADMIN/elements/sidebar.json/element.html
 ADMIN/elements/sidebar.json/element.js
 ADMIN/elements/topbar.json/config.json
 ADMIN/elements/topbar.json/element.html
+ADMIN/elements/update-checker/config.json
+ADMIN/elements/update-checker/element.css
+ADMIN/elements/update-checker/element.html
+ADMIN/elements/update-checker/element.js
 ADMIN/index.html
 ADMIN/js/admin.js
 config/defaults.json
@@ -49,6 +53,7 @@ lib/manifest.js
 lib/routes.js
 lib/siteConfig.js
 lib/staticFile.js
+lib/updateChecker.js
 lib/utils.js
 node.js
 public/404/404.css

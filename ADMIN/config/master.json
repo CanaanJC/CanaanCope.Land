@@ -1,7 +1,8 @@
 {
     "columns": [
         [
-            "master.json"
+            "master.json",
+            "update-checker"
         ],
         [
             "archive",

@@ -10,6 +10,7 @@ const { ensureMasterConfig } = require("./lib/siteConfig");
 const { ensureFavicon } = require("./lib/favicon");
 const { startBackupScheduler, startTerminalCommands } = require("./lib/backup");
 const { startAdminServer } = require("./lib/adminServer");
+const { startUpdateChecker } = require("./lib/updateChecker");
 
 // Ensure config/master.json exists and is fully populated before anything
 // else boots — routes/embed/frontend/backup/admin all assume a complete config.
@@ -34,6 +35,12 @@ async function boot() {
     // Type "backup" + Enter directly into this terminal to trigger one on
     // demand, regardless of schedule/enabled state — for testing.
     startTerminalCommands();
+
+    // Checks config/version.txt against the latest GitHub release once at
+    // boot, then every hour on its own — cached in memory so the admin
+    // panel's "Updates" element never triggers a network call just by
+    // loading/refreshing the page.
+    startUpdateChecker();
 
     // Second HTTP server (separate port, separate ./ADMIN root) for the
     // admin panel — started here so ONE boot command (`node node.js`)
