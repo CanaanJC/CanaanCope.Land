@@ -1,0 +1,148 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   content.md editor — raw plain-text editing via a real <textarea> (native
+   Undo/Redo, native Enter-for-newline, no custom key handling at all), with
+   a read-only colored overlay (<pre>) stacked on top purely for tag-color
+   syntax highlighting.
+
+   The overlay has pointer-events: none so every click passes straight
+   through to the textarea underneath for normal cursor placement/
+   selection/typing — except the specific interactive bits (clickable
+   links, color swatches), which re-enable pointer-events on themselves.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.be-md-wrap {
+    position: absolute;
+    inset: 0;
+    background: #141414;
+}
+
+.be-md-highlight,
+.be-md-editable {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    padding: 16px;
+    box-sizing: border-box;
+    overflow: auto;
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    tab-size: 4;
+    border: none;
+}
+
+/* Overlay — sits on top, shows the colored markup, never intercepts clicks
+   itself (only its .be-linkable / .be-swatch children do). */
+.be-md-highlight {
+    z-index: 2;
+    pointer-events: none;
+    color: var(--admin-text);
+    background: transparent;
+}
+
+/* The real editing surface — sits underneath, fully interactive, but its
+   own text is invisible (only the caret shows) so the colored overlay text
+   on top is the only thing actually visible. This IS a genuine <textarea>,
+   so Ctrl/Cmd+Z undo and pressing Enter both just work exactly like any
+   other plain-text field. */
+.be-md-editable {
+    z-index: 1;
+    resize: none;
+    outline: none;
+    background: transparent;
+    color: transparent;
+    caret-color: var(--admin-text);
+}
+
+.be-md-editable::selection {
+    background: rgba(122, 180, 245, 0.35);
+}
+
+.be-md-editable::placeholder {
+    color: #666;
+}
+
+/* ── Tag colors (CSS variables injected at runtime from tags.json by
+   js/tags-config.js — fallbacks below match the documented defaults) ── */
+
+:root {
+    --tag-color-paragraph: #ffdd00;
+    --tag-color-mobile:    #0e4500;
+    --tag-color-image:     #7d130b;
+    --tag-color-video:     #0012b5;
+    --tag-color-loop:      #00b573;
+    --tag-color-folder:    #b50054;
+    --tag-color-link:      #3de617;
+    --tag-color-stl:       #27007a;
+    --tag-color-audio:     #0012b5;
+}
+
+.be-md-highlight .tag-paragraph { color: var(--tag-color-paragraph); font-weight: 700; }
+.be-md-highlight .tag-mobile    { color: var(--tag-color-mobile);    font-weight: 700; }
+.be-md-highlight .tag-image     { color: var(--tag-color-image); }
+.be-md-highlight .tag-video     { color: var(--tag-color-video); }
+.be-md-highlight .tag-audio     { color: var(--tag-color-audio); }
+.be-md-highlight .tag-folder    { color: var(--tag-color-folder); }
+.be-md-highlight .tag-stl       { color: var(--tag-color-stl); }
+.be-md-highlight .tag-loop      { color: var(--tag-color-loop); font-weight: 700; }
+.be-md-highlight .tag-link      { color: var(--tag-color-link); }
+
+/* Note: there is deliberately NO .tag-link rule. The link tag's contents
+   (the URL) render in the same plain text color as everything else — see
+   .be-linkable below for why it's still clickable regardless. */
+
+/* ── Clickable links — plain text, no color/underline styling at all, just
+   a pointer cursor. Real, clickable target either way (bare URLs in plain
+   text, or inside a <link:...> tag). Re-enables its own pointer-events
+   since it lives inside the (pointer-events: none) overlay. ── */
+.be-md-highlight .tag-link .be-linkable {
+    color: var(--admin-text);
+}
+.be-linkable {
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+/* ── Color swatch chip — small clickable colored dot next to a hex code
+   inside an <stl:...> tag; purely a visual preview of the real color.
+   Clicking it opens a native color picker. Re-enables its own
+   pointer-events for the same reason as .be-linkable above. ── */
+
+.be-swatch {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    margin: 0 2px;
+    vertical-align: middle;
+    background: var(--swatch-color, #888);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    border-radius: 3px;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+    cursor: pointer;
+    user-select: none;
+    pointer-events: auto;
+}
+
+.be-swatch:hover {
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 0 0 3px rgba(255, 255, 255, 0.25);
+}
+
+.be-swatch-cube {
+    display: block;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+/* Hidden native color input used to actually drive the picker UI. */
+.be-swatch-input {
+    position: fixed;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 5000;
+}

@@ -1,0 +1,156 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Blog Editor — top bar: main button, blog dropdown, preview toggle,
+   mode/device toggle groups, save button, current-path link.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.be-topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    height: 56px;
+    box-sizing: border-box;
+    background: var(--admin-panel-bg);
+    border-bottom: 1px solid var(--admin-panel-border);
+    flex-wrap: nowrap;
+    position: relative;
+    z-index: 50;
+}
+
+.be-current-path {
+    margin-left: auto;
+    font-size: 0.8rem;
+    color: #9a9a9a;
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.be-current-path:hover {
+    color: #7ab4f5;
+    text-decoration: underline;
+}
+
+.be-current-path:not([href]),
+.be-current-path[href="#"] {
+    pointer-events: none;
+    cursor: default;
+}
+
+/* ── Library/blog dropdown ── */
+
+.be-dropdown {
+    position: relative;
+}
+
+.be-dropdown-panel {
+    position: fixed;
+    min-width: 260px;
+    max-width: 360px;
+    max-height: 420px;
+    overflow-y: auto;
+    background: var(--admin-panel-bg);
+    border: 1px solid var(--admin-panel-border);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    padding: 6px;
+    z-index: 2000;
+}
+
+.be-dropdown-group-heading {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #8a8a8a;
+    padding: 8px 8px 4px 8px;
+}
+
+.be-dropdown-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    color: var(--admin-text);
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-family: inherit;
+}
+
+.be-dropdown-item:hover {
+    background: #2a2a2a;
+}
+
+.be-dropdown-item--active {
+    background: #2a3a2a;
+}
+
+.be-dropdown-empty {
+    padding: 6px 12px 10px 12px;
+    font-size: 0.78rem;
+    color: #777;
+}
+
+/* ── Mode / device toggles — mutually exclusive; only one group is ever
+   visible at a time. ── */
+
+.be-mode-toggle {
+    display: flex;
+    border: 1px solid #3a3a3a;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.be-toggle-btn {
+    background: #202020;
+    border: none;
+    color: var(--admin-text);
+    padding: 8px 14px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.be-toggle-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.be-toggle-btn--active {
+    background: #3a4a3a;
+}
+
+.be-toggle-btn:not(:last-child) {
+    border-right: 1px solid #3a3a3a;
+}
+
+/* Preview toggle button — same green shade as an active mode/device toggle
+   (.be-toggle-btn--active's #3a4a3a) while preview is on. */
+#be-preview-toggle.be-toggle-btn--active {
+    background: #3a4a3a;
+    border-color: #4a5a4a;
+}
+
+/* ── Save button — flashes green/red briefly; text NEVER changes ── */
+
+#be-save {
+    transition: background-color 160ms ease, color 160ms ease;
+}
+
+#be-save.be-save-btn--ok {
+    background: #2f6b2f;
+    border-color: #3f8a3f;
+    color: #eaffea;
+}
+
+#be-save.be-save-btn--error {
+    background: #6b2f2f;
+    border-color: #8a3f3f;
+    color: #ffeaea;
+}

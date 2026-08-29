@@ -1,0 +1,289 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Blog Editor — media manager: divider, upload/new-folder action row,
+   breadcrumb, the Finder-style icon grid, the right-click context menu,
+   and the full-screen media viewer (lightbox) opened by clicking a file
+   tile.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Faint separator between the tag toolbar and the media manager below it */
+.be-media-divider {
+    height: 1px;
+    margin: 4px 10px;
+    background: rgba(255, 255, 255, 0.08);
+    flex: 0 0 auto;
+}
+
+.be-media-manager {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+    overflow-y: auto;
+}
+
+.be-placeholder--media {
+    padding: 24px 8px;
+}
+
+/* ── Action row ── */
+
+.be-media-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+    flex: 0 0 auto;
+}
+
+.be-media-actions .admin-button {
+    padding: 6px 14px;
+    font-size: 0.82rem;
+}
+
+/* ── Breadcrumb ── */
+
+.be-media-breadcrumb {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2px;
+    margin-bottom: 10px;
+    font-size: 0.8rem;
+    flex: 0 0 auto;
+}
+
+.be-media-crumb {
+    background: none;
+    border: none;
+    color: #9a9a9a;
+    cursor: pointer;
+    padding: 3px 6px;
+    border-radius: 5px;
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    font-size: 0.8rem;
+}
+
+.be-media-crumb:last-child {
+    color: var(--admin-text);
+    font-weight: 700;
+}
+
+.be-media-crumb:hover {
+    background: #2a2a2a;
+    color: var(--admin-text);
+}
+
+.be-media-crumb--dragover {
+    background: #22281f;
+    box-shadow: 0 0 0 1px #4a6a3a;
+}
+
+.be-media-crumb-sep {
+    color: #666;
+    font-size: 0.8rem;
+}
+
+/* ── Grid ── */
+
+.be-media-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+    gap: 10px;
+    flex: 1 1 auto;
+    align-content: flex-start;
+}
+
+.be-media-empty {
+    grid-column: 1 / -1;
+    padding: 24px 8px;
+    text-align: center;
+    font-size: 0.82rem;
+    color: #777;
+}
+
+.be-media-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 4px;
+    border-radius: 8px;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.be-media-tile:hover {
+    background: #262626;
+}
+
+.be-media-tile--dragging {
+    opacity: 0.4;
+}
+
+.be-media-tile--dragover {
+    background: #22281f;
+    box-shadow: 0 0 0 1px #4a6a3a;
+}
+
+.be-media-icon-wrap {
+    width: 64px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.be-media-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 8px;
+    object-fit: cover;
+    background: #141414;
+    border: 1px solid #2e2e2e;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none; /* clicks/drag pass through to the tile itself */
+}
+
+.be-media-icon--img,
+.be-media-icon--video {
+    object-fit: cover;
+}
+
+.be-media-icon--folder {
+    background: #2a2a2a;
+    border-color: #3a3a3a;
+}
+
+.be-media-icon--folder::before {
+    content: "";
+    width: 34px;
+    height: 26px;
+    background: #d8b04a;
+    border-radius: 3px;
+    clip-path: polygon(0 15%, 35% 15%, 42% 0, 100% 0, 100% 100%, 0 100%);
+}
+
+.be-media-icon--blank {
+    background: #202020;
+    border-color: #333;
+    color: #888;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-align: center;
+}
+
+.be-media-label {
+    max-width: 78px;
+    font-size: 0.72rem;
+    text-align: center;
+    color: var(--admin-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.be-media-rename-input {
+    max-width: 78px;
+    width: 78px;
+    background: #141414;
+    border: 1px solid #4a6a3a;
+    border-radius: 4px;
+    color: var(--admin-text);
+    padding: 2px 4px;
+    font-size: 0.72rem;
+    text-align: center;
+    font-family: inherit;
+}
+
+/* ── Right-click context menu ── */
+
+.be-context-menu {
+    position: fixed;
+    z-index: 4000;
+    background: #202020;
+    border: 1px solid #3a3a3a;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    padding: 4px;
+    min-width: 140px;
+}
+
+.be-context-menu-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    color: var(--admin-text);
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-family: inherit;
+}
+
+.be-context-menu-item:hover {
+    background: #2a2a2a;
+}
+
+.be-context-menu-item--danger {
+    color: #e88;
+}
+
+.be-context-menu-item--danger:hover {
+    background: #4a1f1f;
+    color: #ffbaba;
+}
+
+/* ── Media viewer (lightbox) — opened by clicking any non-folder tile.
+   Near-fullscreen overlay; the actual media element (img/video/audio) is
+   sized/typed based on the file's extension. Gifs are just a plain <img>,
+   so they loop exactly like they would anywhere else on the site.
+
+   No close button — clicking anywhere except the media element itself
+   (the box has generous padding around the media for an easy click-off
+   target) or pressing Escape closes it (see media-manager.js). ── */
+
+.be-media-viewer-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 3000;
+    cursor: pointer;
+}
+
+.be-media-viewer-box {
+    width: 92vw;
+    height: 92vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.be-media-viewer-media {
+    max-width: 100%;
+    max-height: 100%;
+    display: block;
+    cursor: default;
+}
+
+.be-media-viewer-media--image {
+    object-fit: contain;
+}
+
+.be-media-viewer-media--video {
+    background: #000;
+    object-fit: contain;
+}
+
+.be-media-viewer-media--audio {
+    width: 480px;
+    max-width: 90vw;
+}

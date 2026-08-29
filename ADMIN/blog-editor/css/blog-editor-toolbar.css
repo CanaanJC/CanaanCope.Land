@@ -1,0 +1,40 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Blog Editor — right-panel toolbar ([Paragraph] / <link embed>) and the
+   Tags Help / Media Help buttons (bottom-right of the page).
+
+   Toolbar buttons reuse the exact same visual style as the top bar's
+   buttons (.admin-button) — only the button TEXT is colored, via
+   --tool-color (set inline per-button in js/toolbar.js, pulled live from
+   tags.json). They are never hidden/disabled based on edit mode.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.be-toolbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 10px;
+    border-bottom: 1px solid var(--admin-panel-border);
+    flex: 0 0 auto;
+}
+
+.be-tool-btn {
+    --tool-color: inherit;
+    color: var(--tool-color);
+}
+
+/* ── Help buttons (bottom-right of the editor page) — Media Help sits to
+   the left of Tags Help, both inside one fixed flex container so neither
+   needs manually-computed offsets. ── */
+
+.be-help-buttons {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 1500;
+    display: flex;
+    gap: 8px;
+}
+
+.be-tool-help-btn {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}

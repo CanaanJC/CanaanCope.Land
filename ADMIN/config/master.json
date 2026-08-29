@@ -2,9 +2,11 @@
     "columns": [
         [
             "master.json",
-            "update-checker"
+            "update-checker",
+            "tag-colors"
         ],
         [
+            "blog-editor",
             "archive",
             "sidebar.json",
             "library-editor",

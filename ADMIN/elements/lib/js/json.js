@@ -22,11 +22,28 @@
 //     delete, or an upload hook setting a field's value) — see notifyEdit()
 //     below — so it can never keep claiming something is saved when it's
 //     since been changed again.
+//   - a "Raw JSON" toggle button, injected automatically next to the Save
+//     button, lets you switch the whole editor to a plain textarea showing
+//     the raw JSON — useful for hand-adding a field the visual editor
+//     doesn't otherwise expose a control for. Switching back parses your
+//     edits back into the visual editor (invalid JSON keeps you in raw mode
+//     with an alert). Saving while in raw mode parses it first automatically.
+//   - when elementConfig.isBlogEditor is true (set only by the Blog Editor's
+//     own config.json mode — see ADMIN/blog-editor/blog-editor.js), any
+//     array field whose KEY is literally "date" is rendered as a special
+//     date-chip list instead of the generic JSON-lines textarea: each date
+//     shows as a chip with an "×" to remove it, and a "+" button opens a
+//     small native calendar picker to add a new date. This ONLY applies
+//     inside the Blog Editor's config.json editor — every other element on
+//     the main Admin page (including any other array field anywhere else)
+//     renders exactly as before.
 //
 // Per-element element.js files (loaded AFTER this, if present) receive the
 // returned `core` handle and can opt into array/card mode and attach field
 // hooks (e.g. upload buttons) — see the bottom of this file for the full
-// core API.
+// core API. `core.save()` returns a Promise<{ ok, error }> so callers can
+// react to success/failure themselves instead of relying solely on the
+// internal #ej-status line.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const HEX_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
@@ -522,6 +539,99 @@ function buildJsonLinesField(value, onChange) {
     return wrap;
 }
 
+// ── Date-list editor (Blog Editor's config.json "date" field ONLY) ──────────
+//
+// Renders `value` (an array of date strings, e.g. ["2026-08-29"]) as a row
+// of chips, each with an "×" to remove it, plus a "+" button that reveals a
+// small native <input type="date"> calendar picker for adding a new date.
+// Only ever mounted when elementConfig.isBlogEditor is true AND the field
+// key is literally "date" — see renderObject() below.
+
+function buildDateListField(value, onChange) {
+    const wrap = document.createElement("div");
+    wrap.className = "admin-datelist";
+
+    let dates = Array.isArray(value) ? value.slice() : [];
+
+    const chipsRow = document.createElement("div");
+    chipsRow.className = "admin-datelist-row";
+
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.className = "admin-datelist-add";
+    addBtn.title = "Add a date";
+    addBtn.textContent = "+";
+
+    const calendarInput = document.createElement("input");
+    calendarInput.type = "date";
+    calendarInput.className = "admin-datelist-calendar";
+    calendarInput.hidden = true;
+
+    function emit() {
+        onChange(dates.slice());
+    }
+
+    function renderChips() {
+        chipsRow.innerHTML = "";
+        dates.forEach((dateStr, index) => {
+            const chip = document.createElement("span");
+            chip.className = "admin-datelist-chip";
+
+            const label = document.createElement("span");
+            label.className = "admin-datelist-chip-label";
+            label.textContent = dateStr;
+            chip.appendChild(label);
+
+            const removeBtn = document.createElement("button");
+            removeBtn.type = "button";
+            removeBtn.className = "admin-datelist-chip-remove";
+            removeBtn.title = "Remove this date";
+            removeBtn.textContent = "×";
+            removeBtn.addEventListener("click", () => {
+                dates.splice(index, 1);
+                emit();
+                renderChips();
+                // Manually fire "input" so the shared edit-tracking
+                // listener (notifyEdit) clears any stale "Saved." status.
+                wrap.dispatchEvent(new Event("input", { bubbles: true }));
+            });
+            chip.appendChild(removeBtn);
+
+            chipsRow.appendChild(chip);
+        });
+        chipsRow.appendChild(addBtn);
+    }
+
+    addBtn.addEventListener("click", () => {
+        calendarInput.hidden = !calendarInput.hidden;
+        if (!calendarInput.hidden) {
+            calendarInput.value = "";
+            calendarInput.focus();
+            if (typeof calendarInput.showPicker === "function") {
+                try { calendarInput.showPicker(); } catch {}
+            }
+        }
+    });
+
+    calendarInput.addEventListener("change", () => {
+        const picked = calendarInput.value;
+        if (picked) {
+            dates.push(picked);
+            emit();
+            renderChips();
+            wrap.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+        calendarInput.value = "";
+        calendarInput.hidden = true;
+    });
+
+    renderChips();
+    wrap.appendChild(chipsRow);
+    wrap.appendChild(calendarInput);
+
+    return wrap;
+}
+
 // ── Shared confirm modal (delete / overwrite) — one per element instance ──
 
 function createConfirmModal(root) {
@@ -589,7 +699,7 @@ function resolveEndpoint(elementConfig) {
 
 // ── Object-mode renderer ─────────────────────────────────────────────────────
 
-function renderObject(obj, container, pathPrefix, data, fieldHooks) {
+function renderObject(obj, container, pathPrefix, data, fieldHooks, isBlogEditor) {
     for (const key of Object.keys(obj)) {
         const value = obj[key];
         const fullPath = pathPrefix ? `${pathPrefix}.${key}` : key;
@@ -601,7 +711,7 @@ function renderObject(obj, container, pathPrefix, data, fieldHooks) {
             legend.textContent = key;
             fieldset.appendChild(legend);
             container.appendChild(fieldset);
-            renderObject(value, fieldset, fullPath, data, fieldHooks);
+            renderObject(value, fieldset, fullPath, data, fieldHooks, isBlogEditor);
             continue;
         }
 
@@ -621,7 +731,15 @@ function renderObject(obj, container, pathPrefix, data, fieldHooks) {
         };
 
         if (Array.isArray(value)) {
-            row.appendChild(buildJsonLinesField(value, setAtPath));
+            // Blog Editor-only special case: the "date" array field gets
+            // the chip/calendar widget instead of the generic JSON-lines
+            // textarea. Everywhere else (main Admin page, any other
+            // element), arrays render exactly as before.
+            if (isBlogEditor && key === "date") {
+                row.appendChild(buildDateListField(value, setAtPath));
+            } else {
+                row.appendChild(buildJsonLinesField(value, setAtPath));
+            }
             container.appendChild(row);
             continue;
         }
@@ -678,6 +796,11 @@ export default function initJsonEditor(root, elementConfig) {
     const saveBtn     = root.querySelector("#ej-save");
     const statusEl    = root.querySelector("#ej-status");
 
+    // True only when mounted from the Blog Editor's own config.json mode
+    // (see blog-editor.js's mountConfigEditor). Gates the "date" field's
+    // special chip/calendar widget so it never affects any other element.
+    const isBlogEditor = !!(elementConfig && elementConfig.isBlogEditor);
+
     // Elements that don't use this core's HTML shape (e.g. archive,
     // logo-uploader, admin-master.json's Panel Layout editor) simply have
     // no #ej-container — bail out quietly so their own bespoke element.js
@@ -686,7 +809,7 @@ export default function initJsonEditor(root, elementConfig) {
         return {
             getData: () => null,
             setData: () => {},
-            save: () => {},
+            save: () => Promise.resolve({ ok: false, error: "No editor mounted" }),
             reload: () => {},
             setArrayMode: () => {},
             setCardTitle: () => {},
@@ -711,6 +834,7 @@ export default function initJsonEditor(root, elementConfig) {
     let data = null;
     let mode = "object"; // or "array"
     let arrayConfig = null; // { fields, newItemFactory, addLabel, cardTitle }
+    let rawMode = false;
 
     function setStatus(text, kind) {
         if (!statusEl) return;
@@ -730,8 +854,9 @@ export default function initJsonEditor(root, elementConfig) {
 
     // Delegated listener on the container catches virtually every edit
     // automatically: typing in a textarea/text input, checkbox toggles,
-    // number inputs, the color-picker's paired <input type="color">, and
-    // the JSON-lines array textarea. "input" events bubble by default and
+    // number inputs, the color-picker's paired <input type="color">, the
+    // JSON-lines array textarea, and the date-list widget's own manually-
+    // dispatched "input" events. "input" events bubble by default and
     // nothing in this file calls stopPropagation, so this single pair of
     // listeners is enough — no need to instrument every field individually.
     containerEl.addEventListener("input", notifyEdit);
@@ -740,7 +865,7 @@ export default function initJsonEditor(root, elementConfig) {
     // ── Object mode render ──
     function renderObjectMode() {
         containerEl.innerHTML = "";
-        renderObject(data, containerEl, "", data, fieldHooks);
+        renderObject(data, containerEl, "", data, fieldHooks, isBlogEditor);
     }
 
     // ── Array/card mode render ──
@@ -853,6 +978,71 @@ export default function initJsonEditor(root, elementConfig) {
         else renderObjectMode();
     }
 
+    // ── Raw JSON toggle ──────────────────────────────────────────────────────
+    // Injected automatically for every element using this core — lets you
+    // hand-edit the underlying JSON as plain text (e.g. to add a field the
+    // visual editor doesn't have a control for yet). Toggling back to the
+    // visual editor parses your edits back into `data`; invalid JSON keeps
+    // you in raw mode with an alert rather than silently discarding it.
+
+    const rawToggleBtn = document.createElement("button");
+    rawToggleBtn.type = "button";
+    rawToggleBtn.className = "admin-button admin-raw-toggle-btn";
+    rawToggleBtn.textContent = "Raw JSON";
+
+    const rawTextarea = document.createElement("textarea");
+    rawTextarea.className = "admin-field-input-text admin-raw-textarea";
+    rawTextarea.spellcheck = false;
+    rawTextarea.hidden = true;
+
+    if (saveBtn && saveBtn.parentNode) {
+        saveBtn.parentNode.insertBefore(rawToggleBtn, saveBtn);
+    } else {
+        root.insertBefore(rawToggleBtn, containerEl);
+    }
+    containerEl.insertAdjacentElement("afterend", rawTextarea);
+
+    rawTextarea.addEventListener("input", notifyEdit);
+
+    function enterRawMode() {
+        rawTextarea.value = JSON.stringify(data, null, 4);
+        containerEl.hidden = true;
+        rawTextarea.hidden = false;
+        if (addBtn) addBtn.dataset.rawHidden = addBtn.hidden ? "" : (addBtn.hidden = true, "1");
+        rawMode = true;
+        rawToggleBtn.textContent = "Visual Editor";
+        requestAnimationFrame(() => autoGrow(rawTextarea));
+    }
+
+    // Returns true if it successfully left raw mode (or wasn't in it).
+    function exitRawMode(applyChanges) {
+        if (applyChanges) {
+            try {
+                data = JSON.parse(rawTextarea.value);
+            } catch (e) {
+                alert(`Invalid JSON — fix it or it can't be applied:\n\n${e.message}`);
+                return false;
+            }
+        }
+        containerEl.hidden = false;
+        rawTextarea.hidden = true;
+        if (addBtn && addBtn.dataset.rawHidden === "1") {
+            addBtn.hidden = false;
+            delete addBtn.dataset.rawHidden;
+        }
+        rawMode = false;
+        rawToggleBtn.textContent = "Raw JSON";
+        render();
+        return true;
+    }
+
+    rawToggleBtn.addEventListener("click", () => {
+        if (rawMode) exitRawMode(true);
+        else enterRawMode();
+    });
+
+    attachAutoGrow(rawTextarea);
+
     // ── Load ──
     fetch(endpoint.get)
         .then(r => r.json())
@@ -867,7 +1057,7 @@ export default function initJsonEditor(root, elementConfig) {
 
     if (addBtn) {
         addBtn.addEventListener("click", () => {
-            if (mode !== "array") return;
+            if (mode !== "array" || rawMode) return;
             const newItem = arrayConfig.newItemFactory ? arrayConfig.newItemFactory() : {};
             data.push(newItem);
             renderArrayMode();
@@ -875,30 +1065,48 @@ export default function initJsonEditor(root, elementConfig) {
         });
     }
 
-    if (saveBtn) {
-        saveBtn.addEventListener("click", () => {
-            setStatus("Saving…");
-            fetch(endpoint.put, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(data),
+    // ── Save (used by both the internal #ej-save click and core.save()) ──────
+    // If currently in raw mode, parses the raw textarea into `data` first
+    // (without necessarily leaving raw mode) so raw edits are never lost.
+    // Returns a Promise<{ ok, error }> so callers (e.g. the Blog Editor's
+    // own Save button) can react without depending on the status text.
+    function performSave() {
+        if (rawMode) {
+            try {
+                data = JSON.parse(rawTextarea.value);
+            } catch (e) {
+                setStatus(`Invalid JSON: ${e.message}`, "error");
+                return Promise.resolve({ ok: false, error: e.message });
+            }
+        }
+
+        setStatus("Saving…");
+        return fetch(endpoint.put, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data),
+        })
+            .then(r => r.json())
+            .then((res) => {
+                if (res.error) throw new Error(res.error);
+                setStatus("Saved.", "ok");
+                return { ok: true };
             })
-                .then(r => r.json())
-                .then((res) => {
-                    if (res.error) throw new Error(res.error);
-                    setStatus("Saved.", "ok");
-                })
-                .catch((e) => {
-                    setStatus(`Save failed: ${e.message}`, "error");
-                });
-        });
+            .catch((e) => {
+                setStatus(`Save failed: ${e.message}`, "error");
+                return { ok: false, error: e.message };
+            });
+    }
+
+    if (saveBtn) {
+        saveBtn.addEventListener("click", () => { performSave(); });
     }
 
     // ── Public core handle ──
     const core = {
         getData: () => data,
         setData: (newData) => { data = newData; render(); },
-        save: () => saveBtn && saveBtn.click(),
+        save: () => performSave(),
         reload: () => {
             fetch(endpoint.get).then(r => r.json()).then((result) => { data = result; render(); });
         },

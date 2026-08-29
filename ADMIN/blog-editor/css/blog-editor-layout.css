@@ -1,0 +1,84 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Blog Editor — page shell, split panels (left 2/3 editor / right 1/3), and
+   the two mode wraps (content.md / config.json) inside the left panel.
+   Uses the same --admin-* CSS variables as /css/admin.css.
+   ───────────────────────────────────────────────────────────────────────── */
+
+[hidden] {
+    display: none !important;
+}
+
+html, body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden; /* panels below handle their own scrolling */
+}
+
+.be-main {
+    position: relative;
+    height: calc(100vh - 56px);
+    width: 100%;
+}
+
+.be-editor-view {
+    display: flex;
+    height: 100%;
+    width: 100%;
+}
+
+.be-panel {
+    min-width: 0;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.be-panel--left {
+    flex: 2 1 0;
+    border-right: 1px solid var(--admin-panel-border);
+    position: relative;
+    overflow: hidden; /* each mode-wrap below manages its own scrolling */
+}
+
+.be-panel--right {
+    flex: 1 1 0;
+    background: #141414;
+    display: flex;
+    flex-direction: column;
+}
+
+.be-placeholder {
+    color: #777;
+    font-size: 0.9rem;
+    padding: 24px;
+    text-align: center;
+}
+
+/* ── Mode wraps — both content.md's and config.json's containers stay
+   mounted simultaneously inside .be-panel--left; only one is ever visible
+   ([hidden] toggled by js/blog-editor.js's applyModeVisibility). Each fills
+   the full panel independently so switching between them is purely
+   visual — no state is ever lost. ── */
+
+.be-mode-wrap {
+    position: absolute;
+    inset: 0;
+    height: 100%;
+    width: 100%;
+}
+
+.be-mode-wrap--markdown {
+    /* content.md's textarea/highlight stack fills the panel edge-to-edge */
+}
+
+.be-mode-wrap--config {
+    padding: 16px;
+    overflow: auto; /* config.json mode's field list scrolls within itself */
+}
+
+.be-mode-wrap--config #ej-container {
+    margin-bottom: 12px;
+}
+
+.be-mode-wrap--config #ej-status {
+    display: none;
+}

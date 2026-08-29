@@ -1,0 +1,135 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Blog Editor — toolbar input dialogs (Paragraph / Link embed) and the
+   Tags Help markdown overlay.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* ── Toolbar dialogs — reuse .admin-modal-overlay / .admin-modal-box from
+   admin.css, with extra vertical spacing between rows. ── */
+
+.be-toolbar-modal-box {
+    text-align: left;
+}
+
+.be-toolbar-modal-title {
+    margin: 0 0 20px 0;
+    font-size: 1.05rem;
+}
+
+.be-toolbar-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    margin-bottom: 24px;
+}
+
+.be-toolbar-modal-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 0;
+}
+
+.be-toolbar-modal-row label {
+    flex: 0 0 140px;
+    font-size: 0.85rem;
+    color: #9a9a9a;
+}
+
+.be-toolbar-modal-row input[type="text"],
+.be-toolbar-modal-row input[type="number"] {
+    flex: 1 1 auto;
+    padding: 10px 10px;
+}
+
+.be-toolbar-modal-row select {
+    padding: 8px 10px;
+}
+
+/* ── Tags Help modal — covers most of the screen, renders tags.md as
+   markdown. Clicking off (the overlay) or the × closes it. ── */
+
+.be-tags-help-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 3000;
+}
+
+.be-tags-help-box {
+    position: relative;
+    width: 90vw;
+    height: 88vh;
+    max-width: 1100px;
+    background: var(--admin-panel-bg);
+    border: 1px solid var(--admin-panel-border);
+    border-radius: 14px;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.be-tags-help-close {
+    position: absolute;
+    top: 10px;
+    right: 14px;
+    background: none;
+    border: none;
+    color: var(--admin-text);
+    font-size: 1.6rem;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 1;
+}
+
+.be-tags-help-close:hover {
+    color: #e66;
+}
+
+.be-tags-help-content {
+    padding: 32px 36px;
+    overflow-y: auto;
+    height: 100%;
+    box-sizing: border-box;
+    line-height: 1.6;
+}
+
+.be-tags-help-content h1,
+.be-tags-help-content h2,
+.be-tags-help-content h3 {
+    margin-top: 1.2em;
+}
+
+.be-tags-help-content h1:first-child {
+    margin-top: 0;
+}
+
+.be-tags-help-content code {
+    background: #252525;
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    font-size: 0.9em;
+}
+
+.be-tags-help-content pre {
+    background: #1e1e1e;
+    border: 1px solid #2e2e2e;
+    border-radius: 8px;
+    padding: 12px 14px;
+    overflow-x: auto;
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    font-size: 0.85rem;
+}
+
+.be-tags-help-content ul {
+    padding-left: 22px;
+}
+
+.be-tags-help-content a {
+    color: #7ab4f5;
+}
