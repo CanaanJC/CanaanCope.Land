@@ -1,16 +1,34 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Library Explorer — main orchestrator. See css/*.css for layout/styling, and the
-// sibling js/ modules for the individual pieces (preview, config editor,
+// Library Explorer — main orchestrator. See css/*.css for layout/styling, and
+// the sibling js/ modules for the individual pieces (preview, config editor,
 // markdown editor + tag syntax highlighting, right-panel toolbar, media
 // manager, media selection mode, library browser).
 //
 // Two top-level views share .be-main: the full-page Library Browser (the
 // default view — shown whenever no blog is being edited) and the split
-// editor view (plus its own full-bleed preview sub-view). There is no
-// blog-picker dropdown anymore — a blog is opened either via a deep-linked
-// URL on load, or by clicking it in the Library Browser and pressing its
-// "Edit" button. The "Libraries" top-bar button always returns to the
-// browser.
+// editor view (plus its own full-bleed preview sub-view). A blog is opened
+// either via a deep-linked URL on load, or by clicking it in the Library
+// Browser and pressing its "Edit" button. The "Libraries" top-bar button
+// always returns to the browser.
+//
+// ── SPECIAL CASE: the About Me page (public/aboutme/) ─────────────────────
+// It's pinned to the BOTTOM of the Library Browser's library list and
+// edited here with the exact same markdown editor + media manager as any
+// blog. But it is NOT a library blog:
+//   - it has no config.json, so the content.md ⇄ config.json mode toggle is
+//     hidden entirely while it's open and only content.md is editable;
+//   - it never appears in /api/blog-list, so the deep link
+//     /library-explorer/aboutme is resolved explicitly in boot();
+//   - it can never be deleted/renamed/moved (the Library Browser gives its
+//     row no context menu at all);
+//   - its "live page" is the site root, not /aboutme (see preview.js).
+//
+// ABOUT_ME_URL_PATH is imported from library-browser.js and the tiny
+// isAboutMeBlog()/makeAboutMeBlog() helpers are declared inline rather than
+// living in their own module: adminServer.js serves index.html for any
+// non-existent path under /library-explorer/, so a missing or mistyped
+// module filename silently returns HTML and kills this whole module graph
+// with a MIME-type error instead of an honest 404.
 //
 // Unsaved-changes protection: any edit in either mounted editor marks the
 // page dirty; switching blogs / leaving the page / returning to the
@@ -33,7 +51,22 @@ import { createPreview } from "./preview.js";
 import { initToolbar } from "./toolbar.js";
 import { mountMediaManager } from "./media-manager.js";
 import { stopSelection } from "./selection-mode.js";
-import { createLibraryBrowser } from "./library-browser.js";
+import { createLibraryBrowser, ABOUT_ME_URL_PATH } from "./library-browser.js";
+
+// ── About Me helpers (inlined — see the note in the header comment) ─────────
+
+function isAboutMeBlog(blog) {
+    return !!blog && (blog.isAboutMe === true || blog.urlPath === ABOUT_ME_URL_PATH);
+}
+
+function makeAboutMeBlog() {
+    return {
+        name: ABOUT_ME_URL_PATH,
+        displayName: "About Me",
+        urlPath: ABOUT_ME_URL_PATH,
+        isAboutMe: true,
+    };
+}
 
 const mainBtn          = document.getElementById("be-main-btn");
 const librariesBtn     = document.getElementById("be-libraries-btn");
@@ -54,6 +87,10 @@ const tagsHelpBtn      = document.getElementById("be-tags-help-btn");
 const mediaHelpBtn     = document.getElementById("be-media-help-btn");
 const libraryHelpBtn   = document.getElementById("be-library-help-btn");
 const mediaManagerEl   = document.getElementById("be-media-manager");
+const deviceToggleGroup = document.getElementById("be-device-toggle-group");
+const deviceDesktopBtn  = document.getElementById("be-device-desktop");
+const deviceMobileBtn   = document.getElementById("be-device-mobile");
+
 
 let libraries       = [];
 let selectedBlog    = null;
@@ -146,6 +183,7 @@ function showLibraryBrowserView() {
     previewViewEl.hidden = true;
     previewToggleBtn.hidden = true;
     modeToggleGroup.hidden = true;
+    if (deviceToggleGroup) deviceToggleGroup.hidden = true;
     saveBtn.hidden = true;
     setHelpButtonsForView("browser");
     libraryBrowser.show();
@@ -157,7 +195,9 @@ function showEditorView() {
     editorViewEl.hidden = false;
     previewViewEl.hidden = true;
     previewToggleBtn.hidden = false;
-    modeToggleGroup.hidden = false;
+    // The About Me page has no config.json — hide the whole mode toggle
+    // rather than offering a mode that can't exist.
+    modeToggleGroup.hidden = isAboutMeBlog(selectedBlog);
     saveBtn.hidden = false;
     setHelpButtonsForView("editor");
     libraryBrowser.hide();
@@ -202,6 +242,9 @@ function applyModeVisibility() {
 
 function switchMode(mode) {
     if (!selectedBlog || mode === currentMode) return;
+    // No config.json exists for the About Me page — refuse the switch
+    // outright (the toggle is hidden anyway; this is belt-and-braces).
+    if (mode === "config.json" && isAboutMeBlog(selectedBlog)) return;
     // A media-selection pick (e.g. <STL>/<image>/etc.) only ever makes
     // sense while content.md is the active mode — cancel it on any mode
     // switch so it can never linger while editing config.json.
@@ -271,11 +314,13 @@ const preview = createPreview({
     toggleBtn: previewToggleBtn,
     editorViewEl, previewViewEl,
     modeToggleGroup,
+    deviceToggleGroup, deviceDesktopBtn, deviceMobileBtn,
     previewContainerEl, previewIframeEl,
     saveBtn,
     getSelectedBlog: () => selectedBlog,
     getHostingPort,
 });
+
 
 // ── Top-right "current path" link ────────────────────────────────────────────
 
@@ -285,7 +330,9 @@ async function updateCurrentPathLink(blog) {
         currentPathEl.removeAttribute("href");
         return;
     }
-    currentPathEl.textContent = blog.urlPath;
+    currentPathEl.textContent = isAboutMeBlog(blog)
+        ? `public/${ABOUT_ME_URL_PATH}`
+        : blog.urlPath;
     const url = await preview.buildArticleUrl(blog);
     if (url) currentPathEl.href = url;
     else currentPathEl.removeAttribute("href");
@@ -299,8 +346,10 @@ async function selectBlog(blog, { pushUrl = false } = {}) {
     stopSelection();
 
     selectedBlog = blog;
+    const aboutMe = isAboutMeBlog(blog);
+
     modeContentBtn.disabled = false;
-    modeConfigBtn.disabled  = false;
+    modeConfigBtn.disabled  = aboutMe; // no config.json exists for About Me
     saveBtn.disabled        = false;
     previewToggleBtn.disabled = false;
     currentMode = "content.md";
@@ -313,23 +362,31 @@ async function selectBlog(blog, { pushUrl = false } = {}) {
     showEditorView();
 
     leftEl.innerHTML = "";
+    currentJsonCore = null;
+    configWrapEl = null;
 
     markdownWrapEl = document.createElement("div");
     markdownWrapEl.className = "be-mode-wrap be-mode-wrap--markdown";
     leftEl.appendChild(markdownWrapEl);
 
-    configWrapEl = document.createElement("div");
-    configWrapEl.className = "be-mode-wrap be-mode-wrap--config";
-    leftEl.appendChild(configWrapEl);
+    // Only real library blogs get a config.json pane mounted at all.
+    if (!aboutMe) {
+        configWrapEl = document.createElement("div");
+        configWrapEl.className = "be-mode-wrap be-mode-wrap--config";
+        leftEl.appendChild(configWrapEl);
+    }
 
     await Promise.all([
         loadMarkdown(markdownWrapEl, blog),
-        mountConfigEditor(configWrapEl, blog, markDirty).then((core) => { currentJsonCore = core; }),
+        aboutMe
+            ? Promise.resolve(null)
+            : mountConfigEditor(configWrapEl, blog, markDirty).then((core) => { currentJsonCore = core; }),
     ]);
 
     // Media manager re-mounts fresh every time the selected blog changes —
-    // always points at THIS blog's own media/ folder, always starts back
-    // at the root of it.
+    // always points at THIS blog's own media/ folder, always starts back at
+    // the root of it. For About Me that's public/aboutme/media/, resolved
+    // server-side (see lib/adminRoutes/blogMediaRoutes.js).
     mountMediaManager(mediaManagerEl, blog);
 
     clearDirty();
@@ -347,7 +404,7 @@ mainBtn.addEventListener("click", () => {
 // ── Boot ─────────────────────────────────────────────────────────────────────
 
 async function boot() {
-    // blog.json must be loaded BEFORE the toolbar is initialized, since
+    // library.json must be loaded BEFORE the toolbar is initialized, since
     // toolbar.js's button text colors / STL defaults are pulled live from
     // it rather than ever being hardcoded (this also injects
     // --lib-sidebar-width for the Library Browser).
@@ -377,6 +434,12 @@ async function boot() {
 
     const deepLinkPath = parseDeepLinkUrlPath();
     if (deepLinkPath) {
+        // /library-explorer/aboutme is a valid deep link even though the
+        // About Me page never appears in /api/blog-list.
+        if (deepLinkPath === ABOUT_ME_URL_PATH) {
+            await selectBlog(makeAboutMeBlog(), { pushUrl: false });
+            return;
+        }
         const match = findBlogByUrlPath(deepLinkPath);
         if (match) {
             await selectBlog(match, { pushUrl: false });

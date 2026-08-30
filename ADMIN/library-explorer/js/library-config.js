@@ -1,18 +1,37 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Loads ADMIN/library-explorer/library.json and injects it as CSS custom properties:
-//   - --tag-color-<key>    for every entry under "tags"       (highlight.css)
-//   - --media-icon-size    from mediaDisplay.iconSize (px)    (media.css)
-//   - --media-text-size    from mediaDisplay.textSize (px)    (media.css)
-//   - --lib-sidebar-width  from layout.sidebarWidth (px)      (browser.css)
+// Loads ADMIN/library-explorer/library.json and injects it as CSS custom
+// properties:
+//   - --tag-color-<key>       for every entry under "tags"      (highlight.css)
+//   - --media-icon-size       from mediaDisplay.iconSize (px)   (media.css)
+//   - --media-text-size       from mediaDisplay.textSize (px)   (media.css)
+//   - --lib-sidebar-width     from layout.sidebarWidth (px)     (browser.css)
+//   - --preview-mobile-ratio  from preview.mobileAspectRatio    (preview.css)
 //
 // Also exposes the raw loaded sections (getTagColors / getStlDefaults /
-// getMediaDisplay / getLayout) so other modules (toolbar.js,
-// media-manager.js, library-browser.js) can pull values directly from
-// blog.json instead of ever hardcoding them.
+// getMediaDisplay / getLayout / getPreviewConfig) so other modules can pull
+// values directly from library.json instead of ever hardcoding them.
 //
-// Falls back silently (CSS's own :root defaults apply) if blog.json is
+// Falls back silently (CSS's own :root defaults apply) if library.json is
 // missing or invalid.
 // ─────────────────────────────────────────────────────────────────────────────
+
+// Default used whenever preview.mobileAspectRatio is missing/unparseable.
+const DEFAULT_MOBILE_RATIO = "9:16";
+
+// Parses an "X:Y" string into a CSS aspect-ratio value ("X / Y"). Returns
+// null for anything that isn't two positive finite numbers separated by a
+// colon — the caller falls back to DEFAULT_MOBILE_RATIO.
+export function parseAspectRatio(raw) {
+    if (typeof raw !== "string") return null;
+    const parts = raw.split(":");
+    if (parts.length !== 2) return null;
+
+    const w = parseFloat(parts[0].trim());
+    const h = parseFloat(parts[1].trim());
+    if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return null;
+
+    return `${w} / ${h}`;
+}
 
 let _loaded = null;
 
@@ -27,10 +46,11 @@ export async function loadBlogConfig() {
         config = {};
     }
 
-    const tags          = (config && config.tags) || {};
-    const stlDefaults    = (config && config.stlDefaults) || {};
-    const mediaDisplay   = (config && config.mediaDisplay) || {};
-    const layout         = (config && config.layout) || {};
+    const tags         = (config && config.tags) || {};
+    const stlDefaults  = (config && config.stlDefaults) || {};
+    const mediaDisplay = (config && config.mediaDisplay) || {};
+    const layout       = (config && config.layout) || {};
+    const previewCfg   = (config && config.preview) || {};
 
     const root = document.documentElement;
 
@@ -50,7 +70,13 @@ export async function loadBlogConfig() {
         root.style.setProperty("--lib-sidebar-width", `${layout.sidebarWidth}px`);
     }
 
-    _loaded = { tags, stlDefaults, mediaDisplay, layout };
+    // Mobile preview frame shape — always set, so a malformed/missing value
+    // still lands on a sane portrait default rather than collapsing the
+    // frame entirely.
+    const ratio = parseAspectRatio(previewCfg.mobileAspectRatio) || parseAspectRatio(DEFAULT_MOBILE_RATIO);
+    root.style.setProperty("--preview-mobile-ratio", ratio);
+
+    _loaded = { tags, stlDefaults, mediaDisplay, layout, preview: previewCfg };
     return _loaded;
 }
 
@@ -71,4 +97,8 @@ export function getMediaDisplay() {
 
 export function getLayout() {
     return (_loaded && _loaded.layout) || {};
+}
+
+export function getPreviewConfig() {
+    return (_loaded && _loaded.preview) || {};
 }

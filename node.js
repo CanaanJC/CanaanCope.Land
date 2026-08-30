@@ -8,6 +8,7 @@ const { serveStaticFile } = require("./lib/staticFile");
 const { loadExtensions, runExtensions } = require("./lib/extensions");
 const { ensureMasterConfig } = require("./lib/siteConfig");
 const { ensureFavicon } = require("./lib/favicon");
+const { ensureAboutMe } = require("./lib/aboutMe");
 const { startBackupScheduler, startTerminalCommands } = require("./lib/backup");
 const { startAdminServer } = require("./lib/adminServer");
 const { startUpdateChecker } = require("./lib/updateChecker");
@@ -20,6 +21,11 @@ async function boot() {
     // Generate media/favicon.png from media/logo.png if it doesn't exist yet.
     // No-op (and never overwrites) once a favicon.png is present.
     await ensureFavicon();
+
+    // Guarantee the special About Me page exists: public/aboutme/ with a
+    // content.md and an (initially empty) media/ folder. Never overwrites
+    // an existing content.md — see lib/aboutMe.js.
+    ensureAboutMe();
 
     // Keep the tiny stat cache bounded / fresh.
     startStatCachePruner();

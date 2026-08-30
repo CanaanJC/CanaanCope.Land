@@ -1,31 +1,32 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Full-page Library Browser — mounted into #be-library-browser, shown
-// instead of the split editor whenever no blog is being edited.
+// Full-page Library Browser — mounted into #be-library-browser.
 //
-// Left column: breadcrumb + a Finder-style list that starts as every
-// configured library, then "becomes" a folder navigator once you click
-// into one (folders down to library.depth - 1, blogs at the leaf level).
-// Blog ordering at the leaf level is decided SERVER-side per library
-// (see lib/adminRoutes/libraryFsRoutes.js): dated blogs newest → oldest by
-// the first entry in their config.json "date" array, undated blogs after
-// them sorted by file name — or purely by file name when the library's
-// useDates is false.
+// The "About Me" page (public/aboutme/) is pinned as the LAST row of the
+// library list. It uses the same icon as any other blog, and deliberately
+// gets NO context menu — so it can never be renamed, moved or deleted.
 //
-// Right column: action bar (New Folder / New Blog / New Library, plus
-// Move Here / Cancel Move while a move is pending) + a details panel that
-// becomes a blog "edit menu" (Edit / Open Live Page) when a blog row is
-// clicked.
-//
-// New Blog and New Library both use proper in-page modals (never
-// window.prompt) — see openBlogModal / openLibraryModal below.
+// The About Me descriptor is defined INLINE here (and mirrored in
+// library-explorer.js / preview.js) rather than living in its own module:
+// adminServer.js serves index.html for any non-existent path under
+// /library-explorer/, so a missing/mistyped import filename silently
+// returns HTML and kills the whole module graph with a MIME error.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { openMarkdownHelp } from "./toolbar.js";
 
+export const ABOUT_ME_URL_PATH = "aboutme";
+export const ABOUT_ME_NAME = "About Me";
+
+function makeAboutMeBlog() {
+    return {
+        name: ABOUT_ME_URL_PATH,
+        displayName: ABOUT_ME_NAME,
+        urlPath: ABOUT_ME_URL_PATH,
+        isAboutMe: true,
+    };
+}
+
 // ── Generic modal builder ────────────────────────────────────────────────
-// Returns a { overlay, close } handle. `bodyBuilder(bodyEl)` returns
-// whatever field references onSubmit needs; returning false from onSubmit
-// keeps the dialog open (validation failure).
 function createModal({ title, submitLabel, bodyBuilder, onSubmit }) {
     const overlay = document.createElement("div");
     overlay.className = "admin-modal-overlay";
@@ -96,7 +97,6 @@ function createModal({ title, submitLabel, bodyBuilder, onSubmit }) {
     return { overlay, close, setError };
 }
 
-// Small helper — one labelled row, optional helper subtext underneath.
 function addRow(body, labelText, inputEl, hintText) {
     const row = document.createElement("div");
     row.className = "be-lib-modal-row";
@@ -126,13 +126,22 @@ function textInput(placeholder) {
     return input;
 }
 
+// .admin-button has no :disabled rule of its own, so a natively-disabled
+// button would still look fully enabled. This adds the actual grey-out.
+function setButtonDisabled(btn, disabled, reasonTitle) {
+    btn.disabled = disabled;
+    btn.style.opacity = disabled ? "0.4" : "";
+    btn.style.cursor  = disabled ? "not-allowed" : "";
+    btn.title = disabled ? (reasonTitle || "") : "";
+}
+
 export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog, getHostingPort }) {
-    let libraries = [];        // raw /api/libraries array
-    let currentLib = null;     // library object, or null = showing the library list
-    let currentSub = "";       // slash-joined subfolder segments within currentLib
-    let currentData = null;    // last /api/library-tree response for currentLib/currentSub
-    let selectedBlogItem = null; // { name, displayName, urlPath } while its edit menu is shown
-    let moveFlag = null;       // { lib, sub, name, displayName, type } or null
+    let libraries = [];
+    let currentLib = null;
+    let currentSub = "";
+    let currentData = null;
+    let selectedBlogItem = null;
+    let moveFlag = null;
 
     containerEl.innerHTML = `
         <div class="be-lib-left">
@@ -267,8 +276,16 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
         detailsEl.appendChild(heading);
 
         const pathLine = document.createElement("p");
-        pathLine.textContent = selectedBlogItem.urlPath;
+        pathLine.textContent = selectedBlogItem.isAboutMe
+            ? `public/${ABOUT_ME_URL_PATH}`
+            : selectedBlogItem.urlPath;
         detailsEl.appendChild(pathLine);
+
+        if (selectedBlogItem.isAboutMe) {
+            const note = document.createElement("p");
+            note.textContent = "Permanent page — cannot be renamed, moved or deleted.";
+            detailsEl.appendChild(note);
+        }
 
         const actionsWrap = document.createElement("div");
         actionsWrap.className = "be-lib-edit-menu-actions";
@@ -278,7 +295,11 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
         editBtn.className = "admin-button";
         editBtn.textContent = "Edit";
         editBtn.addEventListener("click", () => {
-            onOpenBlog({ urlPath: selectedBlogItem.urlPath, name: selectedBlogItem.displayName || selectedBlogItem.name });
+            onOpenBlog({
+                urlPath: selectedBlogItem.urlPath,
+                name: selectedBlogItem.displayName || selectedBlogItem.name,
+                isAboutMe: !!selectedBlogItem.isAboutMe,
+            });
         });
         actionsWrap.appendChild(editBtn);
 
@@ -289,7 +310,9 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
         openLiveBtn.addEventListener("click", async () => {
             const port = await getHostingPort();
             if (!port) return;
-            const url = `http://${window.location.hostname}:${port}/${selectedBlogItem.urlPath}`;
+            const url = selectedBlogItem.isAboutMe
+                ? `http://${window.location.hostname}:${port}/`
+                : `http://${window.location.hostname}:${port}/${selectedBlogItem.urlPath}`;
             window.open(url, "_blank", "noopener,noreferrer");
         });
         actionsWrap.appendChild(openLiveBtn);
@@ -306,7 +329,13 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
         newFolderBtn.type = "button";
         newFolderBtn.className = "admin-button";
         newFolderBtn.textContent = "New Folder";
-        newFolderBtn.disabled = !currentLib || isAtLeafLevel();
+        setButtonDisabled(
+            newFolderBtn,
+            !currentLib || isAtLeafLevel(),
+            !currentLib
+                ? "Open a library first."
+                : "You're at the blog level — folders can't be created here."
+        );
         newFolderBtn.addEventListener("click", () => createFolder());
         actionsEl.appendChild(newFolderBtn);
 
@@ -314,7 +343,13 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
         newBlogBtn.type = "button";
         newBlogBtn.className = "admin-button";
         newBlogBtn.textContent = "New Blog";
-        newBlogBtn.disabled = !currentLib || !isAtLeafLevel();
+        setButtonDisabled(
+            newBlogBtn,
+            !currentLib || !isAtLeafLevel(),
+            !currentLib
+                ? "Open a library first."
+                : "Blogs can only be created at this library's deepest folder level."
+        );
         newBlogBtn.addEventListener("click", () => openBlogModal());
         actionsEl.appendChild(newBlogBtn);
 
@@ -346,7 +381,7 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
         moveHereBtn.type = "button";
         moveHereBtn.className = "admin-button";
         moveHereBtn.textContent = "Move Here";
-        moveHereBtn.disabled = !moveIsLegalHere();
+        setButtonDisabled(moveHereBtn, !moveIsLegalHere(), "Not a legal destination for this item.");
         moveHereBtn.addEventListener("click", () => performMove());
         bannerEl.appendChild(moveHereBtn);
 
@@ -448,6 +483,8 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
 
         row.addEventListener("click", onClick);
 
+        // No contextItems → no context menu at all. This is exactly how the
+        // About Me row is made permanent.
         if (contextItems) {
             row.addEventListener("contextmenu", (e) => {
                 e.preventDefault();
@@ -456,6 +493,24 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
         }
 
         return row;
+    }
+
+    // Pinned About Me row — always last, standard blog icon, no menu.
+    function appendAboutMeRow() {
+        const icon = document.createElement("div");
+        icon.className = "be-lib-icon be-lib-icon--blog";
+
+        listEl.appendChild(buildRow({
+            type: "blog",
+            name: ABOUT_ME_URL_PATH,
+            displayName: ABOUT_ME_NAME,
+            iconEl: icon,
+            onClick: () => {
+                selectedBlogItem = makeAboutMeBlog();
+                renderList();
+                renderDetails();
+            },
+        }));
     }
 
     function renderList() {
@@ -467,34 +522,36 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
                 empty.className = "be-lib-empty";
                 empty.textContent = "No libraries yet — create one on the right.";
                 listEl.appendChild(empty);
-                return;
-            }
-            for (const lib of libraries) {
-                const icon = document.createElement("div");
-                icon.className = "be-lib-icon";
-                if (lib.icon) {
-                    const img = document.createElement("img");
-                    img.src = lib.icon.startsWith("/") ? lib.icon : `/${lib.icon}`;
-                    img.alt = "";
-                    img.addEventListener("error", () => { img.remove(); icon.classList.add("be-lib-icon--folder"); });
-                    icon.appendChild(img);
-                } else {
-                    icon.classList.add("be-lib-icon--folder");
+            } else {
+                for (const lib of libraries) {
+                    const icon = document.createElement("div");
+                    icon.className = "be-lib-icon";
+                    if (lib.icon) {
+                        const img = document.createElement("img");
+                        img.src = lib.icon.startsWith("/") ? lib.icon : `/${lib.icon}`;
+                        img.alt = "";
+                        img.addEventListener("error", () => { img.remove(); icon.classList.add("be-lib-icon--folder"); });
+                        icon.appendChild(img);
+                    } else {
+                        icon.classList.add("be-lib-icon--folder");
+                    }
+                    listEl.appendChild(buildRow({
+                        type: "library",
+                        name: lib.path,
+                        displayName: lib.name || lib.path,
+                        iconEl: icon,
+                        onClick: () => {
+                            currentLib = lib;
+                            currentSub = "";
+                            selectedBlogItem = null;
+                            loadLevel();
+                        },
+                    }));
                 }
-                const row = buildRow({
-                    type: "library",
-                    name: lib.path,
-                    displayName: lib.name || lib.path,
-                    iconEl: icon,
-                    onClick: () => {
-                        currentLib = lib;
-                        currentSub = "";
-                        selectedBlogItem = null;
-                        loadLevel();
-                    },
-                });
-                listEl.appendChild(row);
             }
+
+            // Always last, even with zero libraries.
+            appendAboutMeRow();
             return;
         }
 
@@ -520,7 +577,7 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
                 { label: "Delete", danger: true, action: () => confirmAndDelete({ type: rowType, name: item.name, displayName: item.displayName }) },
             ];
 
-            const row = buildRow({
+            listEl.appendChild(buildRow({
                 type: rowType,
                 name: item.name,
                 displayName: item.displayName || item.name,
@@ -537,8 +594,7 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
                         loadLevel();
                     }
                 },
-            });
-            listEl.appendChild(row);
+            }));
         }
     }
 
@@ -652,7 +708,7 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
             .catch((e) => alert(`Delete failed: ${e.message}`));
     }
 
-    // ── New folder (still a simple prompt — one field, no options) ───────
+    // ── New folder ───────────────────────────────────────────────────────
 
     function createFolder() {
         if (!currentLib || isAtLeafLevel()) return;
@@ -671,13 +727,7 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
             .catch((e) => alert(`Failed to create folder: ${e.message}`));
     }
 
-    // ── New Blog modal — File name + Blog title ──────────────────────────
-    //
-    // The server copies ADMIN/template/blog/config.json + content.md and
-    // creates an empty media/ folder; the title is written into the copied
-    // config.json's "name". If any part of that fails, the server deletes
-    // the folder it made and reports the error here — nothing half-built
-    // is ever left behind.
+    // ── New Blog modal ───────────────────────────────────────────────────
 
     function openBlogModal() {
         if (!currentLib || !isAtLeafLevel()) return;
@@ -727,7 +777,7 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
         });
     }
 
-    // ── New Library modal — Path / Name / Depth / Icon / Sort ────────────
+    // ── New Library modal ────────────────────────────────────────────────
 
     function openLibraryModal() {
         createModal({
@@ -751,7 +801,6 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
                 addRow(body, "Depth:", depthInput,
                     "How many folder levels deep the blogs sit. Whole numbers above 0.");
 
-                // ── Icon upload ──
                 const iconWrap = document.createElement("div");
                 iconWrap.className = "be-lib-modal-icon-wrap";
 
@@ -791,7 +840,6 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
                     }
                 });
 
-                // ── Sort toggle ──
                 const sortToggle = document.createElement("input");
                 sortToggle.type = "checkbox";
                 sortToggle.checked = true;
@@ -816,13 +864,15 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
 
                 if (!libPath) { setError("Please enter a path."); return false; }
                 if (!name)    { setError("Please enter a name."); return false; }
+                if (libPath.toLowerCase() === ABOUT_ME_URL_PATH) {
+                    setError(`"${ABOUT_ME_URL_PATH}" is a reserved path used by the About Me page.`);
+                    return false;
+                }
                 if (!Number.isFinite(depth) || depth < 1 || !Number.isInteger(depth)) {
                     setError("Depth must be a whole number greater than 0.");
                     return false;
                 }
 
-                // Icon (if any) is uploaded first, so the created entry can
-                // reference its final path straight away.
                 let iconPath = "";
                 const file = getIconFile();
                 if (file) {

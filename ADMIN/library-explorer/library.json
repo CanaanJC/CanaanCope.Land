@@ -20,5 +20,8 @@
     },
     "layout": {
         "sidebarWidth": 340
+    },
+    "preview": {
+        "mobileAspectRatio": "9:16"
     }
 }

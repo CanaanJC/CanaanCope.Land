@@ -22,6 +22,13 @@
 
       <button id="be-preview-toggle" class="admin-button" type="button" disabled hidden>Show Preview</button>
 
+      <!-- Device toggle — only ever visible while preview mode is on.
+           Mutually exclusive, same visual style as the edit-mode toggle. -->
+      <div id="be-device-toggle-group" class="be-mode-toggle" role="group" aria-label="Preview device" hidden>
+        <button id="be-device-desktop" class="be-toggle-btn be-toggle-btn--active" type="button">Desktop</button>
+        <button id="be-device-mobile" class="be-toggle-btn" type="button">Mobile</button>
+      </div>
+
       <div id="be-mode-toggle-group" class="be-mode-toggle" role="group" aria-label="Edit mode" hidden>
         <button id="be-mode-content" class="be-toggle-btn be-toggle-btn--active" type="button" disabled>content.md</button>
         <button id="be-mode-config" class="be-toggle-btn" type="button" disabled>config.json</button>

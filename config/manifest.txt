@@ -66,6 +66,7 @@ config/update-notes/26.8.4.md
 config/update-notes/26.8.5.md
 config/version.txt
 .gitignore
+lib/aboutMe.js
 lib/adminRoutes/archiveRoutes.js
 lib/adminRoutes/blogMediaRoutes.js
 lib/adminRoutes/blogRoutes.js
