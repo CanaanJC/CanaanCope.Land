@@ -1,15 +1,24 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Blog Editor — main orchestrator. See css/blog-editor-*.css for
-// layout/styling, and the sibling js/ modules for the individual pieces
-// (dropdown, preview, config editor, markdown editor + tag syntax
-// highlighting, right-panel toolbar, media manager, media selection mode).
+// Library Explorer — main orchestrator. See css/*.css for layout/styling, and the
+// sibling js/ modules for the individual pieces (preview, config editor,
+// markdown editor + tag syntax highlighting, right-panel toolbar, media
+// manager, media selection mode, library browser).
+//
+// Two top-level views share .be-main: the full-page Library Browser (the
+// default view — shown whenever no blog is being edited) and the split
+// editor view (plus its own full-bleed preview sub-view). There is no
+// blog-picker dropdown anymore — a blog is opened either via a deep-linked
+// URL on load, or by clicking it in the Library Browser and pressing its
+// "Edit" button. The "Libraries" top-bar button always returns to the
+// browser.
 //
 // Unsaved-changes protection: any edit in either mounted editor marks the
-// page dirty; switching blogs / leaving the page warns before discarding.
-// Switching content.md ⇄ config.json or toggling preview never discards
-// anything — both editors stay mounted the whole time. The media manager
-// is independent of dirty-tracking — every media action (upload, new
-// folder, rename, move) writes to disk immediately on its own.
+// page dirty; switching blogs / leaving the page / returning to the
+// Library Browser warns before discarding. Switching content.md ⇄
+// config.json or toggling preview never discards anything — both editors
+// stay mounted the whole time. The media manager and the Library Browser
+// are both independent of dirty-tracking — every action either of them
+// takes writes to disk immediately on its own.
 //
 // Any active media-selection mode (e.g. <STL>/<image>/<video>/<audio>/
 // <folder> picking) is cancelled whenever the edit mode is switched away
@@ -17,22 +26,24 @@
 // persist across either.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { loadBlogConfig } from "./blog-config.js";
+import { loadBlogConfig } from "./library-config.js";
 import { mountMarkdownEditor } from "./markdown-editor.js";
 import { mountConfigEditor } from "./config-editor.js";
-import { createDropdown } from "./dropdown.js";
 import { createPreview } from "./preview.js";
 import { initToolbar } from "./toolbar.js";
 import { mountMediaManager } from "./media-manager.js";
 import { stopSelection } from "./selection-mode.js";
+import { createLibraryBrowser } from "./library-browser.js";
 
 const mainBtn          = document.getElementById("be-main-btn");
+const librariesBtn     = document.getElementById("be-libraries-btn");
 const modeToggleGroup  = document.getElementById("be-mode-toggle-group");
 const modeContentBtn   = document.getElementById("be-mode-content");
 const modeConfigBtn    = document.getElementById("be-mode-config");
 const saveBtn          = document.getElementById("be-save");
 const previewToggleBtn = document.getElementById("be-preview-toggle");
 const currentPathEl    = document.getElementById("be-current-path");
+const libraryBrowserEl = document.getElementById("be-library-browser");
 const editorViewEl     = document.getElementById("be-editor-view");
 const previewViewEl    = document.getElementById("be-preview-view");
 const previewContainerEl = document.getElementById("be-preview-container");
@@ -41,6 +52,7 @@ const leftEl           = document.getElementById("be-left");
 const toolbarEl        = document.getElementById("be-toolbar");
 const tagsHelpBtn      = document.getElementById("be-tags-help-btn");
 const mediaHelpBtn     = document.getElementById("be-media-help-btn");
+const libraryHelpBtn   = document.getElementById("be-library-help-btn");
 const mediaManagerEl   = document.getElementById("be-media-manager");
 
 let libraries       = [];
@@ -53,6 +65,7 @@ let configWrapEl    = null;
 let _portPromise    = null;
 let saveFlashTimer  = null;
 let isDirty         = false;
+let currentView     = "browser"; // "browser" | "editor"
 
 const UNSAVED_CHANGES_MESSAGE = "You have unsaved changes. Are you sure you want to leave without saving?";
 
@@ -118,15 +131,61 @@ window.addEventListener("beforeunload", (e) => {
     return "";
 });
 
-// ── Dropdown ─────────────────────────────────────────────────────────────────
+// ── View switching (Library Browser / editor) ────────────────────────────────
 
-const dropdown = createDropdown({
-    btn: document.getElementById("be-dropdown-btn"),
-    panel: document.getElementById("be-dropdown-panel"),
-    onSelect: (blog) => {
-        if (blog.urlPath !== selectedBlog?.urlPath && !confirmDiscardIfDirty()) return;
+function setHelpButtonsForView(view) {
+    if (mediaHelpBtn)   mediaHelpBtn.hidden   = view !== "editor";
+    if (tagsHelpBtn)    tagsHelpBtn.hidden    = view !== "editor";
+    if (libraryHelpBtn) libraryHelpBtn.hidden = view !== "browser";
+}
+
+function showLibraryBrowserView() {
+    currentView = "browser";
+    libraryBrowserEl.hidden = false;
+    editorViewEl.hidden = true;
+    previewViewEl.hidden = true;
+    previewToggleBtn.hidden = true;
+    modeToggleGroup.hidden = true;
+    saveBtn.hidden = true;
+    setHelpButtonsForView("browser");
+    libraryBrowser.show();
+}
+
+function showEditorView() {
+    currentView = "editor";
+    libraryBrowserEl.hidden = true;
+    editorViewEl.hidden = false;
+    previewViewEl.hidden = true;
+    previewToggleBtn.hidden = false;
+    modeToggleGroup.hidden = false;
+    saveBtn.hidden = false;
+    setHelpButtonsForView("editor");
+    libraryBrowser.hide();
+}
+
+const libraryBrowser = createLibraryBrowser({
+    containerEl: libraryBrowserEl,
+    libraryHelpBtnEl: libraryHelpBtn,
+    onOpenBlog: (blog) => {
         selectBlog(blog, { pushUrl: true });
     },
+    getHostingPort,
+});
+
+librariesBtn.addEventListener("click", () => {
+    if (currentView === "editor" && !confirmDiscardIfDirty()) return;
+
+    selectedBlog = null;
+    clearDirty();
+    modeContentBtn.disabled = true;
+    modeConfigBtn.disabled  = true;
+    saveBtn.disabled        = true;
+    previewToggleBtn.disabled = true;
+    currentPathEl.textContent = "";
+    currentPathEl.removeAttribute("href");
+
+    history.pushState(null, "", "/library-explorer");
+    showLibraryBrowserView();
 });
 
 // ── Mode toggle (content.md ⇄ config.json) — purely visual ─────────────────
@@ -240,7 +299,6 @@ async function selectBlog(blog, { pushUrl = false } = {}) {
     stopSelection();
 
     selectedBlog = blog;
-    document.getElementById("be-dropdown-btn").textContent = `${blog.name} ▾`;
     modeContentBtn.disabled = false;
     modeConfigBtn.disabled  = false;
     saveBtn.disabled        = false;
@@ -250,9 +308,9 @@ async function selectBlog(blog, { pushUrl = false } = {}) {
 
     updateCurrentPathLink(blog);
 
-    if (pushUrl) history.pushState(null, "", `/blog-editor/${blog.urlPath}`);
+    if (pushUrl) history.pushState(null, "", `/library-explorer/${blog.urlPath}`);
 
-    dropdown.render(libraries, selectedBlog);
+    showEditorView();
 
     leftEl.innerHTML = "";
 
@@ -291,7 +349,8 @@ mainBtn.addEventListener("click", () => {
 async function boot() {
     // blog.json must be loaded BEFORE the toolbar is initialized, since
     // toolbar.js's button text colors / STL defaults are pulled live from
-    // it rather than ever being hardcoded.
+    // it rather than ever being hardcoded (this also injects
+    // --lib-sidebar-width for the Library Browser).
     await loadBlogConfig();
 
     initToolbar({
@@ -313,16 +372,20 @@ async function boot() {
         if (!Array.isArray(libraries)) libraries = [];
     } catch (e) {
         libraries = [];
-        console.error("Blog Editor: failed to load /api/blog-list:", e);
+        console.error("Library Explorer: failed to load /api/blog-list:", e);
     }
-
-    dropdown.render(libraries, selectedBlog);
 
     const deepLinkPath = parseDeepLinkUrlPath();
     if (deepLinkPath) {
         const match = findBlogByUrlPath(deepLinkPath);
-        if (match) await selectBlog(match, { pushUrl: false });
+        if (match) {
+            await selectBlog(match, { pushUrl: false });
+            return;
+        }
     }
+
+    // No valid deep-linked blog — start on the Library Browser.
+    showLibraryBrowserView();
 }
 
 boot();

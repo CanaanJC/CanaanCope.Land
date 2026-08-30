@@ -5,14 +5,13 @@
             "update-checker"
         ],
         [
-            "blog-editor",
             "archive",
             "sidebar.json",
             "library-editor",
             "topbar.json",
             "admin-master.json",
             "logo-uploader",
-            "blog-editor-config"
+            "library-explorer-config"
         ]
     ]
 }

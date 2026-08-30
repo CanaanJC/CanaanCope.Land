@@ -144,7 +144,7 @@ export function renderMarkup(text) {
 // the real editing surface underneath; swatch edits write directly into
 // its .value and dispatch a real "input" event so the existing
 // repaint/dirty-tracking listeners (wired in markdown-editor.js /
-// blog-editor.js) pick it up exactly like a normal keystroke would.
+// library-explorer.js) pick it up exactly like a normal keystroke would.
 export function wireInteractions(highlightEl, textareaEl) {
     highlightEl.addEventListener("click", (e) => {
         const link = e.target.closest(".be-linkable[data-url]");

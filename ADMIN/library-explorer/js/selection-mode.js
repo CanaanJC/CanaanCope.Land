@@ -1,4 +1,4 @@
-// ADMIN/blog-editor/js/selection-mode.js
+// ADMIN/library-explorer/js/selection-mode.js
 // ─────────────────────────────────────────────────────────────────────────────
 // Generic "media selection mode" framework — shared by any toolbar button
 // that needs to say "let the user pick a media file of kind X from the

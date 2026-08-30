@@ -1,7 +1,10 @@
 /* ─────────────────────────────────────────────────────────────────────────────
-   Blog Editor — right-panel toolbar ([Paragraph] / [Mobile] / <link embed> /
+   Library Explorer — right-panel toolbar ([Paragraph] / [Mobile] / <link embed> /
    <STL> / <image> / <video> / <audio> / <folder>) and the Tags Help /
-   Media Help buttons (bottom-right of the page).
+   Media Help / Library Explorer Help buttons (bottom-right of the page).
+   Only the buttons relevant to the currently active view are ever visible
+   (toggled individually by js/library-explorer.js) — they all share one fixed
+   container so none of them need manually-computed offsets.
 
    Toolbar buttons reuse the exact same visual style as the top bar's
    buttons (.admin-button) — only the button TEXT is colored, via
@@ -35,9 +38,7 @@
     background: #2f2f22;
 }
 
-/* ── Help buttons (bottom-right of the editor page) — Media Help sits to
-   the left of Tags Help, both inside one fixed flex container so neither
-   needs manually-computed offsets. ── */
+/* ── Help buttons — bottom-right of the page. ── */
 
 .be-help-buttons {
     position: fixed;

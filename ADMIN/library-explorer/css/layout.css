@@ -1,6 +1,14 @@
 /* ─────────────────────────────────────────────────────────────────────────────
-   Blog Editor — page shell, split panels (left 2/3 editor / right 1/3), and
-   the two mode wraps (content.md / config.json) inside the left panel.
+   Library Explorer — page shell, split panels (left 2/3 editor / right 1/3), the
+   two mode wraps (content.md / config.json) inside the left panel, and the
+   full-page Library Browser that replaces the editor entirely when no blog
+   is selected.
+
+   Body is a flex column (topbar, then main) rather than a fixed 56px
+   offset — so if the topbar ever grows taller (e.g. the current-path link
+   wrapping to two lines), the main area just shrinks to fit instead of
+   overlapping/clipping.
+
    Uses the same --admin-* CSS variables as /css/admin.css.
    ───────────────────────────────────────────────────────────────────────── */
 
@@ -11,13 +19,20 @@
 html, body {
     height: 100%;
     margin: 0;
-    overflow: hidden; /* panels below handle their own scrolling */
+    overflow: hidden;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
 }
 
 .be-main {
     position: relative;
-    height: calc(100vh - 56px);
+    flex: 1 1 auto;
+    min-height: 0;
     width: 100%;
+    overflow: hidden; /* panels below handle their own scrolling */
 }
 
 .be-editor-view {
@@ -55,7 +70,7 @@ html, body {
 
 /* ── Mode wraps — both content.md's and config.json's containers stay
    mounted simultaneously inside .be-panel--left; only one is ever visible
-   ([hidden] toggled by js/blog-editor.js's applyModeVisibility). Each fills
+   ([hidden] toggled by js/library-explorer.js's applyModeVisibility). Each fills
    the full panel independently so switching between them is purely
    visual — no state is ever lost. ── */
 

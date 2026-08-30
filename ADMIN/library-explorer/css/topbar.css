@@ -1,6 +1,6 @@
 /* ─────────────────────────────────────────────────────────────────────────────
-   Blog Editor — top bar: main button, blog dropdown, preview toggle,
-   mode/device toggle groups, save button, current-path link.
+   Library Explorer — top bar: main/libraries buttons, preview toggle, mode
+   toggle group, save button, current-path link.
    ───────────────────────────────────────────────────────────────────────── */
 
 .be-topbar {
@@ -8,24 +8,31 @@
     align-items: center;
     gap: 12px;
     padding: 10px 16px;
-    height: 56px;
+    min-height: 56px;
     box-sizing: border-box;
     background: var(--admin-panel-bg);
     border-bottom: 1px solid var(--admin-panel-border);
     flex-wrap: nowrap;
+    flex: 0 0 auto;
     position: relative;
     z-index: 50;
 }
 
+/* Wraps onto multiple lines instead of truncating when the article's
+   urlPath is long — constrained to a max width so it wraps within its own
+   box rather than pushing the rest of the top bar around. */
 .be-current-path {
     margin-left: auto;
+    flex: 0 1 320px;
+    max-width: 320px;
     font-size: 0.8rem;
     color: #9a9a9a;
     font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: break-word;
     text-decoration: none;
+    text-align: right;
     cursor: pointer;
 }
 
@@ -40,65 +47,8 @@
     cursor: default;
 }
 
-/* ── Library/blog dropdown ── */
-
-.be-dropdown {
-    position: relative;
-}
-
-.be-dropdown-panel {
-    position: fixed;
-    min-width: 260px;
-    max-width: 360px;
-    max-height: 420px;
-    overflow-y: auto;
-    background: var(--admin-panel-bg);
-    border: 1px solid var(--admin-panel-border);
-    border-radius: 10px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-    padding: 6px;
-    z-index: 2000;
-}
-
-.be-dropdown-group-heading {
-    font-size: 0.75rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: #8a8a8a;
-    padding: 8px 8px 4px 8px;
-}
-
-.be-dropdown-item {
-    display: block;
-    width: 100%;
-    text-align: left;
-    background: none;
-    border: none;
-    color: var(--admin-text);
-    padding: 8px 12px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.85rem;
-    font-family: inherit;
-}
-
-.be-dropdown-item:hover {
-    background: #2a2a2a;
-}
-
-.be-dropdown-item--active {
-    background: #2a3a2a;
-}
-
-.be-dropdown-empty {
-    padding: 6px 12px 10px 12px;
-    font-size: 0.78rem;
-    color: #777;
-}
-
-/* ── Mode / device toggles — mutually exclusive; only one group is ever
-   visible at a time. ── */
+/* ── Mode toggle — mutually exclusive; hidden entirely (not just
+   disabled) while the Library Browser is the active view. ── */
 
 .be-mode-toggle {
     display: flex;
@@ -130,7 +80,7 @@
     border-right: 1px solid #3a3a3a;
 }
 
-/* Preview toggle button — same green shade as an active mode/device toggle
+/* Preview toggle button — same green shade as an active mode toggle
    (.be-toggle-btn--active's #3a4a3a) while preview is on. */
 #be-preview-toggle.be-toggle-btn--active {
     background: #3a4a3a;

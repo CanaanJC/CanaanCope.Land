@@ -213,10 +213,10 @@
     background: #353535;
 }
 
-/* ── Date-list widget (Blog Editor's config.json "date" field ONLY) ───────
+/* ── Date-list widget (Library Explorer's config.json "date" field ONLY) ───────
    Injected by json.js's buildDateListField, only ever mounted when
    elementConfig.isBlogEditor is true (set only by
-   ADMIN/blog-editor/blog-editor.js's mountConfigEditor). */
+   ADMIN/library-explorer/library-explorer.js's mountConfigEditor). */
 
 .admin-datelist {
     flex: 1 1 160px;

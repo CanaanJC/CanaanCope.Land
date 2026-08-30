@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Library Explorer</title>
+    <link rel="stylesheet" href="/css/admin.css" />
+    <link rel="stylesheet" href="/elements/lib/css/json.css" />
+    <link rel="stylesheet" href="/library-explorer/css/layout.css" />
+    <link rel="stylesheet" href="/library-explorer/css/topbar.css" />
+    <link rel="stylesheet" href="/library-explorer/css/toolbar.css" />
+    <link rel="stylesheet" href="/library-explorer/css/modals.css" />
+    <link rel="stylesheet" href="/library-explorer/css/preview.css" />
+    <link rel="stylesheet" href="/library-explorer/css/media.css" />
+    <link rel="stylesheet" href="/library-explorer/css/highlight.css" />
+    <link rel="stylesheet" href="/library-explorer/css/browser.css" />
+  </head>
+  <body>
+    <header class="be-topbar">
+      <button id="be-main-btn" class="admin-button" type="button" title="Return to admin main page">← Main</button>
+      <button id="be-libraries-btn" class="admin-button" type="button" title="Browse libraries">Libraries</button>
+
+      <button id="be-preview-toggle" class="admin-button" type="button" disabled hidden>Show Preview</button>
+
+      <div id="be-mode-toggle-group" class="be-mode-toggle" role="group" aria-label="Edit mode" hidden>
+        <button id="be-mode-content" class="be-toggle-btn be-toggle-btn--active" type="button" disabled>content.md</button>
+        <button id="be-mode-config" class="be-toggle-btn" type="button" disabled>config.json</button>
+      </div>
+
+      <button id="be-save" class="admin-button" type="button" disabled hidden>Save</button>
+
+      <a id="be-current-path" class="be-current-path" href="#" target="_blank" rel="noopener noreferrer" title="Open the live article in a new tab"></a>
+    </header>
+
+    <main class="be-main">
+      <div id="be-library-browser" class="be-library-browser" hidden></div>
+
+      <div id="be-editor-view" class="be-editor-view" hidden>
+        <div id="be-left" class="be-panel be-panel--left">
+          <p class="be-placeholder">Select a blog post to begin editing.</p>
+        </div>
+        <div id="be-right" class="be-panel be-panel--right">
+          <div id="be-toolbar" class="be-toolbar"></div>
+          <div id="be-media-divider" class="be-media-divider"></div>
+          <div id="be-media-manager" class="be-media-manager">
+            <p class="be-placeholder be-placeholder--media">Select a blog post to manage its media.</p>
+          </div>
+        </div>
+      </div>
+
+      <div id="be-preview-view" class="be-preview-view" hidden>
+        <div id="be-preview-container" class="be-preview-container">
+          <iframe id="be-preview-iframe" class="be-preview-iframe" src="about:blank"></iframe>
+        </div>
+      </div>
+    </main>
+
+    <div id="be-help-buttons" class="be-help-buttons">
+      <button id="be-media-help-btn" class="admin-button be-tool-help-btn" type="button" title="Media reference" hidden>Media Help</button>
+      <button id="be-tags-help-btn" class="admin-button be-tool-help-btn" type="button" title="Tag reference" hidden>Tags Help</button>
+      <button id="be-library-help-btn" class="admin-button be-tool-help-btn" type="button" title="Library explorer reference">Library Explorer Help</button>
+    </div>
+
+    <script type="module" src="/library-explorer/js/library-explorer.js"></script>
+  </body>
+</html>

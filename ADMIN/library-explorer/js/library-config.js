@@ -1,12 +1,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Loads ADMIN/blog-editor/blog.json and injects it as CSS custom properties:
+// Loads ADMIN/library-explorer/library.json and injects it as CSS custom properties:
 //   - --tag-color-<key>    for every entry under "tags"       (highlight.css)
-//   - --media-icon-size    from mediaDisplay.iconSize (px)    (blog-editor-media.css)
-//   - --media-text-size    from mediaDisplay.textSize (px)    (blog-editor-media.css)
+//   - --media-icon-size    from mediaDisplay.iconSize (px)    (media.css)
+//   - --media-text-size    from mediaDisplay.textSize (px)    (media.css)
+//   - --lib-sidebar-width  from layout.sidebarWidth (px)      (browser.css)
 //
 // Also exposes the raw loaded sections (getTagColors / getStlDefaults /
-// getMediaDisplay) so other modules (toolbar.js, media-manager.js) can pull
-// values directly from blog.json instead of ever hardcoding them.
+// getMediaDisplay / getLayout) so other modules (toolbar.js,
+// media-manager.js, library-browser.js) can pull values directly from
+// blog.json instead of ever hardcoding them.
 //
 // Falls back silently (CSS's own :root defaults apply) if blog.json is
 // missing or invalid.
@@ -19,7 +21,7 @@ export async function loadBlogConfig() {
 
     let config = {};
     try {
-        const res = await fetch("/blog-editor/blog.json");
+        const res = await fetch("/library-explorer/library.json");
         if (res.ok) config = await res.json();
     } catch {
         config = {};
@@ -28,6 +30,7 @@ export async function loadBlogConfig() {
     const tags          = (config && config.tags) || {};
     const stlDefaults    = (config && config.stlDefaults) || {};
     const mediaDisplay   = (config && config.mediaDisplay) || {};
+    const layout         = (config && config.layout) || {};
 
     const root = document.documentElement;
 
@@ -43,8 +46,11 @@ export async function loadBlogConfig() {
     if (typeof mediaDisplay.textSize === "number") {
         root.style.setProperty("--media-text-size", `${mediaDisplay.textSize}px`);
     }
+    if (typeof layout.sidebarWidth === "number") {
+        root.style.setProperty("--lib-sidebar-width", `${layout.sidebarWidth}px`);
+    }
 
-    _loaded = { tags, stlDefaults, mediaDisplay };
+    _loaded = { tags, stlDefaults, mediaDisplay, layout };
     return _loaded;
 }
 
@@ -61,4 +67,8 @@ export function getStlDefaults() {
 
 export function getMediaDisplay() {
     return (_loaded && _loaded.mediaDisplay) || {};
+}
+
+export function getLayout() {
+    return (_loaded && _loaded.layout) || {};
 }

@@ -524,3 +524,8 @@ body.admin-menu-open {
 .admin-archive-download:hover {
     background: #353535;
 }
+.admin-logo--folder {
+    background: #2a2a2a;
+    padding: 6px;
+}
+

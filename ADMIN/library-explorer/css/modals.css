@@ -1,6 +1,6 @@
 /* ─────────────────────────────────────────────────────────────────────────────
-   Blog Editor — toolbar input dialogs (Paragraph / Link embed) and the
-   Tags Help markdown overlay.
+   Library Explorer — toolbar input dialogs (Paragraph / Link embed) and the
+   Tags Help / Media Help / Library Help markdown overlay.
    ───────────────────────────────────────────────────────────────────────── */
 
 /* ── Toolbar dialogs — reuse .admin-modal-overlay / .admin-modal-box from
@@ -45,8 +45,9 @@
     padding: 8px 10px;
 }
 
-/* ── Tags Help modal — covers most of the screen, renders tags.md as
-   markdown. Clicking off (the overlay) or the × closes it. ── */
+/* ── Tags/Media/Library Help modal — covers most of the screen, renders the
+   given .md file as markdown. Clicking off (the overlay) or the × closes
+   it. ── */
 
 .be-tags-help-overlay {
     position: fixed;

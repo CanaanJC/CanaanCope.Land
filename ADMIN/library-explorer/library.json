@@ -17,5 +17,8 @@
     "mediaDisplay": {
         "iconSize": 64,
         "textSize": 12
+    },
+    "layout": {
+        "sidebarWidth": 340
     }
 }

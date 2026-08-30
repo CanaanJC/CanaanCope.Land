@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Blog Editor — per-article media manager. Sits below the tag toolbar, in
+// Library Explorer — per-article media manager. Sits below the tag toolbar, in
 // the right panel. Always scoped to the CURRENTLY SELECTED blog's own
 // media/ folder (and its subfolders) — never a global/site-wide browser.
 //

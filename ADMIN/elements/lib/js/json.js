@@ -28,13 +28,13 @@
 //     doesn't otherwise expose a control for. Switching back parses your
 //     edits back into the visual editor (invalid JSON keeps you in raw mode
 //     with an alert). Saving while in raw mode parses it first automatically.
-//   - when elementConfig.isBlogEditor is true (set only by the Blog Editor's
-//     own config.json mode — see ADMIN/blog-editor/blog-editor.js), any
+//   - when elementConfig.isBlogEditor is true (set only by the Library Explorer's
+//     own config.json mode — see ADMIN/library-explorer/library-explorer.js), any
 //     array field whose KEY is literally "date" is rendered as a special
 //     date-chip list instead of the generic JSON-lines textarea: each date
 //     shows as a chip with an "×" to remove it, and a "+" button opens a
 //     small native calendar picker to add a new date. This ONLY applies
-//     inside the Blog Editor's config.json editor — every other element on
+//     inside the Library Explorer's config.json editor — every other element on
 //     the main Admin page (including any other array field anywhere else)
 //     renders exactly as before.
 //
@@ -539,7 +539,7 @@ function buildJsonLinesField(value, onChange) {
     return wrap;
 }
 
-// ── Date-list editor (Blog Editor's config.json "date" field ONLY) ──────────
+// ── Date-list editor (Library Explorer's config.json "date" field ONLY) ──────────
 //
 // Renders `value` (an array of date strings, e.g. ["2026-08-29"]) as a row
 // of chips, each with an "×" to remove it, plus a "+" button that reveals a
@@ -731,7 +731,7 @@ function renderObject(obj, container, pathPrefix, data, fieldHooks, isBlogEditor
         };
 
         if (Array.isArray(value)) {
-            // Blog Editor-only special case: the "date" array field gets
+            // Library Explorer-only special case: the "date" array field gets
             // the chip/calendar widget instead of the generic JSON-lines
             // textarea. Everywhere else (main Admin page, any other
             // element), arrays render exactly as before.
@@ -796,8 +796,8 @@ export default function initJsonEditor(root, elementConfig) {
     const saveBtn     = root.querySelector("#ej-save");
     const statusEl    = root.querySelector("#ej-status");
 
-    // True only when mounted from the Blog Editor's own config.json mode
-    // (see blog-editor.js's mountConfigEditor). Gates the "date" field's
+    // True only when mounted from the Library Explorer's own config.json mode
+    // (see library-explorer.js's mountConfigEditor). Gates the "date" field's
     // special chip/calendar widget so it never affects any other element.
     const isBlogEditor = !!(elementConfig && elementConfig.isBlogEditor);
 
@@ -1068,7 +1068,7 @@ export default function initJsonEditor(root, elementConfig) {
     // ── Save (used by both the internal #ej-save click and core.save()) ──────
     // If currently in raw mode, parses the raw textarea into `data` first
     // (without necessarily leaving raw mode) so raw edits are never lost.
-    // Returns a Promise<{ ok, error }> so callers (e.g. the Blog Editor's
+    // Returns a Promise<{ ok, error }> so callers (e.g. the Library Explorer's
     // own Save button) can react without depending on the status text.
     function performSave() {
         if (rawMode) {

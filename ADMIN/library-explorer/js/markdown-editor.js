@@ -11,9 +11,17 @@
 // except for the specific interactive bits (clickable links, color
 // swatches), which re-enable pointer-events on themselves (see
 // highlight.css / wireInteractions in highlight.js).
+//
+// The placeholder is an instruction, not a status: a brand-new blog's
+// content.md is legitimately empty, and leaving "Loading…" sitting there
+// forever made a perfectly fine empty file look like a stuck/broken load.
+// Genuine load FAILURES still overwrite this with their own error text
+// (see loadMarkdown in library-explorer.js).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { renderMarkup, wireInteractions } from "./highlight.js";
+
+const EMPTY_PLACEHOLDER = "Type blog content here…";
 
 export function mountMarkdownEditor(container) {
     container.innerHTML = `
@@ -22,7 +30,7 @@ export function mountMarkdownEditor(container) {
             <textarea class="be-md-editable"
                       spellcheck="true"
                       wrap="off"
-                      placeholder="Loading…"></textarea>
+                      placeholder="${EMPTY_PLACEHOLDER}"></textarea>
         </div>
     `;
 
@@ -51,5 +59,7 @@ export function mountMarkdownEditor(container) {
         textarea,
         repaint,
         syncScroll,
+        // Lets callers restore the normal prompt after showing an error.
+        resetPlaceholder() { textarea.placeholder = EMPTY_PLACEHOLDER; },
     };
 }

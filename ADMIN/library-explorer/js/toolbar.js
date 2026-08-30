@@ -11,7 +11,7 @@
 //
 // Tag colors / STL defaults are NEVER hardcoded here — they're pulled live
 // from blog-config.js's getTagColors()/getStlDefaults(), which are
-// populated from ADMIN/blog-editor/blog.json.
+// populated from ADMIN/library-explorer/blog.json.
 //
 // <STL>, <image>, <video>, <audio>, and <folder> are all consumers of the
 // generic selection-mode framework (selection-mode.js) — clicking one puts
@@ -23,11 +23,13 @@
 //
 // Tags Help and Media Help both open the exact same kind of markdown
 // overlay (openMarkdownHelp), just pointed at different .md files —
-// /blog-editor/tags.md and /blog-editor/media.md respectively — so all
-// the rendering/open/close code is shared between the two buttons.
+// /library-explorer/tags.md and /library-explorer/media.md respectively — so all
+// the rendering/open/close code is shared between the two buttons. This
+// same helper is exported so the Library Browser's own "Library Help"
+// button (library.md) can reuse it too.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { getTagColors, getStlDefaults } from "./blog-config.js";
+import { getTagColors, getStlDefaults } from "./library-config.js";
 import { toggleSelection, onSelectionChange } from "./selection-mode.js";
 import { IMAGE_EXTS, VIDEO_EXTS, AUDIO_EXTS, getExt } from "./media-manager.js";
 
@@ -92,7 +94,7 @@ function insertAtCursor(textarea, text) {
     const newPos = start + text.length;
     textarea.selectionStart = textarea.selectionEnd = newPos;
     // Fire a real "input" event so the highlighter repaint + dirty-tracking
-    // listeners already wired in markdown-editor.js/blog-editor.js pick this
+    // listeners already wired in markdown-editor.js/library-explorer.js pick this
     // up exactly like a normal keystroke would.
     textarea.dispatchEvent(new Event("input", { bubbles: true }));
     textarea.focus();
@@ -310,9 +312,11 @@ function openVideoDialog(onConfirm) {
 
 // ── Generic markdown-help modal — fetches any given .md URL and renders it
 // as markdown inside a large overlay covering most of the screen. Clicking
-// the × button or clicking off (outside the box) closes it. Shared by both
-// the Tags Help button (tags.md) and the Media Help button (media.md) —
-// neither one has any bespoke rendering/open/close code of its own. ──────────
+// the × button or clicking off (outside the box) closes it. Shared by the
+// Tags Help button (tags.md), the Media Help button (media.md), AND the
+// Library Browser's own Library Help button (library.md) — none of them
+// have any bespoke rendering/open/close code of their own. Exported so
+// other modules (library-browser.js) can reuse it directly. ──────────────
 
 function renderSimpleMarkdown(md) {
     const escapeHtml = (s) => s
@@ -367,7 +371,7 @@ function renderSimpleMarkdown(md) {
     return html;
 }
 
-function openMarkdownHelp(mdUrl) {
+export function openMarkdownHelp(mdUrl) {
     const overlay = document.createElement("div");
     overlay.className = "be-tags-help-overlay";
 
@@ -430,11 +434,6 @@ export function initToolbar({ toolbarEl, tagsHelpBtnEl, mediaHelpBtnEl, getTexta
     // type on click, and reflects active/inactive state visually. Kept
     // generic so adding another media-selection tag later is just another
     // call to this same helper.
-        // Wires a "selection type" button (image/video/audio/folder/stl) so
-    // it: colors its own text from tags.json, toggles the given selection
-    // type on click, and reflects active/inactive state visually. Kept
-    // generic so adding another media-selection tag later is just another
-    // call to this same helper.
     function makeSelectionButton({ text, colorKey, buildType }) {
         const btn = document.createElement("button");
         btn.type = "button";
@@ -451,7 +450,6 @@ export function initToolbar({ toolbarEl, tagsHelpBtnEl, mediaHelpBtnEl, getTexta
         });
         return btn;
     }
-
 
     const paragraphBtn = document.createElement("button");
     paragraphBtn.type = "button";
@@ -523,7 +521,7 @@ export function initToolbar({ toolbarEl, tagsHelpBtnEl, mediaHelpBtnEl, getTexta
         }),
     });
 
-        // <video> — enters selection mode immediately for .mp4/.webm files.
+    // <video> — enters selection mode immediately for .mp4/.webm files.
     // Once a matching file is CLICKED, a dialog pops up asking whether it
     // should loop (autoplay, muted, no audio, GIF-style) or play normally
     // with controls. Inserts <relPath> normally, or <relPath loop> if the
@@ -544,7 +542,6 @@ export function initToolbar({ toolbarEl, tagsHelpBtnEl, mediaHelpBtnEl, getTexta
             },
         }),
     });
-
 
     // <audio> — pick any supported audio file (.mp3, .wav); inserts
     // <relPath>.
@@ -591,10 +588,10 @@ export function initToolbar({ toolbarEl, tagsHelpBtnEl, mediaHelpBtnEl, getTexta
     toolbarEl.appendChild(folderBtn);
 
     if (tagsHelpBtnEl) {
-        tagsHelpBtnEl.addEventListener("click", () => openMarkdownHelp("/blog-editor/tags.md"));
+        tagsHelpBtnEl.addEventListener("click", () => openMarkdownHelp("/library-explorer/tags.md"));
     }
 
     if (mediaHelpBtnEl) {
-        mediaHelpBtnEl.addEventListener("click", () => openMarkdownHelp("/blog-editor/media.md"));
+        mediaHelpBtnEl.addEventListener("click", () => openMarkdownHelp("/library-explorer/media.md"));
     }
 }
