@@ -355,3 +355,33 @@
     font-size: 0.8rem;
     white-space: nowrap;
 }
+/* ── Inline config.json editor (selected-blog details panel) ──────────────
+   The editor's own field/button/status styling all comes from
+   /elements/lib/css/json.css, already linked by index.html — this only
+   handles separating it from the buttons above and putting the injected
+   "Raw JSON" toggle and the Save button on one row. */
+
+.be-lib-config-divider {
+    height: 1px;
+    margin: 22px 0 18px 0;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.be-lib-config-title {
+    margin: 0 0 12px 0;
+    font-size: 0.95rem;
+}
+
+/* json.js inserts its Raw JSON toggle immediately BEFORE #ej-save, so both
+   land inside this flex row automatically. */
+.be-lib-config-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+}
+
+.be-lib-config-actions .admin-button {
+    padding: 7px 16px;
+    font-size: 0.85rem;
+}

@@ -13,7 +13,8 @@
         "path": "test",
         "depth": 1,
         "useDates": true,
-        "icon": ""
+        "icon": "",
+        "hidden": false
     },
     {
         "id": "test-2",
@@ -21,6 +22,15 @@
         "path": "test-2",
         "depth": 3,
         "useDates": true,
+        "icon": ""
+    },
+    {
+        "id": "s",
+        "name": "s",
+        "path": "s",
+        "depth": 1,
+        "useDates": true,
+        "hidden": true,
         "icon": ""
     }
 ]

@@ -63,6 +63,16 @@ let _isMobile       = false;
 let _menuBuilt      = false;
 let _menuOpen       = false;
 
+// ── Date mode eligibility ────────────────────────────────────────────────────
+//
+// Mirrors lib/siteConfig.js's normalizeUseDates() and library.js's own
+// usesDates(): date mode ("By Month") is ONLY supported at depth 1. Any
+// deeper library always behaves as though useDates were false and gets the
+// title-mode nested tree instead.
+function usesDates(library) {
+    return !!library && library.depth === 1 && library.useDates === true;
+}
+
 // ── Mobile blog renderer ─────────────────────────────────────────────────────
 
 function buildMobileRows(rawMd, mediaBaseUrl, listingBaseUrl) {
@@ -292,7 +302,7 @@ function scrollToMobileId(id) {
 }
 
 function sortLibraryManifest(library, manifest) {
-    if (library.useDates) return sortByEndDate(manifest);
+    if (usesDates(library)) return sortByEndDate(manifest);
     return [...manifest].sort((a, b) => {
         const segA = a.segments, segB = b.segments;
         const len = Math.max(segA.length, segB.length);
@@ -436,7 +446,7 @@ async function populateLibraryNav(container, library) {
 
         manifest = sortLibraryManifest(library, manifest);
 
-        if (library.useDates) buildMobileDateNav(manifest, container);
+        if (usesDates(library)) buildMobileDateNav(manifest, container);
         else buildMobileTreeNav(manifest, container);
     } catch (err) {
         console.error(`Mobile: failed to load manifest for "${library.path}":`, err);

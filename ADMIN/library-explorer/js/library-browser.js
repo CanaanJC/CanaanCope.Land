@@ -1,9 +1,25 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Full-page Library Browser — mounted into #be-library-browser.
 //
-// The "About Me" page (public/aboutme/) is pinned as the LAST row of the
-// library list. It uses the same icon as any other blog, and deliberately
-// gets NO context menu — so it can never be renamed, moved or deleted.
+// Three distinct kinds of row exist here, each with its OWN context menu
+// (or none at all) — they are deliberately not shared:
+//
+//   LIBRARY rows (the root list) → Rename / Show-Hide / Delete Library.
+//     These act on libraries.json via /api/library-fs/update-library and
+//     /api/library-fs/delete-library. They must NOT reuse the folder/blog
+//     handlers below: those key off `currentLib`, which is still null while
+//     the root list is showing, so they'd act on the wrong thing.
+//
+//   FOLDER / BLOG rows (inside a library) → Rename / Move / Delete, acting
+//     on the filesystem within the currently open library.
+//
+//   The pinned "About Me" row → no context menu whatsoever.
+//
+// Selecting a (non-About-Me) blog also mounts a full inline config.json
+// editor into the details panel, under its Edit / Open Live Page buttons —
+// the same json.js core the split editor view uses, complete with the Raw
+// JSON toggle and its own Save button. That's what makes it possible to
+// edit a run of blogs' configs without opening each one.
 //
 // The About Me descriptor is defined INLINE here (and mirrored in
 // library-explorer.js / preview.js) rather than living in its own module:
@@ -13,6 +29,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { openMarkdownHelp } from "./toolbar.js";
+import { mountBlogConfigPanel } from "./config-editor.js";
 
 export const ABOUT_ME_URL_PATH = "aboutme";
 export const ABOUT_ME_NAME = "About Me";
@@ -126,6 +143,17 @@ function textInput(placeholder) {
     return input;
 }
 
+// Small helper for the dialog's boolean rows — keeps the checkbox from
+// stretching to fill the row like a text input would.
+function checkboxInput(checked) {
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.className = "admin-field-input";
+    input.style.flex = "0 0 auto";
+    input.checked = !!checked;
+    return input;
+}
+
 // .admin-button has no :disabled rule of its own, so a natively-disabled
 // button would still look fully enabled. This adds the actual grey-out.
 function setButtonDisabled(btn, disabled, reasonTitle) {
@@ -142,6 +170,14 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
     let currentData = null;
     let selectedBlogItem = null;
     let moveFlag = null;
+
+    // Incremented on every renderBlogEditMenu() call. The inline config
+    // editor is mounted asynchronously (json.js is a dynamic import + a
+    // fetch), so without this a fast click from blog A to blog B could let
+    // A's mount resolve AFTER B's and attach the wrong config to the panel.
+    // Each mount checks its token is still the current one before touching
+    // the DOM.
+    let configMountToken = 0;
 
     containerEl.innerHTML = `
         <div class="be-lib-left">
@@ -248,7 +284,7 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
         if (!currentLib) {
             const p = document.createElement("p");
             p.className = "be-lib-details-empty";
-            p.textContent = "Select a library on the left to browse its contents.";
+            p.textContent = "Select a library on the left to browse its contents. Right-click a library to rename, hide or delete it.";
             detailsEl.appendChild(p);
             return;
         }
@@ -268,9 +304,18 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
         const sortLine = document.createElement("p");
         sortLine.textContent = `sorted by: ${currentLib.useDates === false ? "file name" : "blog date (newest first)"}`;
         detailsEl.appendChild(sortLine);
+
+        const hiddenLine = document.createElement("p");
+        hiddenLine.textContent = `hidden: ${currentLib.hidden === true ? "yes" : "no"}`;
+        detailsEl.appendChild(hiddenLine);
     }
 
     function renderBlogEditMenu() {
+        // Any previously-mounted inline config editor is now detached
+        // (detailsEl was just cleared) — bump the token so its pending
+        // async mount, if any, becomes a no-op.
+        const mountToken = ++configMountToken;
+
         const heading = document.createElement("h3");
         heading.textContent = selectedBlogItem.displayName || selectedBlogItem.name;
         detailsEl.appendChild(heading);
@@ -318,6 +363,40 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
         actionsWrap.appendChild(openLiveBtn);
 
         detailsEl.appendChild(actionsWrap);
+
+        // ── Inline config.json editor ────────────────────────────────────
+        //
+        // Only for real library blogs — the About Me page has no
+        // config.json at all (see library-explorer.js), so there'd be
+        // nothing to point this at.
+        //
+        // This is a genuine second instance of the same json.js core the
+        // split editor view mounts, against the same target file: identical
+        // field widgets (including the "date" chip/calendar), the
+        // auto-injected "Raw JSON" toggle, and its own Save Changes button
+        // beside it. Saves go straight to /api/file, so nothing here needs
+        // to coordinate with the editor view's dirty-tracking.
+        if (!selectedBlogItem.isAboutMe) {
+            const divider = document.createElement("div");
+            divider.className = "be-lib-config-divider";
+            detailsEl.appendChild(divider);
+
+            const configWrap = document.createElement("div");
+            configWrap.className = "be-lib-config-panel";
+            detailsEl.appendChild(configWrap);
+
+            mountBlogConfigPanel(configWrap, {
+                urlPath: selectedBlogItem.urlPath,
+                name: selectedBlogItem.displayName || selectedBlogItem.name,
+            }).catch((e) => {
+                if (mountToken !== configMountToken) return;
+                configWrap.innerHTML = "";
+                const err = document.createElement("p");
+                err.className = "admin-status admin-status--error";
+                err.textContent = `Failed to load config editor: ${e.message}`;
+                configWrap.appendChild(err);
+            });
+        }
     }
 
     // ── Action bar ───────────────────────────────────────────────────────
@@ -458,7 +537,7 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
 
     // ── List rendering ───────────────────────────────────────────────────
 
-    function buildRow({ type, name, displayName, iconEl, onClick, contextItems }) {
+    function buildRow({ type, name, displayName, iconEl, onClick, contextItems, dimmed }) {
         const row = document.createElement("div");
         row.className = "be-lib-row";
 
@@ -470,6 +549,10 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
             moveFlag.lib === (currentLib ? currentLib.path : null) &&
             moveFlag.sub === currentSub;
         if (isMoveFlagged) row.classList.add("be-lib-row--move-flagged");
+
+        // Hidden libraries stay fully usable here, just visually
+        // de-emphasised so the flag is obvious without opening anything.
+        if (dimmed) row.style.opacity = "0.55";
 
         row.appendChild(iconEl);
 
@@ -535,11 +618,31 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
                     } else {
                         icon.classList.add("be-lib-icon--folder");
                     }
+
+                    const isHidden = lib.hidden === true;
+
+                    // LIBRARY-specific menu — acts on libraries.json, not on
+                    // the filesystem-scoped folder/blog endpoints.
+                    const contextItems = [
+                        { label: "Rename", action: () => startRenameLibrary(lib) },
+                        {
+                            label: isHidden ? "Show on site" : "Hide from site",
+                            action: () => setLibraryHidden(lib, !isHidden),
+                        },
+                        {
+                            label: "Delete Library",
+                            danger: true,
+                            action: () => confirmAndDeleteLibrary(lib),
+                        },
+                    ];
+
                     listEl.appendChild(buildRow({
                         type: "library",
                         name: lib.path,
-                        displayName: lib.name || lib.path,
+                        displayName: `${lib.name || lib.path}${isHidden ? "  (hidden)" : ""}`,
                         iconEl: icon,
+                        dimmed: isHidden,
+                        contextItems,
                         onClick: () => {
                             currentLib = lib;
                             currentSub = "";
@@ -598,7 +701,117 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
         }
     }
 
-    // ── Rename ───────────────────────────────────────────────────────────
+    // ── Library-level actions (libraries.json) ───────────────────────────
+    //
+    // Renaming a library only ever changes its DISPLAY NAME. Its `path`
+    // (the URL segment and folder name) is deliberately left alone —
+    // changing that would break every existing link, bookmark and embed
+    // pointing at the library, and would need the folder moved on disk to
+    // match.
+
+    function startRenameLibrary(lib) {
+        const rows = [...listEl.querySelectorAll(".be-lib-row")];
+        const row = rows.find((r) => {
+            const nameEl = r.querySelector(".be-lib-name-inner");
+            if (!nameEl) return false;
+            // Strip the "  (hidden)" suffix added for display purposes.
+            return nameEl.textContent.replace(/\s+\(hidden\)$/, "") === (lib.name || lib.path);
+        });
+        if (!row) return;
+
+        const nameWrap = row.querySelector(".be-lib-name");
+        const input = document.createElement("input");
+        input.type = "text";
+        input.className = "be-lib-rename-input";
+        input.value = lib.name || lib.path;
+        nameWrap.replaceWith(input);
+        input.focus();
+        input.select();
+
+        let settled = false;
+        function commit() {
+            if (settled) return;
+            settled = true;
+            const typed = input.value.trim();
+            if (!typed || typed === (lib.name || lib.path)) { renderList(); return; }
+
+            fetch(`/api/library-fs/update-library`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ path: lib.path, name: typed }),
+            })
+                .then((r) => r.json())
+                .then((res) => {
+                    if (res.error) throw new Error(res.error);
+                    return loadLibraries().then(renderAll);
+                })
+                .catch((e) => { alert(`Rename failed: ${e.message}`); renderList(); });
+        }
+
+        input.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") { e.preventDefault(); commit(); }
+            else if (e.key === "Escape") { settled = true; renderList(); }
+        });
+        input.addEventListener("blur", commit);
+    }
+
+    function setLibraryHidden(lib, hidden) {
+        fetch(`/api/library-fs/update-library`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ path: lib.path, hidden }),
+        })
+            .then((r) => r.json())
+            .then((res) => {
+                if (res.error) throw new Error(res.error);
+                return loadLibraries().then(renderAll);
+            })
+            .catch((e) => alert(`Failed to update library: ${e.message}`));
+    }
+
+    // Deleting a library nukes its entire folder — every subfolder, blog
+    // and media file inside it — as well as its libraries.json entry.
+    function confirmAndDeleteLibrary(lib) {
+        const label = lib.name || lib.path;
+        const typed = window.prompt(
+            `Delete the ENTIRE library "${label}"?\n\n` +
+            `This permanently removes public/libraries/${lib.path}/ — every folder, ` +
+            `blog and media file inside it — and its entry in libraries.json. ` +
+            `This cannot be undone.\n\n` +
+            `Type the library's path (${lib.path}) to confirm:`
+        );
+
+        if (typed === null) return;                  // cancelled
+        if (typed.trim() !== lib.path) {
+            if (typed.trim()) alert("That didn't match the library's path — nothing was deleted.");
+            return;
+        }
+
+        fetch(`/api/library-fs/delete-library`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ path: lib.path }),
+        })
+            .then((r) => r.json())
+            .then((res) => {
+                if (res.error) throw new Error(res.error);
+                if (res.warning) alert(res.warning);
+
+                // If the deleted library was open, back out to the root list.
+                if (currentLib && currentLib.path === lib.path) {
+                    currentLib = null;
+                    currentSub = "";
+                    currentData = null;
+                }
+                if (moveFlag && moveFlag.lib === lib.path) moveFlag = null;
+                selectedBlogItem = null;
+
+                return loadLibraries().then(renderAll);
+            })
+            .catch((e) => alert(`Delete failed: ${e.message}`));
+    }
+
+    // ── Rename (folders / blogs inside a library) ────────────────────────
 
     function startRenameFor(item) {
         if (!currentLib) return;
@@ -684,7 +897,7 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
             .catch((e) => alert(`Move failed: ${e.message}`));
     }
 
-    // ── Delete ───────────────────────────────────────────────────────────
+    // ── Delete (folders / blogs inside a library) ────────────────────────
 
     function confirmAndDelete(item) {
         if (!currentLib) return;
@@ -840,13 +1053,13 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
                     }
                 });
 
-                const sortToggle = document.createElement("input");
-                sortToggle.type = "checkbox";
-                sortToggle.checked = true;
-                sortToggle.className = "admin-field-input";
-                sortToggle.style.flex = "0 0 auto";
+                const sortToggle = checkboxInput(true);
                 addRow(body, "Sort by blog date:", sortToggle,
                     "On = newest blog date first (undated blogs after, by file name). Off = sort purely by file name.");
+
+                const hiddenToggle = checkboxInput(false);
+                addRow(body, "Hidden:", hiddenToggle,
+                    "Off by default. On = the library still exists and is reachable by URL, but isn't listed publicly. Toggle later by right-clicking the library.");
 
                 const note = document.createElement("p");
                 note.className = "be-lib-modal-note";
@@ -855,9 +1068,9 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
 
                 requestAnimationFrame(() => pathInput.focus());
 
-                return { pathInput, nameInput, depthInput, sortToggle, getIconFile: () => pickedFile };
+                return { pathInput, nameInput, depthInput, sortToggle, hiddenToggle, getIconFile: () => pickedFile };
             },
-            async onSubmit({ pathInput, nameInput, depthInput, sortToggle, getIconFile }, { setError }) {
+            async onSubmit({ pathInput, nameInput, depthInput, sortToggle, hiddenToggle, getIconFile }, { setError }) {
                 const libPath = pathInput.value.trim();
                 const name    = nameInput.value.trim();
                 const depth   = parseInt(depthInput.value, 10);
@@ -902,6 +1115,7 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
                             name,
                             depth,
                             useDates: sortToggle.checked,
+                            hidden: hiddenToggle.checked,
                             icon: iconPath,
                         }),
                     });

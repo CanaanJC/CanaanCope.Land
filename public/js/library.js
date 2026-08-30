@@ -16,6 +16,18 @@ const PRELOAD_AHEAD = 2;
 const _pathParts   = window.location.pathname.split("/").filter(Boolean);
 const IS_BLOCKED   = !!window.__LIBRARY_BLOCKED_PATH__;
 
+// ── Date mode eligibility ─────────────────────────────────────────────────────
+//
+// Mirrors lib/siteConfig.js's normalizeUseDates(): date mode ("By Month")
+// is ONLY supported at depth 1. Any library deeper than that always behaves
+// as though useDates were false and gets the title-mode "Contents" tree.
+// The server already normalizes this in /config/libraries.json, but it's
+// re-asserted here so a stale/cached payload (or a hand-edited config read
+// some other way) can never make a deep library render a By Month dropdown.
+function usesDates(library) {
+    return !!library && library.depth === 1 && library.useDates === true;
+}
+
 // ── Libraries config ──────────────────────────────────────────────────────────
 
 let _librariesCache = null;
@@ -111,7 +123,7 @@ function scrollToId(id, behavior = "smooth") {
     if (el) el.scrollIntoView({ behavior, block: "start" });
 }
 
-// ── Date-mode nav (Year → Month), works for any depth but built off .date ────
+// ── Date-mode nav (Year → Month) — depth-1 libraries only ────────────────────
 
 function buildTopbarDateNav(sortedManifest) {
     const yearToId   = new Map();
@@ -268,7 +280,7 @@ async function injectNav(library, sortedManifest) {
     const existing = topbar.querySelector("#library-nav-dropdown");
     if (existing) existing.remove();
 
-    const nav = library.useDates ? buildTopbarDateNav(sortedManifest) : buildTopbarTreeNav(sortedManifest);
+    const nav = usesDates(library) ? buildTopbarDateNav(sortedManifest) : buildTopbarTreeNav(sortedManifest);
 
     const librariesDropdown = topbar.querySelector("#libraries-nav-dropdown");
     const logo = topbar.querySelector(".topbar-logo");
@@ -287,7 +299,7 @@ async function injectNav(library, sortedManifest) {
 // ── Sorting ───────────────────────────────────────────────────────────────────
 
 function sortManifest(library, manifest) {
-    if (library.useDates) return sortByEndDate(manifest);
+    if (usesDates(library)) return sortByEndDate(manifest);
     return [...manifest].sort((a, b) => {
         const segA = a.segments, segB = b.segments;
         const len = Math.max(segA.length, segB.length);
