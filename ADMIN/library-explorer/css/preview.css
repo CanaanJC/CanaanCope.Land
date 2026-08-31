@@ -1,17 +1,3 @@
-/* ─────────────────────────────────────────────────────────────────────────────
-   Library Explorer — full-bleed live preview. Replaces BOTH split-view halves
-   entirely while active.
-
-   Two device modes, driven by the Desktop/Mobile toggle in the top bar
-   (same visual style as the content.md / config.json mode toggle):
-
-     Desktop — the iframe fills the whole area.
-     Mobile  — the iframe is constrained to a fixed-height frame whose
-               aspect ratio comes from library.json's
-               preview.mobileAspectRatio ("X:Y"), injected as
-               --preview-mobile-ratio by js/library-config.js. Nothing here
-               is hardcoded to a particular phone shape.
-   ───────────────────────────────────────────────────────────────────────── */
 
 .be-preview-view {
     display: flex;
@@ -28,9 +14,6 @@
 }
 
 .be-preview-container--mobile {
-    /* Height-bound: the frame is as tall as the viewport allows, and its
-       width follows from the configured ratio. max-width keeps very wide
-       ratios (e.g. 16:9) from overflowing the panel horizontally. */
     width: auto;
     height: 100%;
     max-width: 100%;

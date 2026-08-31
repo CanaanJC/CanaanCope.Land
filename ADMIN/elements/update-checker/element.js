@@ -1,10 +1,19 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Update checker element. GET /api/update-status only ever reads a cached
-// result — the server itself checks GitHub on boot and once an hour (see
-// lib/updateChecker.js). Loading/refreshing the admin page never triggers a
-// network call on its own. The only thing that forces a real re-check is
-// clicking the refresh button here, which POSTs /api/update-check.
-// ─────────────────────────────────────────────────────────────────────────────
+
+function fmtDate(iso) {
+    try {
+        return new Date(iso).toLocaleString(undefined, {
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: false,
+        });
+    } catch {
+        return iso;
+    }
+}
 
 export default function init(root) {
     const localEl    = root.querySelector("#uc-local");
@@ -26,7 +35,7 @@ export default function init(root) {
         if (data.error) {
             setStatus(`Check failed: ${data.error}`, "error");
         } else if (data.lastChecked) {
-            setStatus(`Last checked: ${new Date(data.lastChecked).toLocaleString()}`);
+            setStatus(`Last checked: ${fmtDate(data.lastChecked)}`);
         } else {
             setStatus("");
         }

@@ -3,13 +3,6 @@
     --sidebar-expanded: 320px;
     --icon-size: 36px;
     --sidebar-bg: #202020;
-    /* --sidebar-font-family / --sidebar-font-size / --sidebar-text-color /
-       --sidebar-icon-size are only ever set at runtime by theme.js
-       (theme.sidebar). When unset, the var() fallbacks below apply
-       immediately at first paint — zero flash. --icon-size above remains a
-       separate, purely cosmetic default used elsewhere (e.g. the homepage
-       site-credit icon) and is intentionally NOT driven by theme.sidebar —
-       see --sidebar-icon-size instead, used only inside .sidebar. */
 }
 
 .sidebar {
@@ -25,8 +18,6 @@
     overflow-x: hidden;
     overflow-y: auto;
     z-index: 1000;
-    /* Full font control (theme.sidebar.font), falls back to the system-ui
-       stack if no custom sidebar font is configured. */
     font-family: var(--sidebar-font-family, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji");
 }
 
@@ -50,13 +41,13 @@
     padding: 12px;
 }
 
-.sidebar-inner::-webkit-scrollbar { 
-    width: 8px; 
+.sidebar-inner::-webkit-scrollbar {
+    width: 8px;
 }
 
-.sidebar-inner::-webkit-scrollbar-thumb { 
-    background: #555; 
-    border-radius: 4px; 
+.sidebar-inner::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 4px;
 }
 
 .sidebar-item {
@@ -75,8 +66,8 @@
 }
 
 .sidebar-item:hover,
-.sidebar-item:focus-visible { 
-    background: #2a2a2a; 
+.sidebar-item:focus-visible {
+    background: #2a2a2a;
 }
 
 .sidebar-item__icon {
@@ -118,7 +109,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .sidebar { 
-        transition: none; 
+    .sidebar {
+        transition: none;
     }
 }

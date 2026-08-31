@@ -6,6 +6,8 @@ import {
     setupLazyLoading,
 } from "./lib-blog.js";
 
+import { libraryUsesDates, compareFolderNames } from "./lib-nav.js";
+
 console.log("Featured module loaded");
 
 if (window.location.pathname !== "/") {
@@ -15,24 +17,10 @@ if (window.location.pathname !== "/") {
 const PRELOAD_AHEAD  = 2;
 const LIBRARIES_URL  = "/config/libraries.json";
 
-// Force every featured entry to load eagerly (no lazy placeholders).
-// Flip to true while diagnosing "my entry never appears" to rule the
-// IntersectionObserver out entirely. Leave false in production.
 const DISABLE_LAZY = false;
 
 const _entryRegistry = new Map();
 
-// ── DOM id safety ────────────────────────────────────────────────────────────
-//
-// Folder slugs are free-form on disk and routinely contain spaces once a
-// library goes multi-level (e.g. "0 Abstract"). Interpolating those raw
-// into an element id produces `id="featured-CrafTech--0 Abstract--test"`,
-// which is INVALID HTML — the spec forbids ASCII whitespace in an id.
-// getElementById tolerates it, but querySelector/CSS selectors do not, and
-// it silently breaks anchor/scroll behavior. Every unsafe character is
-// collapsed to "_" here. The registry below maps the sanitized id back to
-// the real slugPath, so the actual fetch URLs are always built from the
-// untouched original segments.
 function safeIdPart(str) {
     return String(str).replace(/[^A-Za-z0-9_-]/g, "_");
 }
@@ -41,13 +29,6 @@ function entryElementId(library, slugPath) {
     return `featured-${safeIdPart(library.path)}--${slugPath.map(safeIdPart).join("--")}`;
 }
 
-// ── Date handling ────────────────────────────────────────────────────────────
-//
-// lib-blog.js's parseDateStr only understands "YYYY/MM/DD" (it splits on
-// "/" and requires exactly 3 parts). Entries authored as "2026-08-30"
-// therefore parse as null and get treated as undated. Rather than let a
-// formatting inconsistency decide whether something renders, both
-// separators are accepted here.
 function parseFlexibleDate(dateStr) {
     if (typeof dateStr !== "string") return null;
     const parts = dateStr.trim().split(/[/-]/);
@@ -57,45 +38,19 @@ function parseFlexibleDate(dateStr) {
     return new Date(y, m - 1, d);
 }
 
-// Mirrors lib/siteConfig.js's normalizeUseDates(): date mode is only
-// supported for depth-1 libraries — ANY library deeper than that behaves
-// as though useDates were false. The server already forces this in the
-// /config/libraries.json payload, but it's re-asserted client-side so this
-// module behaves correctly even against an older/cached server response.
-function libraryUsesDates(library) {
-    return library.depth === 1 && library.useDates === true;
-}
-
-// ── Global ordering ──────────────────────────────────────────────────────────
-//
-// Every featured blog from EVERY library is pooled into one single list and
-// sorted together — library order in libraries.json is irrelevant here.
-//
-//   1. UNDATED entries first, sorted 0-9 then a-z by their blog folder name
-//      (the last slugPath segment — the actual folder on disk), using a
-//      natural/numeric comparison so "2 foo" sorts before "10 foo".
-//   2. DATED entries after, newest end-date → oldest.
-//
-// An entry counts as "undated" if its library isn't in date mode, if it has
-// no date at all, or if its date string can't be parsed.
 function compareFeatured(a, b) {
     const aUndated = !a.parsedDate;
     const bUndated = !b.parsedDate;
 
     if (aUndated && bUndated) {
-        return a.sortName.localeCompare(b.sortName, undefined, {
-            numeric: true,
-            sensitivity: "base",
-        });
+        return compareFolderNames(a.sortName, b.sortName);
     }
 
-    if (aUndated) return -1; // undated always ahead of dated
+    if (aUndated) return -1;
     if (bUndated) return 1;
 
-    return b.parsedDate - a.parsedDate; // newest first
+    return b.parsedDate - a.parsedDate;
 }
-
-// ── Single entry loader (used by both eager and lazy paths) ──────────────────
 
 async function fetchEntryFiles(library, slugPath) {
     const base = `/${library.path}/${slugPath.map(encodeURIComponent).join("/")}`;
@@ -136,8 +91,6 @@ async function loadFeaturedEntry(elementId) {
         return null;
     }
 }
-
-// ── Manifest collection ──────────────────────────────────────────────────────
 
 async function collectFeatured(libraries) {
     const results = await Promise.all(
@@ -202,8 +155,6 @@ async function collectFeatured(libraries) {
                     manifestIndex,
                     slugPath: entry.slugPath,
                     parsedDate,
-                    // The blog's own folder name on disk — the sort key for
-                    // undated entries (0-9a-z).
                     sortName: entry.slugPath[entry.slugPath.length - 1] || "",
                 });
             });
@@ -220,8 +171,6 @@ async function collectFeatured(libraries) {
 
     return results.flat();
 }
-
-// ── Boot ─────────────────────────────────────────────────────────────────────
 
 async function loadFeatured() {
     const container = document.getElementById("content");
@@ -243,8 +192,6 @@ async function loadFeatured() {
         return;
     }
 
-    // Hidden libraries are deliberately still included — `hidden` only
-    // affects nav dropdown visibility, never featured eligibility.
     const allFeatured = await collectFeatured(libraries);
 
     window.__FEATURED_DEBUG__ = {
@@ -267,8 +214,6 @@ async function loadFeatured() {
         return;
     }
 
-    // One global pool, one sort — undated (0-9a-z by folder name) first,
-    // then dated newest → oldest, across every library at once.
     const sorted = [...allFeatured].sort(compareFeatured);
 
     console.log(

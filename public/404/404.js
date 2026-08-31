@@ -23,8 +23,6 @@ async function loadNotifyConfig() {
 }
 loadNotifyConfig();
 
-// ── Best-effort UA parsing (rough — good enough for a quick human read) ──────
-
 function parseOS(ua) {
     if (/Windows NT 10/.test(ua)) return "Windows 10/11";
     if (/Windows NT/.test(ua)) return "Windows (older)";
@@ -43,8 +41,6 @@ function parseBrowser(ua) {
     if (/Safari\//.test(ua) && !/Chrome/.test(ua)) return "Safari";
     return "Unknown Browser";
 }
-
-// ── Collect everything the browser will hand over ────────────────────────────
 
 async function collectVisitorInfo() {
     const ua = navigator.userAgent || "unknown";
@@ -80,12 +76,6 @@ async function collectVisitorInfo() {
         isAutomated: navigator.webdriver === true, // best crawler/bot signal
     };
 }
-
-// ── Video preloaded hidden from page load (preload="auto" in the HTML) so by
-// the time the user clicks "Fix the Issue" it can start playing instantly,
-// full volume, with zero buffering delay. Calling .play() synchronously
-// inside a click handler is a user gesture, so browsers allow unmuted
-// autoplay here (unlike a page-load autoplay, which would be blocked). ──────
 
 let dinoActive = false;
 
@@ -164,8 +154,6 @@ function showFixVideo() {
     video.muted = false;
     video.currentTime = 0;
     video.play().catch(() => {
-        // Extremely defensive fallback — if the browser still refuses
-        // unmuted playback for some reason, retry muted so it at least plays.
         video.muted = true;
         video.play().catch(() => {});
     });

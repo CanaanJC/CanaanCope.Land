@@ -1,17 +1,4 @@
 #!/usr/bin/env bash
-#
-# installer.sh — bootstrap installer for CanaanCope.Land
-#
-# Usage:
-#   curl -fsSL https://canaancope.land/installer.sh | bash
-#
-# What it does:
-#   1. Downloads the latest GitHub release tarball into the current directory.
-#   2. Extracts it (stripping the wrapper folder) and cleans up leftover files.
-#   3. Asks whether you want to start the server now.
-#      - yes -> runs `sudo ./scripts/run.sh` automatically
-#      - no  -> prints the command to run later
-#
 set -euo pipefail
 
 REPO="CanaanJC/CanaanCope.Land"
@@ -19,7 +6,6 @@ DEST_DIR="$(pwd)"
 
 echo "installer.sh: installing CanaanCope.Land into ${DEST_DIR}"
 
-# ── Dependency sanity check ──────────────────────────────────────────────────
 for cmd in curl tar; do
     if ! command -v "${cmd}" >/dev/null 2>&1; then
         echo "installer.sh: required command \"${cmd}\" not found — please install it and re-run." >&2
@@ -27,7 +13,6 @@ for cmd in curl tar; do
     fi
 done
 
-# ── Resolve latest release tarball URL ───────────────────────────────────────
 echo "installer.sh: looking up latest release..."
 
 API_RESPONSE="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest")"
@@ -47,7 +32,6 @@ fi
 
 echo "installer.sh: latest release is ${TAG_NAME:-unknown}"
 
-# ── Download + extract ───────────────────────────────────────────────────────
 TMP_TARBALL="$(mktemp -t canaancope-XXXXXX.tar.gz)"
 
 echo "installer.sh: downloading release tarball..."
@@ -60,12 +44,6 @@ echo "installer.sh: cleaning up leftover files..."
 rm -f "${TMP_TARBALL}"
 
 echo "installer.sh: done. Files extracted to ${DEST_DIR}"
-
-# ── Ask whether to start the server ──────────────────────────────────────────
-#
-# Note: this script may be run via `curl | bash`, in which case stdin is the
-# piped script itself, not the terminal. Read the prompt from /dev/tty
-# directly so the question still works interactively in that case.
 
 echo ""
 if [[ -r /dev/tty ]]; then

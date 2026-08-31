@@ -31,11 +31,6 @@ function createLogo(src) {
     return a;
 }
 
-// ── Libraries dropdown — title from topbar.json, entries from libraries.json ─
-// `hidden` libraries are filtered out here — they still work exactly the
-// same as any other library (routing, manifests, media, featured entries),
-// they just never appear as an entry in this dropdown.
-
 function createLibrariesDropdown(title, libraries) {
     const wrapper = document.createElement("div");
     wrapper.className = "topbar-dropdown";
@@ -149,15 +144,6 @@ async function loadTopbar() {
     }
 }
 
-// ── Boot ──────────────────────────────────────────────────────────────────────
-//
-// Signals "topbar:ready" (and sets window.__TOPBAR_READY__) only once the
-// topbar's own DOM — logo + Projects/libraries dropdown + slogan — is fully
-// built. Other modules (e.g. library.js) that need to inject their own
-// dropdown alongside the Projects one wait on this signal instead of
-// guessing based on "the topbar has some children", which was racy and
-// could result in the Projects dropdown and the library's By Month/Contents
-// dropdown appearing inconsistently (sometimes both, sometimes only one).
 document.addEventListener("DOMContentLoaded", async () => {
     await loadTopbar();
     window.__TOPBAR_READY__ = true;

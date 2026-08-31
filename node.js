@@ -13,45 +13,23 @@ const { startBackupScheduler, startTerminalCommands } = require("./lib/backup");
 const { startAdminServer } = require("./lib/adminServer");
 const { startUpdateChecker } = require("./lib/updateChecker");
 
-// Ensure config/master.json exists and is fully populated before anything
-// else boots — routes/embed/frontend/backup/admin all assume a complete config.
 ensureMasterConfig();
 
 async function boot() {
-    // Generate media/favicon.png from media/logo.png if it doesn't exist yet.
-    // No-op (and never overwrites) once a favicon.png is present.
     await ensureFavicon();
 
-    // Guarantee the special About Me page exists: public/aboutme/ with a
-    // content.md and an (initially empty) media/ folder. Never overwrites
-    // an existing content.md — see lib/aboutMe.js.
     ensureAboutMe();
 
-    // Keep the tiny stat cache bounded / fresh.
     startStatCachePruner();
 
-    // Dynamically discover and initialize anything dropped into ./extensions.
-    // Nothing is hardcoded here — an empty or missing folder is fine.
     loadExtensions();
 
-    // Full-server backup scheduler (daily/weekly/monthly/yearly, per
-    // config/master.json's backup section). No-op if backup.enabled is false.
     startBackupScheduler();
 
-    // Type "backup" + Enter directly into this terminal to trigger one on
-    // demand, regardless of schedule/enabled state — for testing.
     startTerminalCommands();
 
-    // Checks config/version.txt against the latest GitHub release once at
-    // boot, then every hour on its own — cached in memory so the admin
-    // panel's "Updates" element never triggers a network call just by
-    // loading/refreshing the page.
     startUpdateChecker();
 
-    // Second HTTP server (separate port, separate ./ADMIN root) for the
-    // admin panel — started here so ONE boot command (`node node.js`)
-    // launches both. No-op with a log message if ./ADMIN doesn't exist
-    // (e.g. older archived backups made before Admin existed).
     startAdminServer();
 
     const server = http.createServer((req, res) => {
@@ -68,30 +46,18 @@ async function boot() {
 
         const safePath = sanitizePath(req.url || "/");
 
-        // Standard header set for this request: every non-root path receives
-        // X-Robots-Tag: noindex, follow so only the root domain stays indexed.
         const stdHeaders = buildStdHeaders(safePath);
 
-        // Manifest / media-listing / embed-page routes.
         if (handleRoutes(req, res, safePath, stdHeaders)) return;
 
-        // Extension-provided routes/handlers. Runs after core routes so
-        // extensions can't accidentally shadow built-in endpoints, but before
-        // static file serving so they can add server-side behavior anywhere.
         if (runExtensions(req, res, safePath, stdHeaders)) return;
 
-        // Fallback: static file serving (with directory→index.html resolution,
-        // compression-variant substitution, conditional requests, range requests).
         serveStaticFile(req, res, safePath, stdHeaders);
     });
 
-    // Encourage longer-lived sockets from upstream (Caddy) so it doesn't pay
-    // TCP/TLS setup cost repeatedly for each new request batch.
     server.keepAliveTimeout = 65000;  // ms — must be > Caddy's keep-alive timeout
     server.headersTimeout   = 70000;
 
-    // Bump max sockets / listeners — Node default of 10 event listeners on a
-    // single emitter can throttle high-concurrency image loads.
     server.maxRequestsPerSocket = 0; // unlimited
     server.requestTimeout       = 0; // disable per-request timeout (large media)
 

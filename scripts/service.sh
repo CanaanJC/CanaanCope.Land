@@ -1,40 +1,9 @@
 #!/usr/bin/env bash
-#
-# scripts/service.sh — interactive systemd service control for this repo's
-# `node node.js`. Run from anywhere; always operates relative to the
-# project root (one level up from this script). Must be run with sudo
-# (systemctl start/stop/enable/disable/generating the unit file all need
-# root).
-#
-# Unlike a config-file-driven version of this script, everything here is
-# derived directly from the project itself — no conf.json, no path
-# argument:
-#   - project path  → always this script's own parent directory
-#   - command       → always "node node.js"
-#   - service name  → config/master.json's "siteName" if present, else
-#                      package.json's "name", else the project folder's
-#                      own name — slugified into a systemd-safe unit name
-#
-# Menu (same 6 options as before):
-#   1) Stop
-#   2) Disable
-#   3) Start
-#   4) Enable
-#   5) View live logs
-#   6) Status
-#
-# The systemd unit itself always runs as YOUR normal invoking user (via
-# SUDO_USER), never as root — only this script's own systemctl/unit-file
-# management needs sudo, matching scripts/run.sh's existing security
-# posture.
-#
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJ_PATH="$(cd "${SCRIPT_DIR}/.." && pwd)"
 CMD="node node.js"
-
-# ── Require root/sudo ─────────────────────────────────────────────────────────
 
 if [[ "${EUID}" -ne 0 ]]; then
     echo "service.sh: this script must be run with sudo (systemctl requires root)." >&2
@@ -52,12 +21,6 @@ if ! command -v systemctl >/dev/null 2>&1; then
     exit 1
 fi
 
-# ── Derive the service name ───────────────────────────────────────────────────
-#
-# Preference order: config/master.json's "siteName" → package.json's
-# "name" → the project folder's own name. Never fails outright — falls all
-# the way back to "node-project" if literally nothing usable is found,
-# rather than erroring out.
 derive_name() {
     local master_json="${PROJ_PATH}/config/master.json"
     local package_json="${PROJ_PATH}/package.json"
@@ -104,10 +67,6 @@ UNIT_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
 RUN_AS_USER="${SUDO_USER:-$(logname 2>/dev/null || echo "$USER")}"
 
-# Resolve ExecStart to an absolute path (systemd requires this). CMD is
-# always "node node.js" here, so this just resolves the "node" binary via
-# PATH — kept as a general-purpose resolver (rather than hardcoding the
-# node path) in case CMD is ever extended in the future.
 resolve_cmd() {
     local first_word rest resolved
     first_word="$(echo "${CMD}" | awk '{print $1}')"
@@ -122,7 +81,6 @@ resolve_cmd() {
             resolved="$(cd "${PROJ_PATH}" && realpath -m "${first_word}")"
             ;;
         *)
-            # bare command (e.g. "node") — try PATH first
             if command -v "${first_word}" >/dev/null 2>&1; then
                 resolved="$(command -v "${first_word}")"
             else

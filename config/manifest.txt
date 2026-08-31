@@ -38,6 +38,7 @@ ADMIN/library-explorer/css/preview.css
 ADMIN/library-explorer/css/toolbar.css
 ADMIN/library-explorer/css/topbar.css
 ADMIN/library-explorer/index.html
+ADMIN/library-explorer/js/about-me.js
 ADMIN/library-explorer/js/config-editor.js
 ADMIN/library-explorer/js/dropdown.js
 ADMIN/library-explorer/js/highlight.js
@@ -101,6 +102,11 @@ public/404/404.mp4
 public/404/404.png
 public/404/cmpsd/404.avif
 public/404/cmpsd/404.mp4
+public/aboutmes/content.md
+public/aboutmes/media/cmpsd/fig1.avif
+public/aboutmes/media/files/3dbenchy.stl
+public/aboutmes/media/files/cmpsd/fig1.avif
+public/aboutmes/media/files/fig1.png
 public/archive/archive.css
 public/archive/archive.html
 public/archive/archive.js
@@ -120,6 +126,7 @@ public/js/about-me.js
 public/js/bottom-page.js
 public/js/featured.js
 public/js/lib-blog.js
+public/js/lib-nav.js
 public/js/library.js
 public/js/main.js
 public/js/mobile.js

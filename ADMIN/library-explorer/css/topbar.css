@@ -1,7 +1,3 @@
-/* ─────────────────────────────────────────────────────────────────────────────
-   Library Explorer — top bar: main/libraries buttons, preview toggle, mode
-   toggle group, save button, current-path link.
-   ───────────────────────────────────────────────────────────────────────── */
 
 .be-topbar {
     display: flex;
@@ -18,9 +14,6 @@
     z-index: 50;
 }
 
-/* Wraps onto multiple lines instead of truncating when the article's
-   urlPath is long — constrained to a max width so it wraps within its own
-   box rather than pushing the rest of the top bar around. */
 .be-current-path {
     margin-left: auto;
     flex: 0 1 320px;
@@ -46,9 +39,6 @@
     pointer-events: none;
     cursor: default;
 }
-
-/* ── Mode toggle — mutually exclusive; hidden entirely (not just
-   disabled) while the Library Browser is the active view. ── */
 
 .be-mode-toggle {
     display: flex;
@@ -80,14 +70,10 @@
     border-right: 1px solid #3a3a3a;
 }
 
-/* Preview toggle button — same green shade as an active mode toggle
-   (.be-toggle-btn--active's #3a4a3a) while preview is on. */
 #be-preview-toggle.be-toggle-btn--active {
     background: #3a4a3a;
     border-color: #4a5a4a;
 }
-
-/* ── Save button — flashes green/red briefly; text NEVER changes ── */
 
 #be-save {
     transition: background-color 160ms ease, color 160ms ease;

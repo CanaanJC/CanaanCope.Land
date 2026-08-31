@@ -1,8 +1,3 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Library/blog select dropdown — positions itself under the trigger button,
-// closes on outside click / window resize, and rebuilds its list from the
-// current `libraries` + `selectedBlog` state on every render() call.
-// ─────────────────────────────────────────────────────────────────────────────
 
 export function createDropdown({ btn, panel, onSelect }) {
     function close() {

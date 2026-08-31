@@ -1,16 +1,3 @@
-/* ─────────────────────────────────────────────────────────────────────────────
-   Library Explorer — right-panel toolbar ([Paragraph] / [Mobile] / <link embed> /
-   <STL> / <image> / <video> / <audio> / <folder>) and the Tags Help /
-   Media Help / Library Explorer Help buttons (bottom-right of the page).
-   Only the buttons relevant to the currently active view are ever visible
-   (toggled individually by js/library-explorer.js) — they all share one fixed
-   container so none of them need manually-computed offsets.
-
-   Toolbar buttons reuse the exact same visual style as the top bar's
-   buttons (.admin-button) — only the button TEXT is colored, via
-   --tool-color (set inline per-button in js/toolbar.js, pulled live from
-   blog.json). They are never hidden/disabled based on edit mode.
-   ───────────────────────────────────────────────────────────────────────── */
 
 .be-toolbar {
     display: flex;
@@ -26,19 +13,11 @@
     color: var(--tool-color);
 }
 
-/* ── Active "media selection" state — shown on a toolbar button (e.g.
-   <STL>, <image>, <video>, <audio>, <folder>) while its selection type is
-   the one currently active in the media manager (see selection-mode.js).
-   Generic: any future selection-type button gets this exact same
-   treatment automatically, just by toggling this class based on its own
-   key. ── */
 .be-tool-btn--selecting {
     outline: 2px solid var(--tool-color);
     outline-offset: 2px;
     background: #2f2f22;
 }
-
-/* ── Help buttons — bottom-right of the page. ── */
 
 .be-help-buttons {
     position: fixed;

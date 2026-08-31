@@ -1,34 +1,23 @@
 import {
     loadMarked,
-    getEndDate,
-    sortByEndDate,
     buildProjectBlock,
     createPlaceholder,
     setupLazyLoading,
 } from "./lib-blog.js";
 
+import {
+    entryId,
+    sortManifestEntries,
+    buildNavItems,
+    navTriggerLabel,
+} from "./lib-nav.js";
+
 console.log("Library module loaded");
 
 const PRELOAD_AHEAD = 2;
 
-// ── Guard ─────────────────────────────────────────────────────────────────────
-
 const _pathParts   = window.location.pathname.split("/").filter(Boolean);
 const IS_BLOCKED   = !!window.__LIBRARY_BLOCKED_PATH__;
-
-// ── Date mode eligibility ─────────────────────────────────────────────────────
-//
-// Mirrors lib/siteConfig.js's normalizeUseDates(): date mode ("By Month")
-// is ONLY supported at depth 1. Any library deeper than that always behaves
-// as though useDates were false and gets the title-mode "Contents" tree.
-// The server already normalizes this in /config/libraries.json, but it's
-// re-asserted here so a stale/cached payload (or a hand-edited config read
-// some other way) can never make a deep library render a By Month dropdown.
-function usesDates(library) {
-    return !!library && library.depth === 1 && library.useDates === true;
-}
-
-// ── Libraries config ──────────────────────────────────────────────────────────
 
 let _librariesCache = null;
 
@@ -53,22 +42,9 @@ async function resolveLibrary() {
     return libraries.find(l => l.path === _pathParts[0]) || null;
 }
 
-// ── Page title injection ──────────────────────────────────────────────────────
-//
-// Every library page's static index.html ships with a placeholder
-// <title>Library</title>. As soon as the library is resolved, overwrite the
-// browser tab title with that library's own name (falling back to its path
-// if `name` is empty) — no per-library HTML edits needed, this covers every
-// library index.html (and the blocked/embed shell) automatically.
 function applyLibraryTitle(library) {
     if (!library) return;
     document.title = library.name || library.path || document.title;
-}
-
-// ── Fetch helpers ─────────────────────────────────────────────────────────────
-
-function entryId(slugPath) {
-    return slugPath.join("--");
 }
 
 async function fetchEntryFiles(library, slugPath) {
@@ -95,17 +71,6 @@ function buildEntryBlock(library, slugPath, config, rawMd) {
     });
 }
 
-// ── Wait for topbar ───────────────────────────────────────────────────────────
-//
-// Waits for topbar.js's explicit "topbar:ready" signal (dispatched only once
-// the Projects/libraries dropdown is actually in the DOM), rather than the
-// old "topbar has some children" heuristic. That heuristic raced with
-// topbar.js's own async build sequence — depending on which fetch won,
-// injectNav() below could run before, during, or after topbar.js finished,
-// causing the Projects dropdown and this library's own By Month/Contents
-// dropdown to appear inconsistently (sometimes both, sometimes only one).
-// A safety-net timeout still resolves this after maxMs in case topbar.js
-// ever fails to fire the event at all, so this never hangs forever.
 function waitForTopbarReady(maxMs = 4000) {
     const topbarEl = document.getElementById("topbarList");
     if (!topbarEl) return Promise.resolve(null);
@@ -123,142 +88,31 @@ function scrollToId(id, behavior = "smooth") {
     if (el) el.scrollIntoView({ behavior, block: "start" });
 }
 
-// ── Date-mode nav (Year → Month) — depth-1 libraries only ────────────────────
-
-function buildTopbarDateNav(sortedManifest) {
-    const yearToId   = new Map();
-    const monthToId  = new Map();
-    const yearMonths = new Map();
-
-    for (const entry of sortedManifest) {
-        const endDate = getEndDate(entry.date);
-        if (!endDate) continue;
-        const parts = endDate.split("/");
-        if (parts.length < 2) continue;
-        const year  = parts[0];
-        const month = parts[1].padStart(2, "0");
-        const key   = `${year}/${month}`;
-        const id    = entryId(entry.slugPath);
-        if (!yearToId.has(year))   yearToId.set(year, id);
-        if (!monthToId.has(key))   monthToId.set(key, id);
-        if (!yearMonths.has(year)) yearMonths.set(year, new Set());
-        yearMonths.get(year).add(month);
-    }
-
-    const years = [...yearMonths.keys()].sort((a, b) => Number(b) - Number(a));
-
+function buildTopbarNav(library, sortedManifest) {
     const wrapper = document.createElement("div");
     wrapper.className = "topbar-dropdown";
     wrapper.id = "library-nav-dropdown";
 
     const trigger = document.createElement("span");
     trigger.className = "topbar-dropdown__trigger";
-    trigger.textContent = "By Month";
+    trigger.textContent = navTriggerLabel(library);
     wrapper.appendChild(trigger);
 
     const menu = document.createElement("div");
     menu.className = "topbar-dropdown__menu";
 
-    for (const year of years) {
-        const yearBtn = document.createElement("button");
-        yearBtn.className = "topbar-dropdown__item topbar-tree-item topbar-tree-item--group";
-        yearBtn.dataset.level = "0";
-        yearBtn.textContent = year;
-        yearBtn.addEventListener("click", (e) => {
-            e.preventDefault();
-            wrapper.classList.remove("open");
-            scrollToId(yearToId.get(year));
-        });
-        menu.appendChild(yearBtn);
-
-        const months = [...yearMonths.get(year)].sort((a, b) => Number(b) - Number(a));
-        for (const month of months) {
-            const monthBtn = document.createElement("button");
-            monthBtn.className = "topbar-dropdown__item topbar-tree-item topbar-tree-item--leaf";
-            monthBtn.dataset.level = "1";
-            monthBtn.textContent = month;
-            monthBtn.addEventListener("click", (e) => {
-                e.preventDefault();
-                wrapper.classList.remove("open");
-                scrollToId(monthToId.get(`${year}/${month}`));
-            });
-            menu.appendChild(monthBtn);
-        }
-    }
-
-    wrapper.appendChild(menu);
-    wrapper.addEventListener("mouseenter", () => wrapper.classList.add("open"));
-    wrapper.addEventListener("mouseleave", () => wrapper.classList.remove("open"));
-    return wrapper;
-}
-
-// ── Title-mode nav (recursive N-level tree from folder segments) ────────────
-
-function buildTree(manifest) {
-    const root = { children: new Map() };
-    for (const entry of manifest) {
-        let node = root;
-        for (const seg of entry.segments) {
-            if (!node.children.has(seg.slug)) {
-                node.children.set(seg.slug, {
-                    slug: seg.slug,
-                    num: seg.num,
-                    title: seg.title,
-                    children: new Map(),
-                    entry: null,
-                });
-            }
-            node = node.children.get(seg.slug);
-        }
-        node.entry = entry;
-    }
-    return root;
-}
-
-function firstLeafSlugPath(node) {
-    if (node.entry) return node.entry.slugPath;
-    const sorted = [...node.children.values()].sort((a, b) => a.num - b.num || a.title.localeCompare(b.title));
-    return sorted.length ? firstLeafSlugPath(sorted[0]) : null;
-}
-
-function renderTreeNodes(node, depth, container, closeMenu) {
-    const children = [...node.children.values()]
-        .sort((a, b) => a.num - b.num || a.title.localeCompare(b.title));
-
-    for (const child of children) {
-        const isLeaf = child.children.size === 0;
-
+    for (const item of buildNavItems(library, sortedManifest)) {
         const btn = document.createElement("button");
-        btn.className = `topbar-dropdown__item topbar-tree-item ${isLeaf ? "topbar-tree-item--leaf" : "topbar-tree-item--group"}`;
-        btn.dataset.level = String(depth);
-        btn.textContent = child.title;
+        btn.className = `topbar-dropdown__item topbar-tree-item ${item.isLeaf ? "topbar-tree-item--leaf" : "topbar-tree-item--group"}`;
+        btn.dataset.level = String(item.level);
+        btn.textContent = item.label;
         btn.addEventListener("click", (e) => {
             e.preventDefault();
-            closeMenu();
-            const targetSlugPath = isLeaf ? child.entry.slugPath : firstLeafSlugPath(child);
-            scrollToId(entryId(targetSlugPath));
+            wrapper.classList.remove("open");
+            scrollToId(item.targetId);
         });
-        container.appendChild(btn);
-
-        if (!isLeaf) renderTreeNodes(child, depth + 1, container, closeMenu);
+        menu.appendChild(btn);
     }
-}
-
-function buildTopbarTreeNav(sortedManifest) {
-    const wrapper = document.createElement("div");
-    wrapper.className = "topbar-dropdown";
-    wrapper.id = "library-nav-dropdown";
-
-    const trigger = document.createElement("span");
-    trigger.className = "topbar-dropdown__trigger";
-    trigger.textContent = "Contents";
-    wrapper.appendChild(trigger);
-
-    const menu = document.createElement("div");
-    menu.className = "topbar-dropdown__menu";
-
-    const tree = buildTree(sortedManifest);
-    renderTreeNodes(tree, 0, menu, () => wrapper.classList.remove("open"));
 
     wrapper.appendChild(menu);
     wrapper.addEventListener("mouseenter", () => wrapper.classList.add("open"));
@@ -266,12 +120,6 @@ function buildTopbarTreeNav(sortedManifest) {
     return wrapper;
 }
 
-// Injects this library's own nav dropdown (By Month / Contents) into the
-// topbar, always positioned immediately after the Projects/libraries
-// dropdown (#libraries-nav-dropdown) — never replacing or removing it.
-// Only this function's own #library-nav-dropdown is ever removed/rebuilt
-// here, so the Projects dropdown is guaranteed to always remain visible
-// alongside it, in a fixed, deterministic order: Projects → By Month/Contents.
 async function injectNav(library, sortedManifest) {
     if (!sortedManifest.length) return;
     const topbar = await waitForTopbarReady();
@@ -280,7 +128,7 @@ async function injectNav(library, sortedManifest) {
     const existing = topbar.querySelector("#library-nav-dropdown");
     if (existing) existing.remove();
 
-    const nav = usesDates(library) ? buildTopbarDateNav(sortedManifest) : buildTopbarTreeNav(sortedManifest);
+    const nav = buildTopbarNav(library, sortedManifest);
 
     const librariesDropdown = topbar.querySelector("#libraries-nav-dropdown");
     const logo = topbar.querySelector(".topbar-logo");
@@ -295,27 +143,6 @@ async function injectNav(library, sortedManifest) {
         topbar.appendChild(nav);
     }
 }
-
-// ── Sorting ───────────────────────────────────────────────────────────────────
-
-function sortManifest(library, manifest) {
-    if (usesDates(library)) return sortByEndDate(manifest);
-    return [...manifest].sort((a, b) => {
-        const segA = a.segments, segB = b.segments;
-        const len = Math.max(segA.length, segB.length);
-        for (let i = 0; i < len; i++) {
-            const sa = segA[i], sb = segB[i];
-            if (!sa) return -1;
-            if (!sb) return 1;
-            if (sa.num !== sb.num) return sa.num - sb.num;
-            const c = sa.title.localeCompare(sb.title);
-            if (c !== 0) return c;
-        }
-        return 0;
-    });
-}
-
-// ── Scroll tracking ───────────────────────────────────────────────────────────
 
 function setupScrollTracking(library, slugPaths) {
     const observer = new IntersectionObserver(
@@ -339,8 +166,6 @@ function setupScrollTracking(library, slugPaths) {
     }
 }
 
-// ── Lazy load callback ────────────────────────────────────────────────────────
-
 function makeEntryLoader(library) {
     return async function loadEntryById(id) {
         const slugPath = id.split("--");
@@ -356,8 +181,6 @@ function makeEntryLoader(library) {
     };
 }
 
-// ── Blocked entry mode ────────────────────────────────────────────────────────
-
 async function loadBlockedEntry(library) {
     const slugPath   = window.__LIBRARY_BLOCKED_SLUG__;
     const container  = document.getElementById("projects-container");
@@ -370,8 +193,6 @@ async function loadBlockedEntry(library) {
         console.error(`Library: failed to load blocked entry "${library.path}/${slugPath.join("/")}":`, err);
     }
 }
-
-// ── Normal mode ───────────────────────────────────────────────────────────────
 
 async function loadLibrary(library) {
     const container = document.getElementById("projects-container");
@@ -394,7 +215,7 @@ async function loadLibrary(library) {
         return;
     }
 
-    manifest = sortManifest(library, manifest);
+    manifest = sortManifestEntries(library, manifest);
     injectNav(library, manifest);
 
     const targetId = (() => {
@@ -453,8 +274,6 @@ async function loadLibrary(library) {
         setupLazyLoading(lazyIds, makeEntryLoader(library), PRELOAD_AHEAD);
     }
 }
-
-// ── Boot ──────────────────────────────────────────────────────────────────────
 
 document.addEventListener("DOMContentLoaded", async () => {
     const library = await resolveLibrary();

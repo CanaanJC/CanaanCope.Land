@@ -1,8 +1,4 @@
-// ADMIN/elements/logo-uploader/element.js
 
-// Inline fallback icon — same shape used on the public site (topbar.js /
-// sidebar.js) for missing images. Shown only if NEITHER the public site
-// address NOR the local hosting address can actually load media/logo.png.
 const FALLBACK_ICON =
     'data:image/svg+xml;charset=UTF-8,' +
     encodeURIComponent(`
@@ -12,8 +8,6 @@ const FALLBACK_ICON =
   <circle cx="9" cy="9" r="1.25" fill="#cfcfcf"/>
 </svg>`);
 
-// Off-DOM probe — never touches the visible <img>, so a failed candidate
-// can never leave the preview in a broken/placeholder state by accident.
 function tryLoadImage(url) {
     return new Promise((resolve) => {
         const img = new Image();
@@ -22,8 +16,7 @@ function tryLoadImage(url) {
         img.onload = () => finish(true);
         img.onerror = () => finish(false);
         img.src = url;
-        // Generous timeout — slow DNS/first-hit AVIF-variant builds on the
-        // server shouldn't be mistaken for "logo doesn't exist".
+
         setTimeout(() => finish(false), 8000);
     });
 }
@@ -34,8 +27,6 @@ export default function init(root) {
     const chooseBtn = root.querySelector("#lu-choose");
     const statusEl  = root.querySelector("#lu-status");
 
-    // Populated once from /api/site-info + /api/config, then reused for
-    // every refresh (including after a fresh upload).
     let baseCandidates = [];
 
     function showFallback() {
@@ -48,16 +39,7 @@ export default function init(root) {
         preview.src = url;
     }
 
-    // Show the fallback immediately so there's never a broken-image icon
-    // while candidates are still being probed.
     showFallback();
-
-    // Tries every known base (public siteAddress, then the local
-    // hostname:port this admin page is itself being served alongside) in
-    // order, cache-busted so an upload is never masked by browser/HTTP
-    // caching. Only falls back to the placeholder if NONE of them load —
-    // a single unreachable domain can no longer permanently hide a real,
-    // successfully-uploaded logo.
     async function refreshPreview() {
         const bust = Date.now();
         for (const base of baseCandidates) {

@@ -1,10 +1,4 @@
-/* ─────────────────────────────────────────────────────────────────────────────
-   Library Explorer — toolbar input dialogs (Paragraph / Link embed) and the
-   Tags Help / Media Help / Library Help markdown overlay.
-   ───────────────────────────────────────────────────────────────────────── */
 
-/* ── Toolbar dialogs — reuse .admin-modal-overlay / .admin-modal-box from
-   admin.css, with extra vertical spacing between rows. ── */
 
 .be-toolbar-modal-box {
     text-align: left;
@@ -44,10 +38,6 @@
 .be-toolbar-modal-row select {
     padding: 8px 10px;
 }
-
-/* ── Tags/Media/Library Help modal — covers most of the screen, renders the
-   given .md file as markdown. Clicking off (the overlay) or the × closes
-   it. ── */
 
 .be-tags-help-overlay {
     position: fixed;

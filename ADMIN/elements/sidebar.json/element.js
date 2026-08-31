@@ -1,10 +1,3 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Sidebar-links extension. Core handles fetch/save (generic /api/file target),
-// array/card rendering, delete+confirm, "+ Add", and automatic image-preview
-// on the "image" field. This file only adds:
-//   - the field list / new-item shape
-//   - the image upload button (via a field hook)
-// ─────────────────────────────────────────────────────────────────────────────
 
 const FIELDS = [
     { key: "text",  label: "Text",  type: "text" },

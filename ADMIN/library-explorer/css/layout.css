@@ -1,16 +1,3 @@
-/* ─────────────────────────────────────────────────────────────────────────────
-   Library Explorer — page shell, split panels (left 2/3 editor / right 1/3), the
-   two mode wraps (content.md / config.json) inside the left panel, and the
-   full-page Library Browser that replaces the editor entirely when no blog
-   is selected.
-
-   Body is a flex column (topbar, then main) rather than a fixed 56px
-   offset — so if the topbar ever grows taller (e.g. the current-path link
-   wrapping to two lines), the main area just shrinks to fit instead of
-   overlapping/clipping.
-
-   Uses the same --admin-* CSS variables as /css/admin.css.
-   ───────────────────────────────────────────────────────────────────────── */
 
 [hidden] {
     display: none !important;
@@ -32,7 +19,7 @@ body {
     flex: 1 1 auto;
     min-height: 0;
     width: 100%;
-    overflow: hidden; /* panels below handle their own scrolling */
+    overflow: hidden;
 }
 
 .be-editor-view {
@@ -51,7 +38,7 @@ body {
     flex: 2 1 0;
     border-right: 1px solid var(--admin-panel-border);
     position: relative;
-    overflow: hidden; /* each mode-wrap below manages its own scrolling */
+    overflow: hidden;
 }
 
 .be-panel--right {
@@ -68,12 +55,6 @@ body {
     text-align: center;
 }
 
-/* ── Mode wraps — both content.md's and config.json's containers stay
-   mounted simultaneously inside .be-panel--left; only one is ever visible
-   ([hidden] toggled by js/library-explorer.js's applyModeVisibility). Each fills
-   the full panel independently so switching between them is purely
-   visual — no state is ever lost. ── */
-
 .be-mode-wrap {
     position: absolute;
     inset: 0;
@@ -82,12 +63,11 @@ body {
 }
 
 .be-mode-wrap--markdown {
-    /* content.md's textarea/highlight stack fills the panel edge-to-edge */
 }
 
 .be-mode-wrap--config {
     padding: 16px;
-    overflow: auto; /* config.json mode's field list scrolls within itself */
+    overflow: auto;
 }
 
 .be-mode-wrap--config #ej-container {

@@ -1,23 +1,3 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// content.md editor — plain raw-text editing via a real <textarea>, so native
-// browser Undo/Redo and Enter-for-newline behave exactly like any normal
-// text field. No markdown rendering/interpretation happens anywhere — the
-// raw text in the textarea IS exactly what gets saved.
-//
-// A read-only, non-interactive overlay (<pre>) is stacked on top of the
-// textarea purely to show tag-color syntax highlighting. It has
-// pointer-events: none so every click passes straight through to the
-// textarea underneath for normal cursor placement/selection/typing —
-// except for the specific interactive bits (clickable links, color
-// swatches), which re-enable pointer-events on themselves (see
-// highlight.css / wireInteractions in highlight.js).
-//
-// The placeholder is an instruction, not a status: a brand-new blog's
-// content.md is legitimately empty, and leaving "Loading…" sitting there
-// forever made a perfectly fine empty file look like a stuck/broken load.
-// Genuine load FAILURES still overwrite this with their own error text
-// (see loadMarkdown in library-explorer.js).
-// ─────────────────────────────────────────────────────────────────────────────
 
 import { renderMarkup, wireInteractions } from "./highlight.js";
 
@@ -39,9 +19,6 @@ export function mountMarkdownEditor(container) {
 
     function repaint() {
         const text = textarea.value;
-        // Trailing newline needs a trailing space in a <pre> for the empty
-        // last line to actually take up visible height / stay scrollable
-        // to, matching the textarea underneath exactly.
         highlight.innerHTML = renderMarkup(text) + (text.endsWith("\n") ? " " : "");
     }
 
@@ -59,7 +36,6 @@ export function mountMarkdownEditor(container) {
         textarea,
         repaint,
         syncScroll,
-        // Lets callers restore the normal prompt after showing an error.
         resetPlaceholder() { textarea.placeholder = EMPTY_PLACEHOLDER; },
     };
 }

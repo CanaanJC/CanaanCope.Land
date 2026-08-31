@@ -1,51 +1,3 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Shared generic JSON-editor engine.
-//
-// admin.js always imports this module for every element and calls
-// initJsonEditor(root, elementConfig). By default it behaves exactly like the
-// old master.json/element.js (recursive object editor, Save button, status
-// line) PLUS:
-//   - every string leaf field automatically shows a small square image
-//     preview + compact single-line input instead of a full textarea
-//     whenever its value resolves as a loadable image — either an absolute
-//     URL, or a path relative to the public site (tried against both the
-//     configured siteAddress AND the local LAN address, mirroring the
-//     "Public Page" / "Local Page" fallback already used in admin.js's
-//     header).
-//   - any field whose KEY is literally "font" automatically gets a font
-//     upload button (⬆). Clicking it lets you pick a .ttf/.otf/.woff/.woff2
-//     file, uploads it to public/fonts/, and renders the resulting path in
-//     the actual uploaded font so it's easy to see what font is set. This
-//     does NOT work with plain URLs — uploads only. See attachFontUpload().
-//   - the "Saved." status message is automatically cleared the moment any
-//     further edit is made (typing, checkbox/number/color change, add,
-//     delete, or an upload hook setting a field's value) — see notifyEdit()
-//     below — so it can never keep claiming something is saved when it's
-//     since been changed again.
-//   - a "Raw JSON" toggle button, injected automatically next to the Save
-//     button, lets you switch the whole editor to a plain textarea showing
-//     the raw JSON — useful for hand-adding a field the visual editor
-//     doesn't otherwise expose a control for. Switching back parses your
-//     edits back into the visual editor (invalid JSON keeps you in raw mode
-//     with an alert). Saving while in raw mode parses it first automatically.
-//   - when elementConfig.isBlogEditor is true (set only by the Library Explorer's
-//     own config.json mode — see ADMIN/library-explorer/library-explorer.js), any
-//     array field whose KEY is literally "date" is rendered as a special
-//     date-chip list instead of the generic JSON-lines textarea: each date
-//     shows as a chip with an "×" to remove it, and a "+" button opens a
-//     small native calendar picker to add a new date. This ONLY applies
-//     inside the Library Explorer's config.json editor — every other element on
-//     the main Admin page (including any other array field anywhere else)
-//     renders exactly as before.
-//
-// Per-element element.js files (loaded AFTER this, if present) receive the
-// returned `core` handle and can opt into array/card mode and attach field
-// hooks (e.g. upload buttons) — see the bottom of this file for the full
-// core API. `core.save()` returns a Promise<{ ok, error }> so callers can
-// react to success/failure themselves instead of relying solely on the
-// internal #ej-status line.
-// ─────────────────────────────────────────────────────────────────────────────
-
 const HEX_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
 const FALLBACK_ICON =
@@ -56,8 +8,6 @@ const FALLBACK_ICON =
   <path d="M7 15l2.5-3 2 2.5L14.5 12 17 15" stroke="#cfcfcf" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
   <circle cx="9" cy="9" r="1.25" fill="#cfcfcf"/>
 </svg>`);
-
-// ── Auto-grow textarea helper ────────────────────────────────────────────────
 
 function autoGrow(textarea) {
     textarea.style.height = "auto";
@@ -80,11 +30,6 @@ function attachAutoGrow(textarea) {
     observer.observe(textarea);
 }
 
-// ── Base-URL candidates for resolving relative paths ─────────────────────────
-// Mirrors admin.js's own "Public Page" (siteAddress) / "Local Page"
-// (this admin page's hostname + hosting.port) header logos — same two
-// candidates, tried in the same order, cached once per page load.
-
 let _baseCandidatesPromise = null;
 function getBaseCandidates() {
     if (!_baseCandidatesPromise) {
@@ -102,12 +47,6 @@ function getBaseCandidates() {
     }
     return _baseCandidatesPromise;
 }
-
-// ── Image-link resolution, cached per exact string value ────────────────────
-// Resolves a field's raw value to an actually-loadable image URL, or null.
-// Absolute http(s) URLs are tested as-is. Anything else is treated as a path
-// relative to the public site root and tried against every base candidate,
-// in order, until one succeeds.
 
 function tryLoadImage(url) {
     return new Promise((resolve) => {
@@ -137,7 +76,7 @@ async function resolveImageUrl(trimmedValue) {
     return null;
 }
 
-const _imageResolveCache = new Map(); // trimmed value -> Promise<string|null>
+const _imageResolveCache = new Map();
 
 function getResolvedImageUrl(value) {
     const trimmed = (value || "").trim();
@@ -147,11 +86,6 @@ function getResolvedImageUrl(value) {
     _imageResolveCache.set(trimmed, promise);
     return promise;
 }
-
-// ── Font-link resolution + live @font-face preview ───────────────────────────
-// Deliberately does NOT support absolute URLs — fonts must be uploaded (see
-// attachFontUpload below), never linked. A value only ever previews in its
-// own font if it resolves as a real, existing public/fonts/-relative file.
 
 const FONT_EXT_FORMATS = {
     ".otf":   "opentype",
@@ -167,7 +101,6 @@ function getFontFormat(value) {
 }
 
 async function resolveFontUrl(trimmedValue) {
-    // Fonts are upload-only — never resolved as absolute URLs.
     if (/^https?:\/\//i.test(trimmedValue)) return null;
 
     const bases = await getBaseCandidates();
@@ -178,13 +111,12 @@ async function resolveFontUrl(trimmedValue) {
             const res = await fetch(url, { method: "HEAD" });
             if (res.ok) return url;
         } catch {
-            // try next base
         }
     }
     return null;
 }
 
-const _fontResolveCache = new Map(); // trimmed value -> Promise<string|null>
+const _fontResolveCache = new Map();
 
 function getResolvedFontUrl(value) {
     const trimmed = (value || "").trim();
@@ -196,11 +128,8 @@ function getResolvedFontUrl(value) {
 }
 
 let _fontFaceCounter = 0;
-const _injectedFontFaces = new Map(); // resolved url -> generated family name
+const _injectedFontFaces = new Map();
 
-// Applies (or clears) a live @font-face preview on `textEl` (the textarea/
-// input actually displaying the font path) based on `value`. Injects one
-// <style> @font-face rule per distinct resolved URL, reused across fields.
 function applyFontPreview(textEl, value) {
     const format = getFontFormat(value);
     if (!format) {
@@ -227,11 +156,6 @@ function applyFontPreview(textEl, value) {
     });
 }
 
-// Attaches the font-upload button + live preview wiring to a field row.
-// `field` is { el, getValue, setValue } — the same shape buildStringField
-// returns. Built directly into the core (not a per-element hook) so ANY
-// object-mode field whose key is literally "font" gets this automatically,
-// anywhere in the JSON structure (top-level or nested in a fieldset).
 function attachFontUpload(row, field) {
     const getTextEl = () => row.querySelector(".admin-field-input-text");
 
@@ -240,10 +164,7 @@ function attachFontUpload(row, field) {
         if (el) applyFontPreview(el, field.getValue());
     }
 
-    // Initial preview pass (value may already point at a valid font on load).
     requestAnimationFrame(refreshPreview);
-    // Textarea "input" events bubble — re-check on every keystroke too, in
-    // case someone hand-types/pastes a path instead of using the uploader.
     row.addEventListener("input", refreshPreview);
 
     const fileInput = document.createElement("input");
@@ -288,15 +209,11 @@ function attachFontUpload(row, field) {
         const oldFilename = oldValue ? oldValue.split(/[\\/]+/).pop() : "";
         const newFilename = file.name;
 
-        // No previous font on this field at all — nothing to ask about.
         if (!oldFilename) {
             doUpload(file, "", false);
             return;
         }
 
-        // Same filename as what's already set — confirm an overwrite.
-        // Choosing "No" exits the dialog entirely: nothing is uploaded,
-        // nothing is deleted, the field is left completely untouched.
         if (oldFilename.toLowerCase() === newFilename.toLowerCase()) {
             if (confirm(`"${oldFilename}" already exists. Overwrite it?`)) {
                 doUpload(file, oldFilename, false);
@@ -304,10 +221,6 @@ function attachFontUpload(row, field) {
             return;
         }
 
-        // Different filename — ask whether to delete the old font file.
-        // "Yes" deletes the old file before writing the new one. "No" keeps
-        // both files on disk (public/fonts/) and still switches this field
-        // to the newly uploaded font.
         if (confirm(`A different font file already exists ("${oldFilename}"). Delete it?`)) {
             doUpload(file, oldFilename, true);
         } else {
@@ -318,8 +231,6 @@ function attachFontUpload(row, field) {
     row.appendChild(uploadBtn);
     row.appendChild(fileInput);
 }
-
-// ── Compact (image-preview) row builder ─────────────────────────────────────
 
 function buildCompactRow(initialValue, onInput) {
     const holder = document.createElement("div");
@@ -375,18 +286,11 @@ function buildCompactRow(initialValue, onInput) {
         setValue(v) {
             input.value = v ?? "";
             refreshPreview();
-            // Programmatic value changes (e.g. an upload hook calling
-            // api.setValue()) don't naturally fire an "input" event —
-            // dispatch one so the shared edit-tracking listener on the
-            // container (see initJsonEditor's notifyEdit) still notices
-            // and clears any stale "Saved." status.
             input.dispatchEvent(new Event("input", { bubbles: true }));
         },
         refreshPreview,
     };
 }
-
-// ── Textarea (default) row builder ──────────────────────────────────────────
 
 function buildTextareaRow(initialValue, onInput) {
     const holder = document.createElement("div");
@@ -437,15 +341,10 @@ function buildTextareaRow(initialValue, onInput) {
             text.value = v ?? "";
             wireColorPairing();
             autoGrow(text);
-            // See buildCompactRow.setValue's comment — programmatic
-            // updates need a manually-dispatched "input" event so the
-            // shared edit-tracking listener notices.
             text.dispatchEvent(new Event("input", { bubbles: true }));
         },
     };
 }
-
-// ── String field: toggles between textarea and compact image-preview mode ──
 
 function buildStringField(value, onChange) {
     const wrap = document.createElement("div");
@@ -455,7 +354,7 @@ function buildStringField(value, onChange) {
     let currentValue = value ?? "";
     let usingCompact = false;
     let debounceTimer = null;
-    let evalToken = 0; // guards against stale async results after rapid edits
+    let evalToken = 0;
 
     const isHexLike = () => HEX_RE.test((currentValue || "").trim());
 
@@ -482,7 +381,7 @@ function buildStringField(value, onChange) {
         if (isHexLike()) { swapTo("textarea"); return; }
         const token = ++evalToken;
         getResolvedImageUrl(currentValue).then((url) => {
-            if (token !== evalToken) return; // value changed again meanwhile
+            if (token !== evalToken) return;
             swapTo(url ? "compact" : "textarea");
         });
     }
@@ -494,7 +393,7 @@ function buildStringField(value, onChange) {
         debounceTimer = setTimeout(evaluate, 400);
     }
 
-    evaluate(); // initial check on render
+    evaluate();
 
     return {
         el: wrap,
@@ -507,9 +406,6 @@ function buildStringField(value, onChange) {
         },
     };
 }
-
-// ── Array-of-JSON-lines editor (used for raw arrays inside object mode —
-// NOT the card/array mode used by library-editor / sidebar.json) ──
 
 function buildJsonLinesField(value, onChange) {
     const wrap = document.createElement("div");
@@ -538,14 +434,6 @@ function buildJsonLinesField(value, onChange) {
     wrap.appendChild(text);
     return wrap;
 }
-
-// ── Date-list editor (Library Explorer's config.json "date" field ONLY) ──────────
-//
-// Renders `value` (an array of date strings, e.g. ["2026-08-29"]) as a row
-// of chips, each with an "×" to remove it, plus a "+" button that reveals a
-// small native <input type="date"> calendar picker for adding a new date.
-// Only ever mounted when elementConfig.isBlogEditor is true AND the field
-// key is literally "date" — see renderObject() below.
 
 function buildDateListField(value, onChange) {
     const wrap = document.createElement("div");
@@ -591,8 +479,6 @@ function buildDateListField(value, onChange) {
                 dates.splice(index, 1);
                 emit();
                 renderChips();
-                // Manually fire "input" so the shared edit-tracking
-                // listener (notifyEdit) clears any stale "Saved." status.
                 wrap.dispatchEvent(new Event("input", { bubbles: true }));
             });
             chip.appendChild(removeBtn);
@@ -631,8 +517,6 @@ function buildDateListField(value, onChange) {
 
     return wrap;
 }
-
-// ── Shared confirm modal (delete / overwrite) — one per element instance ──
 
 function createConfirmModal(root) {
     const overlay = document.createElement("div");
@@ -685,19 +569,11 @@ function createConfirmModal(root) {
     };
 }
 
-// ── Endpoint resolution ──────────────────────────────────────────────────────
-// Every element — object mode or array mode — reads/writes via the same
-// generic file endpoint, keyed off config.json's "target" path. No special
-// cases needed; /api/file already validates and scopes paths to .json files
-// inside the project root.
-
 function resolveEndpoint(elementConfig) {
     const target = elementConfig && elementConfig.target;
     const url = `/api/file?path=${encodeURIComponent(target || "")}`;
     return { get: url, put: url };
 }
-
-// ── Object-mode renderer ─────────────────────────────────────────────────────
 
 function renderObject(obj, container, pathPrefix, data, fieldHooks, isBlogEditor) {
     for (const key of Object.keys(obj)) {
@@ -731,10 +607,6 @@ function renderObject(obj, container, pathPrefix, data, fieldHooks, isBlogEditor
         };
 
         if (Array.isArray(value)) {
-            // Library Explorer-only special case: the "date" array field gets
-            // the chip/calendar widget instead of the generic JSON-lines
-            // textarea. Everywhere else (main Admin page, any other
-            // element), arrays render exactly as before.
             if (isBlogEditor && key === "date") {
                 row.appendChild(buildDateListField(value, setAtPath));
             } else {
@@ -767,13 +639,10 @@ function renderObject(obj, container, pathPrefix, data, fieldHooks, isBlogEditor
             continue;
         }
 
-        // String — the auto image-preview-aware field.
         const field = buildStringField(value, setAtPath);
         row.appendChild(field.el);
         container.appendChild(row);
 
-        // Built-in: any field literally named "font" gets a font-upload
-        // button + live font-family preview, regardless of nesting depth.
         if (key === "font") {
             attachFontUpload(row, field);
         }
@@ -787,8 +656,6 @@ function renderObject(obj, container, pathPrefix, data, fieldHooks, isBlogEditor
     }
 }
 
-// ── Public entry point ───────────────────────────────────────────────────────
-
 export default function initJsonEditor(root, elementConfig) {
     const titleEl     = root.querySelector("#ej-title");
     const containerEl = root.querySelector("#ej-container");
@@ -796,15 +663,10 @@ export default function initJsonEditor(root, elementConfig) {
     const saveBtn     = root.querySelector("#ej-save");
     const statusEl    = root.querySelector("#ej-status");
 
-    // True only when mounted from the Library Explorer's own config.json mode
-    // (see library-explorer.js's mountConfigEditor). Gates the "date" field's
-    // special chip/calendar widget so it never affects any other element.
     const isBlogEditor = !!(elementConfig && elementConfig.isBlogEditor);
+    const onEditHook   = elementConfig && typeof elementConfig.onEdit === "function" ? elementConfig.onEdit : null;
+    const onSavedHook  = elementConfig && typeof elementConfig.onSaved === "function" ? elementConfig.onSaved : null;
 
-    // Elements that don't use this core's HTML shape (e.g. archive,
-    // logo-uploader, admin-master.json's Panel Layout editor) simply have
-    // no #ej-container — bail out quietly so their own bespoke element.js
-    // can take over completely.
     if (!containerEl) {
         return {
             getData: () => null,
@@ -817,11 +679,12 @@ export default function initJsonEditor(root, elementConfig) {
             registerFieldHook: () => {},
             confirm: () => {},
             setStatus: () => {},
+            isDirty: () => false,
         };
     }
 
     const endpoint = resolveEndpoint(elementConfig);
-    const fieldHooks = new Map(); // key -> array of hook fns
+    const fieldHooks = new Map();
 
     const displayName = elementConfig && typeof elementConfig.name === "string" && elementConfig.name.trim()
         ? elementConfig.name.trim()
@@ -832,9 +695,12 @@ export default function initJsonEditor(root, elementConfig) {
     const confirmModal = createConfirmModal(root);
 
     let data = null;
-    let mode = "object"; // or "array"
-    let arrayConfig = null; // { fields, newItemFactory, addLabel, cardTitle }
+    let loadFailed = false;
+    let mode = "object";
+    let arrayConfig = null;
     let rawMode = false;
+    let dirty = false;
+    let savePromise = null;
 
     function setStatus(text, kind) {
         if (!statusEl) return;
@@ -842,33 +708,24 @@ export default function initJsonEditor(root, elementConfig) {
         statusEl.className = kind ? `admin-status admin-status--${kind}` : "admin-status";
     }
 
-    // Clears the status line the moment ANY edit happens, but only if it's
-    // currently showing the "Saved." (ok) message — so it never keeps
-    // claiming the data is saved once it's been changed again since. Left
-    // alone if the status is empty, an in-progress "Saving…", or an error.
     function notifyEdit() {
+        dirty = true;
         if (statusEl && statusEl.classList.contains("admin-status--ok")) {
             setStatus("");
         }
+        if (onEditHook) {
+            try { onEditHook(); } catch (e) { console.error("[json.js] onEdit hook threw:", e); }
+        }
     }
 
-    // Delegated listener on the container catches virtually every edit
-    // automatically: typing in a textarea/text input, checkbox toggles,
-    // number inputs, the color-picker's paired <input type="color">, the
-    // JSON-lines array textarea, and the date-list widget's own manually-
-    // dispatched "input" events. "input" events bubble by default and
-    // nothing in this file calls stopPropagation, so this single pair of
-    // listeners is enough — no need to instrument every field individually.
     containerEl.addEventListener("input", notifyEdit);
     containerEl.addEventListener("change", notifyEdit);
 
-    // ── Object mode render ──
     function renderObjectMode() {
         containerEl.innerHTML = "";
         renderObject(data, containerEl, "", data, fieldHooks, isBlogEditor);
     }
 
-    // ── Array/card mode render ──
     function buildFieldRow(item, fieldDef) {
         const row = document.createElement("div");
         row.className = "admin-field-row";
@@ -897,12 +754,9 @@ export default function initJsonEditor(root, elementConfig) {
             return row;
         }
 
-        // text (string, image-preview aware)
         const field = buildStringField(item[fieldDef.key] ?? "", (v) => { item[fieldDef.key] = v; });
         row.appendChild(field.el);
 
-        // Built-in: array/card-mode fields named "font" also get the
-        // font-upload button, same as object mode.
         if (fieldDef.key === "font") {
             attachFontUpload(row, field);
         }
@@ -967,23 +821,20 @@ export default function initJsonEditor(root, elementConfig) {
             const card = buildCard(item, () => {
                 data.splice(index, 1);
                 renderArrayMode();
-                notifyEdit(); // deleting a card is an edit — clear any "Saved." message
+                notifyEdit();
             });
             containerEl.appendChild(card);
         });
     }
 
     function render() {
+        if (data === null || data === undefined) {
+            containerEl.innerHTML = "";
+            return;
+        }
         if (mode === "array") renderArrayMode();
         else renderObjectMode();
     }
-
-    // ── Raw JSON toggle ──────────────────────────────────────────────────────
-    // Injected automatically for every element using this core — lets you
-    // hand-edit the underlying JSON as plain text (e.g. to add a field the
-    // visual editor doesn't have a control for yet). Toggling back to the
-    // visual editor parses your edits back into `data`; invalid JSON keeps
-    // you in raw mode with an alert rather than silently discarding it.
 
     const rawToggleBtn = document.createElement("button");
     rawToggleBtn.type = "button";
@@ -1014,7 +865,6 @@ export default function initJsonEditor(root, elementConfig) {
         requestAnimationFrame(() => autoGrow(rawTextarea));
     }
 
-    // Returns true if it successfully left raw mode (or wasn't in it).
     function exitRawMode(applyChanges) {
         if (applyChanges) {
             try {
@@ -1043,72 +893,145 @@ export default function initJsonEditor(root, elementConfig) {
 
     attachAutoGrow(rawTextarea);
 
-    // ── Load ──
     fetch(endpoint.get)
         .then(r => r.json())
         .then((result) => {
             if (result && result.error) throw new Error(result.error);
             data = result;
+            loadFailed = false;
             render();
         })
         .catch((e) => {
+            data = null;
+            loadFailed = true;
             setStatus(`Failed to load: ${e.message}`, "error");
+            console.error(`[json.js] failed to load ${endpoint.get}:`, e);
         });
 
     if (addBtn) {
         addBtn.addEventListener("click", () => {
             if (mode !== "array" || rawMode) return;
+            if (!Array.isArray(data)) return;
             const newItem = arrayConfig.newItemFactory ? arrayConfig.newItemFactory() : {};
             data.push(newItem);
             renderArrayMode();
-            notifyEdit(); // adding a card is an edit — clear any "Saved." message
+            notifyEdit();
         });
     }
 
-    // ── Save (used by both the internal #ej-save click and core.save()) ──────
-    // If currently in raw mode, parses the raw textarea into `data` first
-    // (without necessarily leaving raw mode) so raw edits are never lost.
-    // Returns a Promise<{ ok, error }> so callers (e.g. the Library Explorer's
-    // own Save button) can react without depending on the status text.
+    function setSaveBusy(busy) {
+        if (!saveBtn) return;
+        saveBtn.disabled = busy;
+        if (busy) saveBtn.setAttribute("aria-busy", "true");
+        else saveBtn.removeAttribute("aria-busy");
+    }
+
+    function parseSaveResponse(res) {
+        return res.text().then((text) => {
+            let parsed = null;
+            if (text && text.trim()) {
+                try { parsed = JSON.parse(text); } catch { parsed = null; }
+            }
+            if (!res.ok) {
+                throw new Error((parsed && parsed.error) || `HTTP ${res.status}`);
+            }
+            if (parsed && parsed.error) throw new Error(parsed.error);
+            return parsed || {};
+        });
+    }
+
+    function sendSave(body) {
+        return fetch(endpoint.put, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body,
+        }).then(parseSaveResponse);
+    }
+
     function performSave() {
+        if (savePromise) return savePromise;
+
         if (rawMode) {
             try {
                 data = JSON.parse(rawTextarea.value);
             } catch (e) {
                 setStatus(`Invalid JSON: ${e.message}`, "error");
+                alert(`Invalid JSON — nothing was saved:\n\n${e.message}`);
                 return Promise.resolve({ ok: false, error: e.message });
             }
         }
 
+        if (data === null || data === undefined) {
+            const msg = loadFailed
+                ? "This file never loaded — reload the page before saving."
+                : "Nothing loaded yet — wait for the editor to finish loading.";
+            setStatus(msg, "error");
+            console.error(`[json.js] refused to save ${endpoint.put}: ${msg}`);
+            return Promise.resolve({ ok: false, error: msg });
+        }
+
+        let body;
+        try {
+            body = JSON.stringify(data);
+        } catch (e) {
+            setStatus(`Could not serialize data: ${e.message}`, "error");
+            alert(`Save aborted — the data could not be serialized:\n\n${e.message}`);
+            return Promise.resolve({ ok: false, error: e.message });
+        }
+
         setStatus("Saving…");
-        return fetch(endpoint.put, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(data),
-        })
-            .then(r => r.json())
-            .then((res) => {
-                if (res.error) throw new Error(res.error);
+        setSaveBusy(true);
+
+        savePromise = sendSave(body)
+            .catch((firstError) => new Promise((resolve, reject) => {
+                console.warn(`[json.js] save failed for ${endpoint.put}, retrying once:`, firstError);
+                setTimeout(() => {
+                    sendSave(body).then(resolve, () => reject(firstError));
+                }, 600);
+            }))
+            .then(() => {
+                dirty = false;
                 setStatus("Saved.", "ok");
+                if (onSavedHook) {
+                    try { onSavedHook(); } catch (e) { console.error("[json.js] onSaved hook threw:", e); }
+                }
                 return { ok: true };
             })
             .catch((e) => {
                 setStatus(`Save failed: ${e.message}`, "error");
+                console.error(`[json.js] save failed for ${endpoint.put}:`, e);
+                alert(`Save failed — your changes were NOT written.\n\n${e.message}`);
                 return { ok: false, error: e.message };
+            })
+            .finally(() => {
+                savePromise = null;
+                setSaveBusy(false);
             });
+
+        return savePromise;
     }
 
     if (saveBtn) {
         saveBtn.addEventListener("click", () => { performSave(); });
     }
 
-    // ── Public core handle ──
     const core = {
         getData: () => data,
-        setData: (newData) => { data = newData; render(); },
+        setData: (newData) => { data = newData; loadFailed = false; render(); },
         save: () => performSave(),
         reload: () => {
-            fetch(endpoint.get).then(r => r.json()).then((result) => { data = result; render(); });
+            return fetch(endpoint.get)
+                .then(r => r.json())
+                .then((result) => {
+                    if (result && result.error) throw new Error(result.error);
+                    data = result;
+                    loadFailed = false;
+                    dirty = false;
+                    render();
+                })
+                .catch((e) => {
+                    setStatus(`Failed to reload: ${e.message}`, "error");
+                });
         },
         setArrayMode(config) {
             mode = "array";
@@ -1139,6 +1062,7 @@ export default function initJsonEditor(root, elementConfig) {
             confirmModal.open(message, confirmLabel, callback);
         },
         setStatus,
+        isDirty: () => dirty,
     };
 
     return core;

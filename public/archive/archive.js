@@ -44,9 +44,6 @@ function setLanLink(lanIp, port) {
     statusText.textContent = "Running";
 }
 
-// Shown independently of the main link — only appears once the admin
-// process actually reports running. If this backup has no admin.js at all,
-// this is simply never called and the block stays hidden — no error shown.
 function setAdminLanLink(lanIp, port) {
     const url = `http://${lanIp}:${port}/`;
     adminLanLinkEl.href = url;
@@ -66,8 +63,6 @@ function fmtRemaining(ms) {
     return `${mins}:${String(secs).padStart(2, "0")}`;
 }
 
-// Shows whichever cutoff is soonest — idle timer (extended by heartbeat) or
-// the absolute max-runtime cap (never extended by anything).
 function tickCountdown() {
     const candidates = [expiresAt, maxExpiresAt].filter(Boolean);
     if (candidates.length === 0) return;
@@ -98,8 +93,6 @@ function stopCountdown() {
     maxExpiresAt = null;
 }
 
-// Page-side heartbeat — sent purely because the control page is open.
-// Resets the idle timer only; the max-runtime cap is never touched by this.
 function startHeartbeat() {
     if (heartbeatTimer) return;
     heartbeatTimer = setInterval(() => {
@@ -148,10 +141,6 @@ function showNextBackup(nextBackupAt) {
     nextBackupEl.hidden = false;
 }
 
-
-// Single source of truth for log replay + status transitions — SSE always
-// sends the full buffered history on connect, so nothing else should ever
-// manually re-append instance.logs (that was causing duplicated log lines).
 function connectLogs() {
     if (eventSource) eventSource.close();
     eventSource = new EventSource(`/archive/${uuid}/logs`);
@@ -183,10 +172,6 @@ function connectLogs() {
             statusText.textContent = "Error — see log below";
         }
 
-        // Admin process status is independent of the main instance — it may
-        // start slightly after, or (for old backups) never exist at all.
-        // No error state is ever shown for it; it just quietly appears once
-        // ready or stays hidden if unavailable/failed.
         if (data.adminStatus === "running") {
             fetch(`/archive/${uuid}/status`)
                 .then(res => res.json())
@@ -200,7 +185,6 @@ function connectLogs() {
     };
 
     eventSource.onerror = () => {
-        // Dropped connection — SSE auto-reconnects on its own, nothing to do.
     };
 }
 
@@ -261,9 +245,6 @@ window.addEventListener("beforeunload", () => {
     stopHeartbeat();
 });
 
-// On load: check if an instance is already running for this UUID and resume
-// showing it exactly as if the page had never been closed. Otherwise, show
-// the plain "Server not running" idle state — never "Booting..." here.
 fetch(`/archive/${uuid}/status`)
     .then(res => res.json())
     .then((info) => {

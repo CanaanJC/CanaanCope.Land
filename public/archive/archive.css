@@ -42,9 +42,6 @@ html, body {
     gap: 14px;
 }
 
-/* Without this, the [hidden] attribute loses to the class's `display: flex`
-   rule (same specificity, this rule loads later) — both panels rendered
-   simultaneously regardless of JS toggling. This restores correct hiding. */
 .archive-panel[hidden] {
     display: none;
 }

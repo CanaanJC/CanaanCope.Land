@@ -1,12 +1,9 @@
-/* ─────────────────────────────────────────────────────────────────────────────
-   Library Explorer — media manager: divider, upload/new-folder action row,
-   breadcrumb, the Finder-style icon grid, the right-click context menu,
-   the full-screen media viewer (lightbox) opened by clicking a file
-   tile, and the generic "media selection mode" tile highlight (see
-   js/selection-mode.js).
-   ───────────────────────────────────────────────────────────────────────── */
+:root {
+    --media-icon-size: 64px;
+    --media-text-size: 12px;
+    --media-tile-width: 84px;
+}
 
-/* Faint separator between the tag toolbar and the media manager below it */
 .be-media-divider {
     height: 1px;
     margin: 4px 10px;
@@ -27,8 +24,6 @@
     padding: 24px 8px;
 }
 
-/* ── Action row ── */
-
 .be-media-actions {
     display: flex;
     gap: 8px;
@@ -40,8 +35,6 @@
     padding: 6px 14px;
     font-size: 0.82rem;
 }
-
-/* ── Breadcrumb ── */
 
 .be-media-breadcrumb {
     display: flex;
@@ -84,11 +77,9 @@
     font-size: 0.8rem;
 }
 
-/* ── Grid ── */
-
 .be-media-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(var(--media-tile-width, 84px), 1fr));
     gap: 10px;
     flex: 1 1 auto;
     align-content: flex-start;
@@ -128,10 +119,6 @@
     box-shadow: 0 0 0 1px #4a6a3a;
 }
 
-/* ── Media-selection-mode highlight — generic, driven purely by
-   --select-color (set inline by media-manager.js from the active
-   selection type's own `color`, whatever that type turns out to be). ── */
-
 .be-media-tile--selectable {
     box-shadow: 0 0 0 2px var(--select-color, #fff);
     background: rgba(255, 255, 255, 0.04);
@@ -142,24 +129,24 @@
 }
 
 .be-media-icon-wrap {
-    width: 64px;
-    height: 64px;
+    width: var(--media-icon-size, 64px);
+    height: var(--media-icon-size, 64px);
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
 .be-media-icon {
-    width: 64px;
-    height: 64px;
-    border-radius: 8px;
+    width: var(--media-icon-size, 64px);
+    height: var(--media-icon-size, 64px);
+    border-radius: calc(var(--media-icon-size, 64px) * 0.125);
     object-fit: cover;
     background: #141414;
     border: 1px solid #2e2e2e;
     display: flex;
     align-items: center;
     justify-content: center;
-    pointer-events: none; /* clicks/drag pass through to the tile itself */
+    pointer-events: none;
 }
 
 .be-media-icon--img,
@@ -174,8 +161,8 @@
 
 .be-media-icon--folder::before {
     content: "";
-    width: 34px;
-    height: 26px;
+    width: calc(var(--media-icon-size, 64px) * 0.53);
+    height: calc(var(--media-icon-size, 64px) * 0.41);
     background: #d8b04a;
     border-radius: 3px;
     clip-path: polygon(0 15%, 35% 15%, 42% 0, 100% 0, 100% 100%, 0 100%);
@@ -185,15 +172,16 @@
     background: #202020;
     border-color: #333;
     color: #888;
-    font-size: 0.72rem;
+    font-size: calc(var(--media-text-size, 12px) * 0.95);
     font-weight: 700;
     letter-spacing: 0.02em;
     text-align: center;
 }
 
 .be-media-label {
-    max-width: 78px;
-    font-size: 0.72rem;
+    max-width: calc(var(--media-icon-size, 64px) + 14px);
+    font-size: var(--media-text-size, 12px);
+    line-height: 1.25;
     text-align: center;
     color: var(--admin-text);
     overflow: hidden;
@@ -202,19 +190,17 @@
 }
 
 .be-media-rename-input {
-    max-width: 78px;
-    width: 78px;
+    max-width: calc(var(--media-icon-size, 64px) + 14px);
+    width: calc(var(--media-icon-size, 64px) + 14px);
     background: #141414;
     border: 1px solid #4a6a3a;
     border-radius: 4px;
     color: var(--admin-text);
     padding: 2px 4px;
-    font-size: 0.72rem;
+    font-size: var(--media-text-size, 12px);
     text-align: center;
     font-family: inherit;
 }
-
-/* ── Right-click context menu ── */
 
 .be-context-menu {
     position: fixed;
@@ -253,15 +239,6 @@
     background: #4a1f1f;
     color: #ffbaba;
 }
-
-/* ── Media viewer (lightbox) — opened by clicking any non-folder tile.
-   Near-fullscreen overlay; the actual media element (img/video/audio) is
-   sized/typed based on the file's extension. Gifs are just a plain <img>,
-   so they loop exactly like they would anywhere else on the site.
-
-   No close button — clicking anywhere except the media element itself
-   (the box has generous padding around the media for an easy click-off
-   target) or pressing Escape closes it (see media-manager.js). ── */
 
 .be-media-viewer-overlay {
     position: fixed;

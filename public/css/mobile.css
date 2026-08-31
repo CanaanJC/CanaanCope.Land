@@ -1,12 +1,4 @@
-/* ─────────────────────────────────────────────────────────────────────────────
-   mobile.css — Mobile patch overlay
-   
-   Activated by body.mobile class (toggled by mobile.js) and/or
-   @media (max-width: 768px). All rules are scoped so they
-   only apply when in mobile mode and never affect desktop.
-   ───────────────────────────────────────────────────────────────────────── */
 
-/* ── Mobile root variables ──────────────────────────────────────────────── */
 
 body.mobile {
     --mobile-burger-size: 56px;
@@ -14,8 +6,6 @@ body.mobile {
     --mobile-menu-icon-size: 28px;
     --mobile-side-padding: 16px;
 }
-
-/* ── Topbar adjustments ─────────────────────────────────────────────────── */
 
 body.mobile .topbar-logo {
     display: none !important;
@@ -37,7 +27,6 @@ body.mobile .topbar-slogan {
     left: auto;
     width: 100%;
     text-align: center;
-    /* Single line, scales down to fit the viewport */
     font-size: clamp(0.5rem, 3vw, 1.1rem);
     white-space: nowrap;
     overflow: hidden;
@@ -46,13 +35,9 @@ body.mobile .topbar-slogan {
     box-sizing: border-box;
 }
 
-/* ── Sidebar — completely hidden ────────────────────────────────────────── */
-
 body.mobile .sidebar {
     display: none !important;
 }
-
-/* ── Hamburger button (bottom-left, floating) ───────────────────────────── */
 
 .mobile-burger {
     display: none;
@@ -103,8 +88,6 @@ body.mobile .mobile-burger:active {
     border-radius: 2px;
 }
 
-/* ── Slide-out menu (from left) ─────────────────────────────────────────── */
-
 .mobile-menu-overlay {
     display: none;
 }
@@ -148,11 +131,9 @@ body.mobile .mobile-menu {
     overflow-x: hidden;
     scrollbar-width: thin;
     scrollbar-color: #555 transparent;
-    /* Tighter padding to match sidebar item spacing */
     padding: 12px 12px 12px 12px;
     box-sizing: border-box;
     gap: 4px;
-    /* Fixed chrome font — independent from the page font control */
     font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
 }
 
@@ -169,19 +150,15 @@ body.mobile .mobile-menu::-webkit-scrollbar-thumb {
     border-radius: 3px;
 }
 
-/* ── Menu logo (2x size, top) ───────────────────────────────────────────── */
-
 .mobile-menu__logo {
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    /* Tight padding so the gap below the logo matches the gap between items */
     padding: 4px 8px 4px 8px;
     text-decoration: none;
     -webkit-tap-highlight-color: transparent;
 }
 
-/* object-fit: cover — same zoom-to-fill behavior as the desktop topbar logo. */
 .mobile-menu__logo-img {
     width: calc(var(--mobile-menu-icon-size) * 2);
     height: calc(var(--mobile-menu-icon-size) * 2);
@@ -195,8 +172,6 @@ body.mobile .mobile-menu::-webkit-scrollbar-thumb {
     background: #2a2a2a;
     padding: 2px;
 }
-
-/* ── Menu items (shared style) ──────────────────────────────────────────── */
 
 .mobile-menu__item {
     display: flex;
@@ -232,7 +207,6 @@ body.mobile .mobile-menu::-webkit-scrollbar-thumb {
     justify-content: center;
 }
 
-/* object-fit: cover — same zoom-to-fill behavior as the desktop dropdown icons. */
 .mobile-menu__icon {
     width: var(--mobile-menu-icon-size);
     height: var(--mobile-menu-icon-size);
@@ -253,17 +227,12 @@ body.mobile .mobile-menu::-webkit-scrollbar-thumb {
     text-overflow: ellipsis;
 }
 
-/* ── Menu divider ───────────────────────────────────────────────────────── */
-
 .mobile-menu__divider {
     border: none;
     border-top: 1px solid #2a2a2a;
-    /* Compact margins so the gaps stay consistent with item spacing */
     margin: 6px 4px;
     opacity: 0.7;
 }
-
-/* ── Page dropdown slot (injected by library.js) ─────────────────────────── */
 
 .mobile-menu__page-dropdown-slot {
     display: flex;
@@ -275,13 +244,10 @@ body.mobile .mobile-menu::-webkit-scrollbar-thumb {
     display: none;
 }
 
-/* Hide the divider immediately following an empty dropdown slot
-   so we don't get a floating divider with no content above it */
 .mobile-menu__page-dropdown-slot:empty + .mobile-menu__divider {
     display: none;
 }
 
-/* Style the dropdown when relocated inside the mobile menu */
 .mobile-menu .topbar-dropdown {
     position: relative;
     width: 100%;
@@ -392,7 +358,6 @@ body.mobile .mobile-menu::-webkit-scrollbar-thumb {
     padding: 1px;
 }
 
-/* Re-style library.js dropdown items inside the menu */
 .mobile-menu .topbar-tree-item--group {
     font-weight: 700;
     color: var(--text) !important;
@@ -417,8 +382,6 @@ body.mobile .mobile-menu::-webkit-scrollbar-thumb {
     color: var(--muted) !important;
 }
 
-/* ── Blog content (mobile) — full-width, stacked ────────────────────────── */
-
 body.mobile #about-me-content,
 body.mobile #featured-content,
 body.mobile #projects-container {
@@ -434,9 +397,6 @@ body.mobile #about-me-content {
     padding-bottom: 0 !important;
 }
 
-/* Stack two-column rows into a single column. Because buildRows always
-   appends side "a" before side "b", and rows iterate by number, the
-   natural DOM order is P1 → P1a → P1b → P2 → P2a → P2b … */
 body.mobile .blog-row--half {
     grid-template-columns: 1fr !important;
     gap: 20px !important;
@@ -450,14 +410,10 @@ body.mobile .blog-row {
     margin-bottom: 24px !important;
 }
 
-/* Empty cells from one-sided rows shouldn't take vertical space */
 body.mobile .blog-cell--empty {
     display: none !important;
 }
 
-/* Center images/embeds/models at 95% width for slight side indent.
-   Applies to all card wraps, including link embeds and STL viewers, so
-   every tag type gets the same consistent mobile treatment. */
 body.mobile .blog-image-wrap,
 body.mobile .blog-folder-outer,
 body.mobile .blog-audio-wrap,
@@ -469,7 +425,6 @@ body.mobile .blog-stl-wrap {
     margin-right: auto !important;
 }
 
-/* Multi-media stack: keep stacking but each item gets the 95% rule */
 body.mobile .blog-media-stack {
     width: 100% !important;
 }
@@ -478,7 +433,6 @@ body.mobile .blog-media-stack-item {
     width: 100% !important;
 }
 
-/* Cells holding text — full width */
 body.mobile .blog-cell {
     width: 100% !important;
 }
@@ -489,14 +443,6 @@ body.mobile .blog-cell--text-beside-image {
     display: block !important;
 }
 
-/* ── Link embed (mobile) — same static/interactive behavior as desktop,
-      just narrower (95%, inherited above). No extra overrides needed:
-      .blog-link-wrap--static / --interactive and the open button /
-      static anchor all work identically at any width. ── */
-
-/* ── Typography scaling ───────────────────────────────────────────────── */
-
-/* Blog titles are centered on mobile (desktop keeps them left-aligned). */
 body.mobile .blog-title {
     font-size: 1.5rem !important;
     padding-left: 0 !important;
@@ -533,15 +479,12 @@ body.mobile .blog-md-content {
     line-height: 1.7;
 }
 
-/* Folder badge — slightly smaller on mobile */
 body.mobile .blog-folder-badge {
     font-size: 0.85rem;
     padding: 4px 12px;
     bottom: 10px;
     right: 10px;
 }
-
-/* ── Gallery modal — single column on mobile ────────────────────────────── */
 
 body.mobile .blog-gallery-card {
     width: 95vw;
@@ -563,32 +506,16 @@ body.mobile video.blog-gallery-media {
     max-height: 60vh;
 }
 
-/* ── Body scroll lock when menu is open ─────────────────────────────────── */
-
 body.mobile.mobile-menu-open {
     overflow: hidden;
 }
-
-/* ── Bottom page (mobile) — bottom-text stacked above the credit line, both
-      flowing normally (not absolutely positioned) inside a centered flex
-      column. This is what fixes the overlap seen on mobile: desktop relies
-      on .site-credit being position:absolute + .bottom-text having a big
-      margin-bottom to reserve clearance for it, but that layout doesn't
-      translate to mobile's narrower/taller flow, so here the credit line is
-      taken out of absolute positioning entirely and just follows in normal
-      flow underneath the bottom-text. ─────────────────────────────────────
-
-      TUNABLE PADDING: `padding-bottom` on body.mobile .bottom-page below is
-      the single value controlling clearance between the bottom of the
-      credit line and the bottom of the screen (to clear the floating
-      hamburger button). Increase/decrease that one value to adjust it. */
 
 body.mobile .bottom-page {
     flex-direction: column;
     padding-left: var(--mobile-side-padding);
     padding-right: var(--mobile-side-padding);
     padding-top: 24px;
-    padding-bottom: calc(var(--mobile-burger-size) + -30px); /* ← tune clearance here */
+    padding-bottom: calc(var(--mobile-burger-size) + -30px);
 }
 
 body.mobile .bottom-text {

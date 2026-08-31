@@ -37,8 +37,6 @@
     line-height: 1.4;
 }
 
-/* ── Available Elements — one horizontal, wrapping row of inline chips ── */
-
 .le-available {
     margin-bottom: 4px;
 }
@@ -79,11 +77,6 @@
     text-align: center;
     flex: 1 1 100%;
 }
-
-/* ── Columns — wrapping grid of fixed-width mini-columns. Each column
-   keeps its own compact width instead of stretching to fill the row, so
-   e.g. 3 columns lay out as 2 on one row + 1 on the next (same width as
-   the other two), never a single full-width column by itself. ── */
 
 .le-columns {
     display: flex;

@@ -1,39 +1,7 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Right-panel toolbar — [Paragraph] / [Mobile] / <link embed> / <STL> /
-// <image> / <video> / <audio> / <folder> buttons, plus the Tags Help /
-// Media Help buttons (bottom-right of the editor page).
-//
-// The main buttons insert text directly into the currently mounted
-// content.md textarea. They are ALWAYS visible/enabled regardless of edit
-// mode (content.md vs config.json) — never hidden or greyed out — but only
-// actually do anything while content.md is the active mode. Clicking them
-// while editing config.json is a silent no-op, per spec.
-//
-// Tag colors / STL defaults are NEVER hardcoded here — they're pulled live
-// from blog-config.js's getTagColors()/getStlDefaults(), which are
-// populated from ADMIN/library-explorer/blog.json.
-//
-// <STL>, <image>, <video>, <audio>, and <folder> are all consumers of the
-// generic selection-mode framework (selection-mode.js) — clicking one puts
-// the media manager into "pick a matching item" mode (matching tiles
-// highlight in that tag's color); picking one inserts the appropriate tag
-// at the last cursor position in content.md. Any future media-selection
-// tag follows the exact same pattern without this file (or
-// media-manager.js) needing any new type-specific branching elsewhere.
-//
-// Tags Help and Media Help both open the exact same kind of markdown
-// overlay (openMarkdownHelp), just pointed at different .md files —
-// /library-explorer/tags.md and /library-explorer/media.md respectively — so all
-// the rendering/open/close code is shared between the two buttons. This
-// same helper is exported so the Library Browser's own "Library Help"
-// button (library.md) can reuse it too.
-// ─────────────────────────────────────────────────────────────────────────────
 
 import { getTagColors, getStlDefaults } from "./library-config.js";
 import { toggleSelection, onSelectionChange } from "./selection-mode.js";
 import { IMAGE_EXTS, VIDEO_EXTS, AUDIO_EXTS, getExt } from "./media-manager.js";
-
-// ── Small reusable input modal (Paragraph / Link / Video dialogs) ────────────
 
 function createSmallModal({ title, bodyBuilder, onSubmit }) {
     const overlay = document.createElement("div");
@@ -93,9 +61,6 @@ function insertAtCursor(textarea, text) {
     textarea.value = `${before}${text}${after}`;
     const newPos = start + text.length;
     textarea.selectionStart = textarea.selectionEnd = newPos;
-    // Fire a real "input" event so the highlighter repaint + dirty-tracking
-    // listeners already wired in markdown-editor.js/library-explorer.js pick this
-    // up exactly like a normal keystroke would.
     textarea.dispatchEvent(new Event("input", { bubbles: true }));
     textarea.focus();
 }
@@ -103,30 +68,6 @@ function insertAtCursor(textarea, text) {
 function tagExists(text, openTag) {
     return text.includes(openTag);
 }
-
-// ── Paragraph auto-suggestion ──────────────────────────────────────────────
-//
-// Scans the ENTIRE live textarea content (never a saved/cached copy) for
-// every OPENING paragraph tag — [P<n>], [P<n>a], or [P<n>b] — and builds a
-// full map of { number -> { a: bool, b: bool, full: bool } } covering every
-// paragraph number found anywhere in the document, regardless of where the
-// cursor is or what order the tags physically appear in. Closing tags
-// ([/P<n>...]) are deliberately never matched, since the required literal
-// is "[P" immediately (no "/" in between).
-//
-// Based on the HIGHEST paragraph number found:
-//   - it has an "a" half but no "b" half yet   → suggest same number, "b"
-//     (Right) — completing the pair.
-//   - it has both halves, a full-width tag, or
-//     nothing was found at all                  → suggest number + 1 (or 1
-//     if nothing exists yet), "a" (Left) — starting a new pair.
-//
-// This guarantees P4b → P5a → P5b → P6a → P6b progresses correctly every
-// time, even if tags were inserted out of order or the file was edited by
-// hand.
-//
-// This is purely a pre-filled SUGGESTION — always fully editable in the
-// dialog before confirming.
 
 function suggestNextParagraph(text) {
     const re = /\[P(\d+)([abAB]?)\]/g;
@@ -156,8 +97,6 @@ function suggestNextParagraph(text) {
 
     return { num: maxNum + 1, align: "Left" };
 }
-
-// ── Paragraph dialog ──────────────────────────────────────────────────────────
 
 function openParagraphDialog(getTextarea) {
     const textarea = getTextarea();
@@ -208,7 +147,6 @@ function openParagraphDialog(getTextarea) {
                 return false;
             }
 
-            // Left = "a", Right = "b", Full = no suffix.
             const suffixMap = { Full: "", Left: "a", Right: "b" };
             const suffix  = suffixMap[select.value] || "";
             const tagName = `P${num}${suffix}`;
@@ -228,8 +166,6 @@ function openParagraphDialog(getTextarea) {
         },
     });
 }
-
-// ── Link embed dialog ──────────────────────────────────────────────────────────
 
 function openLinkDialog(getTextarea) {
     createSmallModal({
@@ -281,12 +217,6 @@ function openLinkDialog(getTextarea) {
     });
 }
 
-// ── Video options dialog ────────────────────────────────────────────────────
-// Shown BEFORE entering selection mode for <video>. Defaults to not
-// looping. If the user checks the box, the picked video is tagged to
-// autoplay/loop/mute (no audio) GIF-style; otherwise it plays normally
-// with controls.
-
 function openVideoDialog(onConfirm) {
     createSmallModal({
         title: "Insert Video Tag",
@@ -309,14 +239,6 @@ function openVideoDialog(onConfirm) {
         },
     });
 }
-
-// ── Generic markdown-help modal — fetches any given .md URL and renders it
-// as markdown inside a large overlay covering most of the screen. Clicking
-// the × button or clicking off (outside the box) closes it. Shared by the
-// Tags Help button (tags.md), the Media Help button (media.md), AND the
-// Library Browser's own Library Help button (library.md) — none of them
-// have any bespoke rendering/open/close code of their own. Exported so
-// other modules (library-browser.js) can reuse it directly. ──────────────
 
 function renderSimpleMarkdown(md) {
     const escapeHtml = (s) => s
@@ -409,31 +331,10 @@ export function openMarkdownHelp(mdUrl) {
         .catch((e) => { content.textContent = `Failed to load ${mdUrl}: ${e.message}`; });
 }
 
-// ── Public init ───────────────────────────────────────────────────────────────
-//
-// `getTextarea()` returns the currently mounted content.md textarea (or
-// null). `isMarkdownMode()` returns true only while content.md is the
-// active edit mode — used to make the main buttons silent no-ops in
-// config.json mode without ever hiding/disabling them.
-//
-// Buttons use the exact same visual style as the top bar's buttons
-// (.admin-button) — only their TEXT is colored, pulled live from
-// blog.json via getTagColors() (never hardcoded).
-//
-// `tagsHelpBtnEl` / `mediaHelpBtnEl` (the two help buttons, bottom-right of
-// the page) are wired here to open tags.md / media.md respectively — both
-// independent of edit mode, both always work, both share the exact same
-// openMarkdownHelp() modal above.
-
 export function initToolbar({ toolbarEl, tagsHelpBtnEl, mediaHelpBtnEl, getTextarea, isMarkdownMode }) {
     const colors = getTagColors();
     const stl    = getStlDefaults();
 
-    // Wires a "selection type" button (image/video/audio/folder/stl) so
-    // it: colors its own text from tags.json, toggles the given selection
-    // type on click, and reflects active/inactive state visually. Kept
-    // generic so adding another media-selection tag later is just another
-    // call to this same helper.
     function makeSelectionButton({ text, colorKey, buildType }) {
         const btn = document.createElement("button");
         btn.type = "button";
@@ -461,8 +362,6 @@ export function initToolbar({ toolbarEl, tagsHelpBtnEl, mediaHelpBtnEl, getTexta
         openParagraphDialog(getTextarea);
     });
 
-    // [Mobile] — no dialog at all, just drops [M1]\n\n[/M1] straight at the
-    // cursor, same insertion behavior as Paragraph but with zero options.
     const mobileBtn = document.createElement("button");
     mobileBtn.type = "button";
     mobileBtn.className = "admin-button be-tool-btn";
@@ -485,8 +384,6 @@ export function initToolbar({ toolbarEl, tagsHelpBtnEl, mediaHelpBtnEl, getTexta
         openLinkDialog(getTextarea);
     });
 
-    // <STL> — pick an .stl file; inserts <stl:relPath|bgHex|modelHex>
-    // using the bg/model defaults from blog.json's stlDefaults section.
     const stlBtn = makeSelectionButton({
         text: "<STL>",
         colorKey: "stl",
@@ -504,8 +401,6 @@ export function initToolbar({ toolbarEl, tagsHelpBtnEl, mediaHelpBtnEl, getTexta
         }),
     });
 
-    // <image> — pick any supported image (.png, .jpg, .jpeg, .webp, .svg,
-    // .avif, .gif); inserts <relPath>.
     const imageBtn = makeSelectionButton({
         text: "<image>",
         colorKey: "image",
@@ -521,11 +416,6 @@ export function initToolbar({ toolbarEl, tagsHelpBtnEl, mediaHelpBtnEl, getTexta
         }),
     });
 
-    // <video> — enters selection mode immediately for .mp4/.webm files.
-    // Once a matching file is CLICKED, a dialog pops up asking whether it
-    // should loop (autoplay, muted, no audio, GIF-style) or play normally
-    // with controls. Inserts <relPath> normally, or <relPath loop> if the
-    // dialog's checkbox was checked.
     const videoBtn = makeSelectionButton({
         text: "<video>",
         colorKey: "video",
@@ -543,8 +433,6 @@ export function initToolbar({ toolbarEl, tagsHelpBtnEl, mediaHelpBtnEl, getTexta
         }),
     });
 
-    // <audio> — pick any supported audio file (.mp3, .wav); inserts
-    // <relPath>.
     const audioBtn = makeSelectionButton({
         text: "<audio>",
         colorKey: "audio",
@@ -560,8 +448,6 @@ export function initToolbar({ toolbarEl, tagsHelpBtnEl, mediaHelpBtnEl, getTexta
         }),
     });
 
-    // <folder> — pick a FOLDER (matches() targets isFolder, not an
-    // extension) instead of navigating into it; inserts <./relPath>.
     const folderBtn = makeSelectionButton({
         text: "<folder>",
         colorKey: "folder",

@@ -2,10 +2,6 @@ console.log("Theme module loaded");
 
 const THEME_URL = "/config/theme.json";
 
-// Shared fallback stack — matches the var() fallback baked directly into
-// base.css/topbar.css/sidebar.css/bottom-page.css/lib-blog.css, so
-// JS-applied custom fonts degrade into the exact same stack instead of a
-// bare "sans-serif" safety net.
 const SYSTEM_FONT_STACK = 'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"';
 const MONO_FONT_STACK   = '"JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace';
 
@@ -19,16 +15,6 @@ function setFavicon(href) {
     }
     link.href = href;
 }
-
-// ── Custom font handling ─────────────────────────────────────────────────────
-//
-// Server-resolved (lib/routes.js: buildThemePayload) into 6 independent
-// slots, each either null ("off" — no font-family CSS variable is set at
-// all, so the matching CSS's own var() fallback applies instantly with
-// zero flash) or { family, url, format } ("on" — inject a @font-face rule
-// and set the CSS variable to that one font, chained in front of the
-// matching system/mono stack as a safety net in case the file fails to
-// decode at runtime).
 
 const FONT_VAR_MAP = {
     body:       { varName: "--page-font-family",        stack: SYSTEM_FONT_STACK },
@@ -55,7 +41,7 @@ function fontFaceRule(font) {
 
 function applyThemeFonts(fonts) {
     const root  = document.documentElement.style;
-    const rules = new Set(); // dedupe — shared font paths can produce identical @font-face bodies
+    const rules = new Set();
 
     for (const [key, cfg] of Object.entries(FONT_VAR_MAP)) {
         const font = fonts && fonts[key];
@@ -63,9 +49,6 @@ function applyThemeFonts(fonts) {
             rules.add(fontFaceRule(font));
             root.setProperty(cfg.varName, `"${font.family}", ${cfg.stack}`);
         } else {
-            // "Off" — explicitly clear any previously-set value (theme.json
-            // is fetched fresh with no-store every load) so the matching
-            // CSS's own var() fallback applies instead.
             root.removeProperty(cfg.varName);
         }
     }
@@ -74,11 +57,6 @@ function applyThemeFonts(fonts) {
     const combined = [...rules].join("\n");
     if (styleEl.textContent !== combined) styleEl.textContent = combined;
 }
-
-// ── Color / size variables — theme.js just applies whatever the server
-// already resolved (each section's backgroundColor/fontSize/textColor has
-// already fallen back to theme.master's equivalent field server-side where
-// left empty) — no further fallback logic needed here. ──────────────────────
 
 function px(n) {
     return (typeof n === "number" && !isNaN(n)) ? `${n}px` : null;
@@ -120,7 +98,6 @@ function applyThemeVars(theme) {
     if (sidebar.iconSize       != null) root.setProperty("--sidebar-icon-size", px(sidebar.iconSize));
 
     const bottomText = theme.bottomText || {};
-    setOrClear(root, "--bottom-text-bg",        bottomText.backgroundColor);
     setOrClear(root, "--bottom-text-color",     bottomText.textColor);
     setOrClear(root, "--bottom-text-font-size", px(bottomText.fontSize));
 
@@ -143,20 +120,10 @@ async function loadTheme() {
         applyThemeVars(data.theme);
         applyThemeFonts(data.fonts);
 
-        // Exposed for other modules (e.g. topbar.js) that also need favicon/
-        // slogan/theme data without a second fetch.
         window.__SITE_THEME__ = data;
     } catch (err) {
         console.error("Theme: failed to load theme.json:", err);
     }
 }
 
-// Runs immediately rather than waiting for DOMContentLoaded — fetching and
-// setting a style property on document.documentElement doesn't require the
-// full DOM tree, just <html> itself, which exists as soon as parsing
-// starts. This shaves a bit more time off the window during which a
-// configured custom font hasn't loaded yet (the "flash" for that case).
-// The "no custom font configured" case doesn't flash at all — see the
-// var() fallback chains in base.css/topbar.css/sidebar.css/bottom-page.css/
-// lib-blog.css.
 loadTheme();

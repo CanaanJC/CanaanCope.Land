@@ -1,69 +1,8 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// lib-blog.js — Shared rendering library for blog-style content
-//
-// Provides parsing, rendering, gallery, and lazy-loading utilities for
-// project entries (about-me, featured projects, project listings).
-//
-// ── Tag syntax ────────────────────────────────────────────────────────────────
-//
-//   [P1] ... [/P1]        Full-width content row (number selects row order)
-//   [P1a] ... [/P1a]      Left half of row 1 (pairs with P1b)
-//   [P1b] ... [/P1b]      Right half of row 1 (pairs with P1a)
-//   [M1] ... [/M1]        Mobile-only row — nested inside a [P..] block, or
-//                         standalone at the top level. Invisible on desktop.
-//
-// All media references are INLINE-ONLY, wrapped in angle brackets:
-//
-//   <fig1.png>                          image
-//   <fig1.png loop>                     video forced to loop/mute/autoplay
-//                                       (the "loop" keyword only affects video
-//                                       files — .gif is always loop-video)
-//   <clip.mp4>                          video with normal controls
-//   <sound.mp3>                         audio with normal controls
-//   <./gallery>                         folder → thumbnail + gallery modal
-//   <link:https://example.com>          16:9 STATIC link preview — the whole
-//                                       card is a plain link; clicking it
-//                                       (anywhere) opens the page in a new
-//                                       tab. The embedded preview itself is
-//                                       NOT interactive/scrollable/clickable.
-//   <link:https://example.com|click>    16:9 INTERACTIVE embedded link
-//                                       preview — the iframe itself is fully
-//                                       usable (scroll/click/type inside it),
-//                                       with a small "open in new tab" button
-//                                       floating in the corner.
-//   <stl:model.stl|#bgHex|#modelHex>    1:1 drag-to-orbit 3D model viewer
-//
-// There is no more "bare"/standalone media syntax — a tag used alone as the
-// entire content of a [P..]/[M..] side renders full-size (the old
-// "standalone" behavior); a tag used mid-sentence renders inline with the
-// surrounding text split around it. Putting 2+ tags, one per line, alone in
-// a [P..]/[M..] side renders them as a vertical stack in one cell.
-//
-// Mobile vs desktop rendering:
-//   - parseContentMd extracts [P…] blocks AND strips any nested [M…]…[/M…]
-//     sub-blocks from their content — [M…] is mobile-only and is invisible
-//     to the desktop renderer.
-//   - parseAllBlocks (mobile path) extracts both [P…] and [M…] in document
-//     order. The mobile renderer (registered via setMobileRowsBuilder)
-//     handles nested [M…] inside P content itself by splitting the text.
-//   - buildRows wraps its output in a .blog-rows-wrapper (display:contents)
-//     that stores its render inputs, enabling rerenderAllBlogContent() to
-//     rebuild every rendered block in place when the viewport toggles
-//     between mobile and desktop.
-//
-// NOTE: renderMediaToken / renderCell below are the SINGLE shared rendering
-// path used by both the desktop renderer (_buildDesktopRowsFragment) and
-// the mobile renderer (mobile.js's buildMobileRows). Any tag — link, stl,
-// folder, image, video, audio — behaves identically on both, since both
-// paths call into this same file for the actual tag handling.
-// ─────────────────────────────────────────────────────────────────────────────
 
 console.log("lib-blog module loaded");
 
 const MARKED_CDN = "https://cdn.jsdelivr.net/npm/marked@12/marked.min.js";
 const BLOG_ROWS_WRAPPER_CLASS = "blog-rows-wrapper";
-
-// ── Markdown loader ──────────────────────────────────────────────────────────
 
 export async function loadMarked() {
     if (window.marked) return;
@@ -76,10 +15,6 @@ export async function loadMarked() {
     });
 }
 
-// ── Date helpers ─────────────────────────────────────────────────────────────
-
-// The "end date" used for chronological sorting is always the LAST entry in
-// the date array, regardless of how many entries it has (1, 2, 3, 4, …).
 export function getEndDate(date) {
     if (!date) return null;
     if (Array.isArray(date)) return date.length > 0 ? date[date.length - 1] : null;
@@ -104,10 +39,6 @@ export function sortByEndDate(list) {
     });
 }
 
-// Pairs consecutive dates into ranges joined by an en dash. An odd date left
-// over at the end (no partner) is shown on its own. Works for any array
-// length: [d1] → "d1"; [d1,d2] → "d1 – d2"; [d1,d2,d3] → "d1 – d2, d3";
-// [d1,d2,d3,d4] → "d1 – d2, d3 – d4"; and so on.
 export function formatDateRanges(dateArr) {
     if (!Array.isArray(dateArr)) return String(dateArr);
     const parts = [];
@@ -123,8 +54,6 @@ export function formatDateRanges(dateArr) {
     }
     return parts.join(", ");
 }
-
-// ── File-type helpers ────────────────────────────────────────────────────────
 
 function isGifFile(filename) {
     return /\.gif$/i.test(filename);
@@ -142,10 +71,6 @@ function isAudioFile(filename) {
     return /\.(mp3|wav)$/i.test(filename);
 }
 
-// ── Content parsing (block level: [P..] / [M..]) ─────────────────────────────
-
-// Desktop parser. Strips nested [M…]…[/M…] blocks from P content so they
-// never appear on desktop.
 export function parseContentMd(raw) {
     const blockRegex   = /\[P([^\]]+)\]([\s\S]*?)\[\/P\1\]/g;
     const innerMRegex  = /\[M([^\]]+)\]([\s\S]*?)\[\/M\1\]/g;
@@ -158,9 +83,6 @@ export function parseContentMd(raw) {
     return blocks;
 }
 
-// Mobile-aware parser. Extracts both [P…] and [M…] blocks in document order.
-// Returns { kind: "P"|"M", tag, content }. Nested [M…] inside P content stays
-// embedded — the mobile renderer splits it out itself.
 export function parseAllBlocks(raw) {
     const blockRegex = /\[([PM])([^\]]+)\]([\s\S]*?)\[\/\1\2\]/g;
     const blocks = [];
@@ -190,18 +112,10 @@ export function groupIntoRows(blocks) {
         .map(([num, sides]) => ({ num, sides }));
 }
 
-// ── Inline token parsing (the <...> syntax) ──────────────────────────────────
-
-// Matches every <...> occurrence in a string. A fresh RegExp is constructed
-// per call site rather than sharing one module-level instance, so lastIndex
-// never leaks between unrelated calls.
 function inlineTokenRegex() {
     return /<([^<>]+)>/g;
 }
 
-// Classifies the raw text INSIDE a pair of angle brackets. Returns a typed
-// token object, or null if it doesn't match any known tag — in which case
-// the original "<...>" text is left as literal text by callers.
 export function parseInlineToken(raw) {
     const value = String(raw).trim();
     if (!value) return null;
@@ -210,9 +124,6 @@ export function parseInlineToken(raw) {
         return { type: "folder", folder: value.slice(2) };
     }
 
-    // link:URL              → static (whole card is a plain link, preview
-    //                         itself is non-interactive)
-    // link:URL|click        → interactive (fully usable embedded iframe)
     if (/^link:/i.test(value)) {
         let rest = value.slice(5).trim();
         let interactive = false;
@@ -243,9 +154,6 @@ export function parseInlineToken(raw) {
     return null;
 }
 
-// Splits arbitrary text into an ordered list of { type: "text", value } and
-// { type: "token", token } segments. Unrecognized "<...>" sequences are left
-// embedded in the surrounding text (not treated as a token, not stripped).
 export function extractInlineSegments(text) {
     const regex = inlineTokenRegex();
     const segments = [];
@@ -270,9 +178,6 @@ export function extractInlineSegments(text) {
     return segments;
 }
 
-// True/token if `content`, once trimmed, is EXACTLY one "<...>" token and
-// nothing else. This is what makes a tag used alone in a [P..]/[M..] side
-// render full-size instead of inline with text.
 export function isSoleToken(content) {
     const trimmed = String(content).trim();
     const m = trimmed.match(/^<([^<>]+)>$/);
@@ -280,8 +185,6 @@ export function isSoleToken(content) {
     return parseInlineToken(m[1]);
 }
 
-// A "stack": 2+ non-empty lines, each independently a sole token. Returns an
-// array of tokens (same order as the lines), or null if it doesn't qualify.
 export function parseMultiMediaBlock(content) {
     const lines = content.split("\n").map(l => l.trim()).filter(Boolean);
     if (lines.length < 2) return null;
@@ -290,20 +193,10 @@ export function parseMultiMediaBlock(content) {
     return tokens;
 }
 
-// True if a block should be treated as "pure media" for layout purposes
-// (gets the image-left/right positioning classes instead of text-flow
-// classes) — either a sole token or a multi-token stack.
 export function isMediaOnlyBlock(content) {
     return !!isSoleToken(content) || !!parseMultiMediaBlock(content);
 }
 
-// ── Loop / gif video element ─────────────────────────────────────────────────
-
-// Build a looping, muted, autoplay <video> with no controls (a GIF replacement).
-// For gif sources, uses a bulletproof fallback: if the video can't decode (the
-// server is still serving the raw .gif while the MP4 variant builds), swap in an
-// animated <img>. Detection combines <video>/<source> error events AND a
-// timeout guard (videoWidth stays 0), because source-level errors are unreliable.
 function buildLoopVideoEl(src, file, isGif, className) {
     const video = document.createElement("video");
     video.className = className || "blog-video blog-loop-video";
@@ -333,9 +226,6 @@ function buildLoopVideoEl(src, file, isGif, className) {
     });
     video.addEventListener("canplay", kickPlay);
 
-    // GIF-only fallback to an animated <img>. Not applied to real loop-MP4s,
-    // whose bytes always decode (the original MP4 is served while its smaller
-    // variant builds).
     if (isGif) {
         let swapped = false;
         const swapToImg = () => {
@@ -350,13 +240,9 @@ function buildLoopVideoEl(src, file, isGif, className) {
             if (video.parentNode) video.replaceWith(img);
         };
 
-        // Error can surface on either the <video> (all sources failed) or the
-        // <source> child — listen on both.
         video.addEventListener("error", swapToImg, { once: true });
         source.addEventListener("error", swapToImg, { once: true });
 
-        // Guard: if after a short delay the video still has no decodable track,
-        // the server is serving the raw .gif — fall back to <img>.
         fallbackTimer = setTimeout(() => {
             if (!swapped && video.videoWidth === 0) swapToImg();
         }, 1200);
@@ -371,33 +257,6 @@ function makeLoopWrap(src, file, isGif) {
     wrap.appendChild(buildLoopVideoEl(src, file, isGif, "blog-video blog-loop-video"));
     return wrap;
 }
-
-// ── Link embed ────────────────────────────────────────────────────────────────
-//
-// Two modes, selected by the `|click` suffix on the tag:
-//
-//   STATIC (default, no |click):
-//     Renders a 16:9 card with a non-interactive preview iframe
-//     (pointer-events: none) and a transparent anchor covering the ENTIRE
-//     card. Clicking anywhere on the card opens the target page in a new
-//     tab — nothing inside the card itself is scrollable/clickable.
-//
-//   INTERACTIVE (|click):
-//     Renders a 16:9 card with a FULLY INTERACTIVE iframe — can be
-//     scrolled/clicked/used directly. A small "open in new tab" button
-//     floats in the corner on top of it for convenience.
-//
-// In both modes, a no-cors fetch probes reachability FIRST: no-cors
-// resolves for ANY response the server actually sends back (regardless of
-// status code — 200, 404, 500, whatever), and only rejects on a genuine
-// network-level failure (DNS failure, connection refused, timeout, etc.).
-// Only that genuine failure case shows an inline error card instead of the
-// iframe/link — there is no redirect to this site's own /404 page.
-//
-// Note: this probe can't detect a page that actively refuses to be framed
-// (X-Frame-Options / CSP frame-ancestors) — those still show as a blank/
-// blocked iframe, same limitation any embed has. The error card only covers
-// genuine unreachability.
 
 function buildLinkErrorCard(url) {
     const card = document.createElement("div");
@@ -444,8 +303,6 @@ function renderLinkEmbed(url, interactive) {
     iframe.loading = "lazy";
     iframe.referrerPolicy = "no-referrer-when-downgrade";
     if (!interactive) {
-        // Non-interactive preview — the overlay anchor (added below) is what
-        // actually handles clicks for the static mode.
         iframe.tabIndex = -1;
         iframe.setAttribute("aria-hidden", "true");
     }
@@ -472,25 +329,6 @@ function renderLinkEmbed(url, interactive) {
 
     return wrap;
 }
-
-// ── STL viewer ────────────────────────────────────────────────────────────────
-//
-// Renders as a 1:1 card. Lazily loads three.js + STLLoader + OrbitControls
-// from a CDN (only once — shared across every STL viewer on the page) the
-// first time an <stl:...> tag is actually encountered. No visible UI beyond
-// the model itself — click-and-drag to orbit, no zoom, no pan, styled after
-// macOS Finder/Quick Look's STL preview.
-//
-// NOTE: STLLoader.js / OrbitControls.js internally do `import * as THREE
-// from "three"` — a bare specifier the browser can't resolve on its own
-// without an import map. jsdelivr's "/+esm" endpoint rewrites those bare
-// imports into real URLs automatically, so we load everything through that
-// endpoint instead of the raw file paths.
-//
-// FILL_FRACTION below controls how much of the viewport the model's
-// bounding sphere occupies — 0.9 means the model's outer extremes touch
-// ~90% of the frame (tight zoom, small margin). Lower it (e.g. 0.7) for
-// more breathing room, raise it (closer to 1.0) to zoom in further.
 
 let _threePromise = null;
 
@@ -542,13 +380,6 @@ function renderStlViewer(url, bgColor, modelColor) {
         loader.load(
             url,
             (geometry) => {
-                // STL files store "up" as +Z (matches a 3D printer's build
-                // plate orientation), but three.js treats +Y as up — without
-                // this the model loads in tipped over on its side. Rotating
-                // the GEOMETRY itself (not the mesh) -90° around X converts
-                // Z-up to Y-up, and doing it before computeBoundingSphere()
-                // means centering/framing below is computed against the
-                // already-corrected orientation.
                 geometry.rotateX(-Math.PI / 2);
 
                 geometry.computeVertexNormals();
@@ -563,13 +394,6 @@ function renderStlViewer(url, bgColor, modelColor) {
                 }
                 scene.add(mesh);
 
-                // ── Zoomed-in framing ──
-                // Solve for the camera distance where the bounding sphere's
-                // diameter fills STL_FILL_FRACTION of the vertical frustum,
-                // using the camera's actual vertical FOV — this is exact,
-                // not a rough multiplier guess. The camera sits on the
-                // (1,1,1) diagonal, so the true distance-from-origin D is
-                // split evenly across x/y/z (each = D / sqrt(3)).
                 const radius = (sphere && sphere.radius) || 1;
                 const halfFovRad = THREE.MathUtils.degToRad(camera.fov / 2);
                 const dist = radius / (STL_FILL_FRACTION * Math.tan(halfFovRad));
@@ -606,9 +430,6 @@ function renderStlViewer(url, bgColor, modelColor) {
 
     return wrap;
 }
-
-
-// ── Gallery modal ────────────────────────────────────────────────────────────
 
 let _escListener = null;
 
@@ -708,8 +529,6 @@ export function openGalleryModal(files, mediaBaseUrl) {
     document.addEventListener("keydown", _escListener);
 }
 
-// ── Folder cell ──────────────────────────────────────────────────────────────
-
 export function renderFolderCell(folderName, mediaBaseUrl, listingUrl) {
     const cell = document.createElement("div");
     cell.className = "blog-cell blog-cell--image-left";
@@ -781,12 +600,6 @@ export function renderFolderCell(folderName, mediaBaseUrl, listingUrl) {
     return cell;
 }
 
-// ── Media token renderer (dispatches by token.type) ──────────────────────────
-//
-// This is the SINGLE shared entry point used by both the desktop renderer
-// and the mobile renderer (mobile.js) — any tag behaves identically in both
-// modes because both call through here.
-
 export function renderMediaToken(token, mediaBaseUrl, listingBaseUrl) {
     switch (token.type) {
         case "folder":
@@ -852,13 +665,10 @@ export function renderMediaToken(token, mediaBaseUrl, listingBaseUrl) {
     }
 }
 
-// ── Cell renderer ────────────────────────────────────────────────────────────
-
 export function renderCell(content, mediaBaseUrl, listingBaseUrl) {
     const cell = document.createElement("div");
     cell.className = "blog-cell";
 
-    // Multi-token stack — 2+ lines, each a sole token.
     const stack = parseMultiMediaBlock(content);
     if (stack) {
         cell.classList.add("blog-cell--image-left", "blog-media-stack");
@@ -871,7 +681,6 @@ export function renderCell(content, mediaBaseUrl, listingBaseUrl) {
         return cell;
     }
 
-    // Sole token — the whole side is exactly one tag, render full-size.
     const sole = isSoleToken(content);
     if (sole) {
         if (sole.type === "folder") {
@@ -882,7 +691,6 @@ export function renderCell(content, mediaBaseUrl, listingBaseUrl) {
         return cell;
     }
 
-    // Mixed text + inline token(s) — split and render each segment in place.
     const segments = extractInlineSegments(content);
     const hasToken = segments.some(s => s.type === "token");
 
@@ -904,7 +712,6 @@ export function renderCell(content, mediaBaseUrl, listingBaseUrl) {
         return cell;
     }
 
-    // Plain markdown, no media at all.
     const div = document.createElement("div");
     div.className = "blog-md-content";
     div.innerHTML = window.marked.parse(content);
@@ -912,15 +719,11 @@ export function renderCell(content, mediaBaseUrl, listingBaseUrl) {
     return cell;
 }
 
-// ── Mobile row builder hook ──────────────────────────────────────────────────
-
 let _mobileRowsBuilder = null;
 
 export function setMobileRowsBuilder(fn) {
     _mobileRowsBuilder = fn;
 }
-
-// ── Internal: build the row fragment for the current mode ────────────────────
 
 function _renderRowsFragment(rawMd, mediaBaseUrl, listingBaseUrl) {
     if (document.body.classList.contains("mobile") && _mobileRowsBuilder) {
@@ -981,13 +784,7 @@ function _buildDesktopRowsFragment(rawMd, mediaBaseUrl, listingBaseUrl) {
     return frag;
 }
 
-// ── Rows builder (public) ────────────────────────────────────────────────────
-
 export function buildRows(rawMd, mediaBaseUrl, listingBaseUrl) {
-    // Wrap the fragment in a tracker element so rerenderAllBlogContent()
-    // can find and rebuild it later when the viewport mode toggles.
-    // display:contents makes the wrapper invisible to layout — its children
-    // appear as if direct siblings under the parent, preserving all CSS.
     const wrapper = document.createElement("div");
     wrapper.className = BLOG_ROWS_WRAPPER_CLASS;
     wrapper.style.display = "contents";
@@ -995,8 +792,6 @@ export function buildRows(rawMd, mediaBaseUrl, listingBaseUrl) {
     wrapper.appendChild(_renderRowsFragment(rawMd, mediaBaseUrl, listingBaseUrl));
     return wrapper;
 }
-
-// ── Re-render all tracked blog content (called on mode toggle) ───────────────
 
 export function rerenderAllBlogContent() {
     const wrappers = document.querySelectorAll(`.${BLOG_ROWS_WRAPPER_CLASS}`);
@@ -1007,8 +802,6 @@ export function rerenderAllBlogContent() {
         wrapper.appendChild(_renderRowsFragment(args.rawMd, args.mediaBaseUrl, args.listingBaseUrl));
     }
 }
-
-// ── Project block builder ────────────────────────────────────────────────────
 
 export function buildProjectBlock(options) {
     const {
@@ -1045,8 +838,6 @@ export function buildProjectBlock(options) {
     return article;
 }
 
-// ── Placeholder for lazy loading ─────────────────────────────────────────────
-
 export function createPlaceholder(elementId, minHeight = 400) {
     const div = document.createElement("div");
     div.className = "blog-placeholder";
@@ -1055,8 +846,6 @@ export function createPlaceholder(elementId, minHeight = 400) {
     div.style.minHeight = `${minHeight}px`;
     return div;
 }
-
-// ── Lazy loader ──────────────────────────────────────────────────────────────
 
 export function setupLazyLoading(slugs, loadFn, preloadAhead = 2) {
     const preloadMargin = `${preloadAhead * 100}%`;

@@ -1,21 +1,4 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Panel Layout editor — replaces the old generic json.js-based raw "columns"
-// array editor. Lets you pick how many columns the admin page has (1-5) and
-// drag elements (folder names from ADMIN/elements/) into them, in any order,
-// with duplicates allowed.
-//
-// Talks directly to /api/layout (GET/PUT) and /api/element-list —
-// completely independent of the shared json.js engine. This element's HTML
-// deliberately has no #ej-container/#ej-save/etc., so json.js's
-// initJsonEditor() just no-ops on it (see its own early-return guard for
-// elements that don't have that shape) and this file's own init() does all
-// the real work.
-//
-// Every mutation (column count change, drag/drop insert/move, chip removal)
-// always ends by calling render() — so that's also the single choke point
-// used to clear a stale "Saved." status message the moment anything changes
-// after a save (see the top of render() below).
-// ─────────────────────────────────────────────────────────────────────────────
+
 
 const MIN_COLUMNS = 1;
 const MAX_COLUMNS = 5;
@@ -36,22 +19,12 @@ export default function init(root) {
         statusEl.textContent = text;
         statusEl.className = kind ? `admin-status admin-status--${kind}` : "admin-status";
     }
-
-    // Clears the status line the moment ANY edit happens, but only if it's
-    // currently showing the "Saved." (ok) message — mirrors json.js's
-    // notifyEdit(). Called at the top of render() rather than being
-    // threaded through every individual mutation function, since every
-    // mutation in this file always ends in a render() call anyway.
     function clearSavedStatusIfEditing() {
         if (statusEl.classList.contains("admin-status--ok")) {
             setStatus("");
         }
     }
 
-    // ── Column-count normalization ──────────────────────────────────────────
-    // Clamps to [MIN_COLUMNS, MAX_COLUMNS]. Shrinking never deletes items —
-    // anything in a column beyond the new count is appended, in order, onto
-    // the new last column. Growing just appends empty columns.
     function resizeColumns(newCount) {
         const clamped = Math.max(MIN_COLUMNS, Math.min(MAX_COLUMNS, newCount));
 
@@ -67,7 +40,6 @@ export default function init(root) {
         render();
     }
 
-    // ── Locate an item anywhere in `columns` by its generated id ────────────
     function findById(id) {
         for (let colIndex = 0; colIndex < columns.length; colIndex++) {
             const itemIndex = columns[colIndex].findIndex((item) => item.id === id);
@@ -77,10 +49,6 @@ export default function init(root) {
         }
         return null;
     }
-
-    // ── Drop-position math — which index, inside a column, does this drag
-    // currently sit above? Based on the vertical midpoint of each existing
-    // chip — the standard approach for a simple vertical reorder list.
     function getDropIndex(containerEl, clientY) {
         const chips = [...containerEl.querySelectorAll(":scope > .le-chip")];
         for (let i = 0; i < chips.length; i++) {
@@ -122,8 +90,6 @@ export default function init(root) {
         }
     }
 
-    // ── Rendering ────────────────────────────────────────────────────────────
-
     function renderAvailableList() {
         availableListEl.innerHTML = "";
 
@@ -150,11 +116,6 @@ export default function init(root) {
         }
     }
 
-    // Dropping a dragged-from-a-column chip back onto the available pane
-    // removes it (a quick way to delete without hunting for the × button).
-    // Dragging a fresh "new" item here is a no-op — it's already available.
-    // Wired once, not per-render, since availableListEl itself never gets
-    // replaced (only its children do).
     availableListEl.addEventListener("dragover", (e) => e.preventDefault());
     availableListEl.addEventListener("drop", (e) => {
         e.preventDefault();
@@ -246,15 +207,10 @@ export default function init(root) {
     }
 
     function render() {
-        // Any call to render() means something changed (or the initial
-        // load just finished, when the status is empty anyway) — clear a
-        // stale "Saved." message before repainting.
-        clearSavedStatusIfEditing();
+
         renderAvailableList();
         renderColumns();
     }
-
-    // ── Load current state ──────────────────────────────────────────────────
 
     Promise.all([
         fetch("/api/element-list").then(r => r.json()),

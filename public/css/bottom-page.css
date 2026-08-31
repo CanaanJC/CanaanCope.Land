@@ -1,15 +1,3 @@
-/* ── Bottom page group (homepage only) — bottom-text + site credit, loaded
-      in together as one unit after a configurable delay (config/master.json's
-      "bottomPageLoadDelayMs", themed via theme.json's theme.bottomText),
-      then permanently pinned to the true bottom of the page as more content
-      lazy-loads in below it. Intentionally NOT overridden in mobile.css —
-      same layout in both modes.
-
-      The version text (.site-credit__version) and "Site designed by…"
-      credit line (.site-credit__text) are NEVER themed — they're fixed,
-      always follow --muted/--text, exactly as before. Only #bottom-text
-      (the configurable bottomText content) is themeable. ── */
-
 .bottom-page {
     position: relative;
     width: 100%;
@@ -21,8 +9,6 @@
     box-sizing: border-box;
 }
 
-/* ── Bottom text ── */
-
 .bottom-text {
     width: 100%;
     max-width: min(
@@ -30,18 +16,10 @@
         calc((100% - var(--blog-sidebar-offset, 64px)) * 0.9)
     );
     margin: 0 auto;
-    /* Fixed, permanent clearance above the absolutely-positioned credit
-       line below — reserves enough room so the two never touch regardless
-       of how long/short the bottom-text is or how it wraps. Growing this
-       margin grows .bottom-page's own height (since .bottom-text drives it
-       in normal flow), which pushes the text upward relative to the
-       credit's fixed bottom:24px anchor. */
     margin-bottom: calc(var(--icon-size, 36px) + 40px);
     padding: 12px 16px;
     box-sizing: border-box;
     text-align: center;
-    background: var(--bottom-text-bg, transparent);
-    border-radius: 10px;
     color: var(--bottom-text-color, var(--page-text-color, var(--text)));
     font-family: var(--bottom-text-font-family, var(--page-font-family, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"));
     font-size: var(--bottom-text-font-size, 15px);
@@ -64,8 +42,6 @@
 .bottom-text a:hover {
     text-decoration: underline;
 }
-
-/* ── Site credit ── */
 
 .site-credit {
     position: absolute;
@@ -98,9 +74,6 @@
     background: #303030;
 }
 
-/* Column of one or two lines — the parent row's align-items: center keeps
-   this whole stack vertically centered against the icon regardless of
-   whether the version line is present. */
 .site-credit__text-wrap {
     display: flex;
     flex-direction: column;

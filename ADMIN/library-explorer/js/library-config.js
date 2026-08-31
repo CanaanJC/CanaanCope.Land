@@ -1,26 +1,8 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Loads ADMIN/library-explorer/library.json and injects it as CSS custom
-// properties:
-//   - --tag-color-<key>       for every entry under "tags"      (highlight.css)
-//   - --media-icon-size       from mediaDisplay.iconSize (px)   (media.css)
-//   - --media-text-size       from mediaDisplay.textSize (px)   (media.css)
-//   - --lib-sidebar-width     from layout.sidebarWidth (px)     (browser.css)
-//   - --preview-mobile-ratio  from preview.mobileAspectRatio    (preview.css)
-//
-// Also exposes the raw loaded sections (getTagColors / getStlDefaults /
-// getMediaDisplay / getLayout / getPreviewConfig) so other modules can pull
-// values directly from library.json instead of ever hardcoding them.
-//
-// Falls back silently (CSS's own :root defaults apply) if library.json is
-// missing or invalid.
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Default used whenever preview.mobileAspectRatio is missing/unparseable.
 const DEFAULT_MOBILE_RATIO = "9:16";
+const DEFAULT_ICON_SIZE = 64;
+const DEFAULT_TEXT_SIZE = 12;
+const DEFAULT_SIDEBAR_WIDTH = 340;
 
-// Parses an "X:Y" string into a CSS aspect-ratio value ("X / Y"). Returns
-// null for anything that isn't two positive finite numbers separated by a
-// colon — the caller falls back to DEFAULT_MOBILE_RATIO.
 export function parseAspectRatio(raw) {
     if (typeof raw !== "string") return null;
     const parts = raw.split(":");
@@ -31,6 +13,15 @@ export function parseAspectRatio(raw) {
     if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return null;
 
     return `${w} / ${h}`;
+}
+
+function toPixels(value, fallback) {
+    if (typeof value === "number" && Number.isFinite(value) && value > 0) return value;
+    if (typeof value === "string") {
+        const n = parseFloat(value.trim());
+        if (Number.isFinite(n) && n > 0) return n;
+    }
+    return fallback;
 }
 
 let _loaded = null;
@@ -60,29 +51,30 @@ export async function loadBlogConfig() {
         }
     }
 
-    if (typeof mediaDisplay.iconSize === "number") {
-        root.style.setProperty("--media-icon-size", `${mediaDisplay.iconSize}px`);
-    }
-    if (typeof mediaDisplay.textSize === "number") {
-        root.style.setProperty("--media-text-size", `${mediaDisplay.textSize}px`);
-    }
-    if (typeof layout.sidebarWidth === "number") {
-        root.style.setProperty("--lib-sidebar-width", `${layout.sidebarWidth}px`);
-    }
+    const iconSize = toPixels(mediaDisplay.iconSize, DEFAULT_ICON_SIZE);
+    const textSize = toPixels(mediaDisplay.textSize, DEFAULT_TEXT_SIZE);
+    const tileWidth = Math.max(iconSize + 20, 56);
 
-    // Mobile preview frame shape — always set, so a malformed/missing value
-    // still lands on a sane portrait default rather than collapsing the
-    // frame entirely.
+    root.style.setProperty("--media-icon-size", `${iconSize}px`);
+    root.style.setProperty("--media-text-size", `${textSize}px`);
+    root.style.setProperty("--media-tile-width", `${tileWidth}px`);
+
+    const sidebarWidth = toPixels(layout.sidebarWidth, DEFAULT_SIDEBAR_WIDTH);
+    root.style.setProperty("--lib-sidebar-width", `${sidebarWidth}px`);
+
     const ratio = parseAspectRatio(previewCfg.mobileAspectRatio) || parseAspectRatio(DEFAULT_MOBILE_RATIO);
     root.style.setProperty("--preview-mobile-ratio", ratio);
 
-    _loaded = { tags, stlDefaults, mediaDisplay, layout, preview: previewCfg };
+    _loaded = {
+        tags,
+        stlDefaults,
+        mediaDisplay: { ...mediaDisplay, iconSize, textSize },
+        layout: { ...layout, sidebarWidth },
+        preview: previewCfg,
+    };
     return _loaded;
 }
 
-// Safe to call synchronously any time after boot() has kicked off
-// loadBlogConfig() — callers that need to guarantee it's loaded first
-// should await loadBlogConfig() themselves.
 export function getTagColors() {
     return (_loaded && _loaded.tags) || {};
 }

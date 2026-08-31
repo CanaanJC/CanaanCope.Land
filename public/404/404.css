@@ -1,6 +1,3 @@
-/* ── 404 page — background/font/text color follow the site theme via
-      base.css's --bg / --page-text-color / --page-font-family, set live
-      by /js/theme.js ── */
 
 html, body {
     height: 100%;

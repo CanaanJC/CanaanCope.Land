@@ -1,7 +1,4 @@
-/* ── Library page-specific styles (projects, small-projects, CrafTech, any
-      other library defined in config/libraries.json) ── */
 
-/* Hide scrollbar */
 
 html, body {
     scrollbar-width: none;
@@ -12,8 +9,6 @@ html::-webkit-scrollbar,
 body::-webkit-scrollbar {
     display: none;
 }
-
-/* Page layout */
 
 :root {
     --library-sidebar-offset: 64px;
@@ -28,8 +23,6 @@ body::-webkit-scrollbar {
     max-width: calc((100% - var(--library-sidebar-offset)) * 0.9);
 }
 
-/* Topbar nav dropdown ("By Month" for date-mode, "Contents" for title-mode) */
-
 #library-nav-dropdown .topbar-dropdown__item {
     background: none;
     border: none;
@@ -40,11 +33,6 @@ body::-webkit-scrollbar {
     font-size: var(--topbar-font-size);
     color: var(--text);
 }
-
-/* Generic tree item — works for date Year/Month or title-mode N-level trees.
-   No max-width/ellipsis here on purpose: the dropdown box itself sizes to
-   the longest item (see topbar.css `.topbar-dropdown__menu { width: max-content }`),
-   so titles are never clipped. */
 
 .topbar-tree-item {
     display: block;
@@ -72,10 +60,6 @@ body::-webkit-scrollbar {
 .topbar-tree-item--leaf:hover {
     color: var(--muted) !important;
 }
-
-/* Indent by nesting depth. data-level="0" is the first (top) grouping level;
-   works for any library depth — add more rules here if you ever go past 6
-   nested levels deep. */
 
 .topbar-tree-item[data-level="0"] { padding-left: 12px !important; }
 .topbar-tree-item[data-level="1"] { padding-left: 24px !important; }

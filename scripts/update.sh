@@ -1,99 +1,5 @@
 #!/usr/bin/env bash
-#
-# scripts/update.sh — self-updater for this repo.
-#
-# Run from anywhere; always operates on the project root (one level up from
-# this script, i.e. this script must live at scripts/update.sh).
-#
-# NOTE: this script requires bash specifically (arrays, [[ ]], BASH_SOURCE,
-# etc. are used throughout) — see the guard immediately below. Running it
-# via `sh scripts/update.sh` (which on many systems is dash, not bash) will
-# now fail fast with a clear message instead of a confusing mid-script
-# syntax error.
-#
-# ── What it does, in order ───────────────────────────────────────────────
-#   1. Checks dependencies (curl, jq, tar, node) — offers to apt-get install
-#      anything missing.
-#   2. Reads config/version.txt (defaults to "0.0.0" if missing) WITHOUT
-#      downloading the repo, and compares it against the latest GitHub
-#      Release's tag using version-aware sort (26.8.1 < 26.8.2 < 26.11.8).
-#      If not newer, exits cleanly with nothing touched.
-#   3. Shows old → new and asks a single y/N confirmation.
-#   4. Runs a real backup (via lib/backup.js's performBackup()), tagged
-#      "update from <old> to <new>", wrapped in a hard timeout.
-#   5. ACTUALLY VERIFIES the backup exists on disk — re-reads the backup's
-#      own manifest.json, finds the entry matching this exact tag, and
-#      confirms its folderPath (and a node.js inside it) really exist.
-#      If the backup failed, timed out, or can't be verified, the script
-#      aborts immediately — nothing else is ever touched.
-#   6. Downloads the new release's full tarball and extracts it to a
-#      scratch temp dir (scripts/.tmp-update, relative to project root —
-#      removed automatically on exit, including Ctrl-C, via trap).
-#   7. Diffs the EXTRACTED release's own config/manifest.txt against the
-#      local copy to find files that existed before but were removed
-#      upstream (done from the downloaded tarball itself, not a separate
-#      raw-file fetch, so it always matches exactly what's about to sync).
-#   8. Prints the full list of files removed upstream (if any) and asks
-#      ONE combined y/N prompt before deleting them locally.
-#   9. Syncs every file listed in the NEW release's manifest into the
-#      project root:
-#        - scripts/update.sh (this script) → updated via a safe
-#                    write-to-temp-file + atomic rename. This is safe even
-#                    while the script is running: rename() only repoints
-#                    the directory entry at a new inode, it never touches
-#                    the inode this process already has open and is
-#                    executing from — so the currently-running process is
-#                    completely unaffected, and the new version takes
-#                    effect on the next run.
-#        - *.json  → deep-merged with an ORDER-PRESERVING merge that
-#                    mirrors lib/siteConfig.js's deepMerge(): any field,
-#                    array, or nested structure that exists in the new
-#                    release but is MISSING locally gets added (appended
-#                    after your existing fields); anything you already
-#                    have on disk is left completely untouched, and the
-#                    original order of your existing keys is never
-#                    changed.
-#        - everything else → added if missing, overwritten if it already
-#                    exists (this is also how config/version.txt itself
-#                    ends up updated — the version number is never set
-#                    explicitly by this script, it's just whatever comes
-#                    out of the sync).
-#  10. Runs a final verification pass: confirms config/version.txt now
-#      reads the target version and that every manifest-listed file
-#      actually exists on disk post-sync.
-#  11. AFTER the sync has completed (so this reads real on-disk files
-#      under config/update-notes/, not the tmp extraction dir), for every
-#      version strictly after LOCAL_VERSION and up to AND INCLUDING
-#      REMOTE_VERSION that has a config/update-notes/<version>.md present
-#      on disk, prints a clickable link AND the note's full contents to
-#      the terminal, oldest → newest, one section per file — always,
-#      regardless of verbosity — so skipping several releases never
-#      misses anything requiring manual steps.
-#  12. Cleans up all temp files (via trap, runs even on error/abort/Ctrl-C)
-#      and prints "done".
-#
-# ── Verbosity ──────────────────────────────────────────────────────────────
-# VERBOSE below controls default output. Leave it "false" for quiet mode
-# (just "backing up" / "backup complete" / delete prompts / "updated
-# files"). Set it to "true" here to always run verbose, OR run the script
-# as `./update.sh verbose` to force verbose for a single run without
-# touching this file.
-#
-# ── Update source ─────────────────────────────────────────────────────────
-# Hardcoded to this project's public GitHub repo. No auth, no env vars,
-# no per-machine setup required.
-#
 
-# ── Require bash ───────────────────────────────────────────────────────────
-#
-# This must be the very first executable statement, before `set -euo
-# pipefail` and before anything else — so that running this script under a
-# non-bash shell (e.g. `sh scripts/update.sh`, where `sh` is often dash)
-# fails immediately with a clear, actionable message instead of an opaque
-# "syntax error near unexpected token" partway through (dash chokes on
-# `[[ ]]`, arrays, and BASH_SOURCE, all used extensively below).
-# `${BASH_VERSION:-}` is safe to reference even under `set -u` / non-bash
-# shells since the default-value form never triggers "unbound variable".
 if [ -z "${BASH_VERSION:-}" ]; then
     echo "update.sh: this script requires bash — it won't run correctly under sh/dash." >&2
     echo "           run it as: bash scripts/update.sh   (or: ./scripts/update.sh)" >&2
@@ -119,41 +25,29 @@ DOWNLOAD_MAX_TIME=300       # 5 minutes hard cap on the whole download
 
 VERBOSE=false # default verbosity — set to true to always print full detail
 
-# `./update.sh verbose` forces full verbose output for this run only,
-# without needing to edit this file.
 if [[ "${1:-}" == "verbose" ]]; then
     VERBOSE=true
 fi
 
-# Prints only when VERBOSE is true.
 vecho() {
     if [[ "${VERBOSE}" == true ]]; then
         echo "$@"
     fi
 }
 
-# Returns 0 (true) if $1 is strictly greater than $2 (low, exclusive lower
-# bound) and less than or equal to $3 (high, inclusive upper bound), using
-# `sort -V` version-aware comparison. Returns 1 (false) otherwise —
-# including the edge case where $1 == $2 (not in range, since low is
-# exclusive).
 in_version_range() {
     local ver="$1" low="$2" high="$3"
 
-    # exclusive lower bound
     if [[ "${ver}" == "${low}" ]]; then
         return 1
     fi
 
-    # ver must be > low: if sort -V puts low on top of [ver, low], ver <= low
     local lowest
     lowest="$(printf '%s\n%s\n' "${ver}" "${low}" | sort -V | head -n1)"
     if [[ "${lowest}" == "${ver}" ]]; then
         return 1
     fi
 
-    # ver must be <= high: if sort -V puts ver on top of [ver, high] and
-    # ver != high, then ver > high
     local highest
     highest="$(printf '%s\n%s\n' "${ver}" "${high}" | sort -V | tail -n1)"
     if [[ "${highest}" == "${ver}" ]] && [[ "${ver}" != "${high}" ]]; then
@@ -162,8 +56,6 @@ in_version_range() {
 
     return 0
 }
-
-# ── Dependency checks ──────────────────────────────────────────────────────────
 
 vecho "update.sh: checking dependencies..."
 
@@ -205,24 +97,6 @@ if [[ ${#MISSING_CMDS[@]} -gt 0 ]]; then
     done
 fi
 
-# ── jq order-preserving deep-merge function ───────────────────────────────────
-#
-# Mirrors lib/siteConfig.js's deepMerge() semantics — LOCAL always wins on
-# any actual conflict — but preserves the ORIGINAL KEY ORDER of the local
-# file exactly as-is, only ever APPENDING genuinely new keys (ones that
-# don't exist locally at all) at the end, rather than re-sorting or
-# rebuilding the object.
-#
-# Rules, for every key across both sides:
-#   - key exists in local only        → kept as-is (local's value, local's position)
-#   - key exists in new only          → appended at the end (new's value)
-#   - key exists in both, both objects→ recurse (so nested new fields get
-#                                        added without disturbing existing
-#                                        sibling keys or their order)
-#   - key exists in both, NOT both objects (arrays, scalars, mismatched
-#     types) → local's value wins wholesale, untouched
-#
-# Invoked as: jq -n -f <(this def) --slurpfile local "$dest" --slurpfile new "$src"
 JQ_DEEPMERGE='
 def deepmerge($local; $new):
     if (($local | type) == "object") and (($new | type) == "object") then
@@ -250,13 +124,6 @@ def deepmerge($local; $new):
 deepmerge($local[0]; $new[0])
 '
 
-# Merges a single JSON file: $dest (existing local copy) is the base whose
-# key order and existing values are always preserved; $src (the new
-# release's copy) only ever contributes fields that are missing locally.
-# If $dest doesn't exist yet, or isn't valid JSON, just copies $src
-# verbatim instead of attempting a merge. If the merge itself fails for
-# some reason, falls back to copying the new file verbatim rather than
-# leaving a half-written/corrupt file on disk.
 merge_json_file() {
     local rel="$1"
     local src="${EXTRACTED_ROOT}/${rel}"
@@ -280,8 +147,6 @@ merge_json_file() {
         vecho "  added: ${rel}"
     fi
 }
-
-# ── Version check (no repo download yet — just version.txt via the API) ──────
 
 LOCAL_VERSION="0.0.0"
 if [[ -f "${VERSION_FILE}" ]]; then
@@ -328,8 +193,6 @@ if [[ ! "${confirm_update}" =~ ^[Yy]$ ]]; then
     echo "update.sh: cancelled — no changes made."
     exit 0
 fi
-
-# ── Backup — must genuinely succeed AND be verified on disk before anything else happens ──
 
 vecho ""
 vecho "update.sh: verifying a backup destination is configured..."
@@ -429,15 +292,11 @@ else
     echo "backup complete"
 fi
 
-# ── Scratch dir setup ──────────────────────────────────────────────────────────
-
 rm -rf "${TMP_DIR}"
 mkdir -p "${TMP_DIR}"
 trap 'rm -rf "${TMP_DIR}"' EXIT
 vecho ""
 vecho "update.sh: scratch/temp files for this run live at ${PROJECT_ROOT}/${TMP_DIR} (auto-deleted on exit, including Ctrl-C)"
-
-# ── Download + extract the new release tarball ────────────────────────────────
 
 vecho ""
 vecho "update.sh: downloading release ${REMOTE_TAG}..."
@@ -445,10 +304,6 @@ vecho "update.sh: downloading release ${REMOTE_TAG}..."
 TARBALL_URL="https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/archive/refs/tags/${REMOTE_TAG}.tar.gz"
 TARBALL_PATH="${TMP_DIR}/release.tar.gz"
 
-# Note: progress meter only shown in verbose mode — a stalled/slow download
-# will still show curl's progress there rather than looking hung. In quiet
-# mode we pass -s to suppress it. Connect and total-time caps ensure it
-# fails loudly instead of hanging indefinitely either way.
 CURL_DOWNLOAD_FLAGS=(-fL)
 if [[ "${VERBOSE}" != true ]]; then
     CURL_DOWNLOAD_FLAGS+=(-s)
@@ -469,7 +324,6 @@ mkdir -p "${EXTRACT_DIR}"
 vecho "update.sh: extracting..."
 tar -xzf "${TARBALL_PATH}" -C "${EXTRACT_DIR}"
 
-# GitHub tarballs contain exactly one top-level folder (e.g. repo-26.8.0/).
 EXTRACTED_ROOT="$(find "${EXTRACT_DIR}" -mindepth 1 -maxdepth 1 -type d | head -n1)"
 
 if [[ -z "${EXTRACTED_ROOT}" ]]; then
@@ -481,10 +335,6 @@ if [[ ! -f "${EXTRACTED_ROOT}/${MANIFEST_FILE}" ]]; then
     echo "update.sh: new release has no ${MANIFEST_FILE} — cannot safely determine which files to sync. Aborting." >&2
     exit 1
 fi
-
-# ── Manifest diff — find files removed upstream, using the DOWNLOADED release's
-#    own manifest.txt (not a separate raw-file fetch) so this always exactly
-#    matches what's about to be synced ─────────────────────────────────────────
 
 echo ""
 echo "update.sh: checking for files removed in the new release..."
@@ -503,8 +353,6 @@ else
     echo "update.sh: no local ${MANIFEST_FILE} found — skipping removed-file detection (nothing to diff against)."
 fi
 
-# ── Deletion — single combined confirmation, then delete if approved ─────────
-
 if [[ -n "${REMOVED_FILES}" ]]; then
     echo ""
     echo "update.sh: the files listed above no longer exist in the new release."
@@ -521,15 +369,6 @@ if [[ -n "${REMOVED_FILES}" ]]; then
         echo "update.sh: keeping removed-upstream files as-is."
     fi
 fi
-
-# ── Sync every manifest-listed file — merge JSON, add/overwrite everything else ──
-#
-# scripts/update.sh (this running script) is updated via write-to-temp +
-# atomic rename instead of an in-place overwrite. rename() only repoints
-# the directory entry at a new inode; it never touches the inode this
-# process already has open and is executing from, so the currently-running
-# process is completely safe, and the new script takes effect on the next
-# run.
 
 vecho ""
 vecho "update.sh: syncing files (JSON files are order-preserving deep-merged; everything else is added/overwritten)..."
@@ -578,8 +417,6 @@ else
     echo "updated files"
 fi
 
-# ── Final verification ────────────────────────────────────────────────────────
-
 vecho ""
 vecho "update.sh: running final verification..."
 
@@ -613,14 +450,6 @@ if [[ ${VERIFY_OK} -eq 1 ]]; then
 else
     echo "update.sh: verification found issues (see warnings above) — review before trusting this update." >&2
 fi
-
-# ── Update notes — every version between local and target, INCLUSIVE of target ──
-#
-# Runs AFTER the sync above, and reads directly from the real on-disk
-# config/update-notes/ directory in the project root (NOT the tmp
-# extraction dir) — so this reflects exactly what's actually on disk right
-# now, post-sync, including any notes files that were just added by this
-# very update.
 
 NOTES_FOUND=0
 NOTES_DIR="${PROJECT_ROOT}/config/update-notes"

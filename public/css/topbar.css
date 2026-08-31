@@ -3,10 +3,6 @@
     --topbar-bg: #202020;
     --slogan-font-size: 20px;
     --slogan-color: var(--muted);
-    /* --topbar-font-family / --slogan-font-family / --topbar-text-color are
-       only ever set at runtime by theme.js (theme.topbar / theme.topbar.slogan).
-       When unset, the var() fallbacks below apply immediately at first
-       paint — system-ui stack / var(--text) — zero flash. */
 }
 
 .topbar {
@@ -21,8 +17,6 @@
     z-index: 900;
     display: flex;
     align-items: center;
-    /* Full font control (theme.topbar.font), falls back to the system-ui
-       stack if no custom topbar font is configured. */
     font-family: var(--topbar-font-family, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji");
 }
 
@@ -42,8 +36,6 @@
     display: none;
 }
 
-/* ── Logo ── */
-
 .topbar-logo {
     display: flex;
     align-items: center;
@@ -53,10 +45,6 @@
     text-decoration: none;
 }
 
-/* object-fit: cover — a remote/local image of any aspect ratio (16:9,
-   portrait, etc.) is zoomed/cropped so the entire square slot is filled,
-   with no letterboxing. Only the .fallback state (generic placeholder SVG)
-   stays "contain" below, since that glyph should never be cropped. */
 .topbar-logo__img {
     height: 36px;
     width: 36px;
@@ -70,8 +58,6 @@
     background: #2a2a2a;
     padding: 2px;
 }
-
-/* ── Dropdown ── */
 
 .topbar-dropdown {
     position: relative;
@@ -154,7 +140,6 @@
     justify-content: center;
 }
 
-/* object-fit: cover — same zoom-to-fill behavior as the topbar logo above. */
 .topbar-dropdown__icon {
     width: 18px;
     height: 18px;
@@ -171,8 +156,6 @@
 .topbar-dropdown__name {
     flex: 1 1 auto;
 }
-
-/* ── Slogan ── */
 
 .topbar-slogan {
     position: absolute;

@@ -55,9 +55,6 @@ function buildCreditBlock(version) {
     img.alt = "Canaan Copeland";
     img.loading = "lazy";
 
-    // Both lines live in their own column so the pair, together, stay
-    // vertically centered against the icon regardless of whether the
-    // version line is present.
     const textWrap = document.createElement("span");
     textWrap.className = "site-credit__text-wrap";
 
@@ -78,9 +75,6 @@ function buildCreditBlock(version) {
     return link;
 }
 
-// Builds the single combined group — bottom-text (if configured) stacked
-// above the credit line, both inside one wrapper so they always move/load
-// together as a unit, at the same visual elevation.
 function buildGroup(bottomText, version) {
     const group = document.createElement("div");
     group.id = "bottom-page";
@@ -94,14 +88,6 @@ function buildGroup(bottomText, version) {
     return group;
 }
 
-// Keeps `group` pinned as the LAST child of `container` forever — not just
-// once at load time. The homepage keeps lazy-loading featured project
-// content further down as the user scrolls (see featured.js), so a single
-// one-time placement would eventually end up sitting above newly-loaded
-// content instead of below it. This re-appends the group any time
-// something else lands after it, and nothing else — no repeated
-// self-triggering, no fighting with a second observer (there's only ever
-// one group now, so there's nothing to ping-pong against).
 function pinToBottomForever(container, group) {
     let pinning = false;
 
@@ -111,9 +97,6 @@ function pinToBottomForever(container, group) {
 
         pinning = true;
         container.appendChild(group); // re-appending an existing node moves it
-        // Let this mutation (our own move) finish flushing to the observer's
-        // queue before allowing the guard to reopen, so it never reacts to
-        // its own move as if it were new content.
         setTimeout(() => { pinning = false; }, 0);
     });
 
@@ -135,9 +118,6 @@ async function init() {
         await loadMarked();
     }
 
-    // Single hardcoded (config-driven) delay before this group ever appears
-    // at all — purely cosmetic, avoids any flicker while the rest of the
-    // homepage is still loading/settling.
     setTimeout(() => {
         const group = buildGroup(bottomText, version);
         container.appendChild(group);

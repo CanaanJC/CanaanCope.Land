@@ -12,11 +12,6 @@ let _isMobile   = false;
 let _columnEls  = []; // in DOM order, one per column
 let _menuOpen   = false;
 
-// Inline fallback icon — same shape used across the public site (topbar.js /
-// sidebar.js / logo-uploader) for missing images. Shown here whenever either
-// header logo (Public Page / Local Page) fails to load — most commonly
-// because this is a fresh checkout of the repo with no media/logo.png yet
-// (media/ is gitignored), but also covers any other load failure.
 const FALLBACK_ICON =
     'data:image/svg+xml;charset=UTF-8,' +
     encodeURIComponent(`
@@ -35,28 +30,13 @@ function attachLogoFallback(imgEl) {
     });
 }
 
-// Wire up the fallback immediately so it applies no matter when/whether
-// loadHeader() ever successfully sets a real src.
 attachLogoFallback(domainLogoEl);
 attachLogoFallback(localLogoEl);
 
-function applyTheme(theme) {
-    const root = document.documentElement;
-    if (theme.backgroundColor) root.style.setProperty("--admin-bg", theme.backgroundColor);
-    if (theme.page?.textColor) root.style.setProperty("--admin-text", theme.page.textColor);
-    if (theme.page?.fontFamily) root.style.setProperty("--admin-font", theme.page.fontFamily);
-    if (theme.topbar?.backgroundColor) root.style.setProperty("--admin-panel-bg", theme.topbar.backgroundColor);
-}
-
-// Hides a logo/link pair entirely rather than leaving a broken image icon
-// and a dead "#" link (which just reloads the current admin page) if its
-// target couldn't be determined.
 function hideHeaderLink(linkEl) {
     linkEl.style.visibility = "hidden";
 }
 
-// Sets a logo <img>'s src to a real URL, clearing any previously-applied
-// fallback styling so it displays normally if this URL loads successfully.
 function setLogoSrc(imgEl, src) {
     imgEl.classList.remove("admin-logo--fallback");
     imgEl.src = src;
@@ -76,13 +56,11 @@ async function loadHeader() {
             }),
         ]);
     } catch (e) {
-        console.error("Admin: failed to load header/theme — check the server terminal for the actual error:", e);
+        console.error("Admin: failed to load header — check the server terminal for the actual error:", e);
         hideHeaderLink(domainLinkEl);
         hideHeaderLink(localLinkEl);
         return;
     }
-
-    applyTheme(config.theme || {});
 
     const publicPort = config.hosting?.port;
     const logoRelPath = "/media/logo.png";
@@ -105,14 +83,6 @@ async function loadHeader() {
     }
 }
 
-// Optional per-element config.json — sits next to element.html/css/js inside
-// each /ADMIN/elements/<name>/ folder. Not every element has one (a plain
-// 404/failed fetch just means "no config" and the element gets `null`).
-// This is how a generic "edit this JSON file" element (e.g. the "master.json"
-// element) learns which file it's actually pointed at (its "target") and,
-// optionally, what title to display instead of that raw path (its "name")
-// — all without any code changes. Copy the folder, rename it, edit its
-// config.json.
 async function loadElementConfig(name) {
     try {
         const res = await fetch(`/elements/${name}/config.json`);
@@ -134,7 +104,6 @@ async function loadElementInto(panelEl, name) {
 
         const elementConfig = await loadElementConfig(name);
 
-        // Shared core CSS/JS — always loaded, once each.
         if (!document.querySelector('link[data-json-core-css]')) {
             const coreLink = document.createElement("link");
             coreLink.rel = "stylesheet";
@@ -146,9 +115,6 @@ async function loadElementInto(panelEl, name) {
         const { default: initJsonEditor } = await import("/elements/lib/js/json.js");
         const core = initJsonEditor(panelEl, elementConfig);
 
-        // Optional per-element extension — element.js/element.css. Absence
-        // of either is completely normal (master.json, topbar.json,
-        // admin-master.json ship with neither).
         const cssHref = `${base}.css`;
         const cssCheck = await fetch(cssHref, { method: "HEAD" }).catch(() => null);
         if (cssCheck && cssCheck.ok) {
@@ -172,15 +138,6 @@ async function loadElementInto(panelEl, name) {
     }
 }
 
-
-// ── Responsive column layout ─────────────────────────────────────────────────
-//
-// Desktop: N columns side by side, each ~100/N% wide (inline width, set once
-// after load). Mobile (≤768px, same breakpoint as the public site's
-// mobile.js): a single full-width column stacking every column's panels on
-// top of each other in order — handled purely with a body class + CSS so no
-// DOM rebuild/element re-init is needed when the breakpoint is crossed.
-
 function checkMobile() {
     return window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches;
 }
@@ -193,15 +150,12 @@ function applyResponsiveLayout() {
     document.body.classList.toggle("admin-mobile", _isMobile);
 
     if (_isMobile) {
-        // Let CSS (body.admin-mobile .admin-column) drive full width.
         _columnEls.forEach(el => { el.style.width = ""; });
     } else {
         const width = _columnEls.length > 0 ? `${100 / _columnEls.length}%` : "100%";
         _columnEls.forEach(el => { el.style.width = width; });
     }
 }
-
-// ── Server size badge (top-right, left of the burger) ───────────────────────
 
 function buildServerSizeBadge() {
     const badge = document.createElement("div");
@@ -223,8 +177,6 @@ function buildServerSizeBadge() {
             badge.textContent = "? GB";
         });
 }
-
-// ── Slide-out panel menu (mirrors the public site's mobile hamburger menu) ──
 
 function buildAdminMenuShell() {
     const burger = document.createElement("button");
@@ -291,10 +243,6 @@ function toggleAdminMenu() {
     else openAdminMenu();
 }
 
-// Builds the flat menu list — first column's panels, then the next
-// column's, etc., matching the order panels appear in config/master.json.
-// Labels use each panel's own rendered <h2> when available, falling back to
-// the raw element name.
 function populateAdminMenu(panelRegistry) {
     const list = document.getElementById("adminMenuList");
     if (!list) return;
@@ -324,8 +272,6 @@ document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && _menuOpen) closeAdminMenu();
 });
 
-// ── Column/panel building ────────────────────────────────────────────────────
-
 async function buildColumns() {
     let layout;
     try {
@@ -337,8 +283,6 @@ async function buildColumns() {
 
     const columns = Array.isArray(layout.columns) ? layout.columns : [];
 
-    // Recognize mobile before the very first paint of columns, so panels
-    // never briefly show a squeezed multi-column layout on small screens.
     _isMobile = checkMobile();
     document.body.classList.toggle("admin-mobile", _isMobile);
     const width = (!_isMobile && columns.length > 0) ? `${100 / columns.length}%` : "";
@@ -368,8 +312,6 @@ async function buildColumns() {
     buildAdminMenuShell();
     populateAdminMenu(panelRegistry);
 }
-
-// ── Resize handling ──────────────────────────────────────────────────────────
 
 window.addEventListener("resize", () => {
     clearTimeout(window.__adminResizeTimer);
