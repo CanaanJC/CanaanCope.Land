@@ -43,24 +43,13 @@ tar -xzf "${TMP_TARBALL}" -C "${DEST_DIR}" --strip-components=1
 echo "installer.sh: cleaning up leftover files..."
 rm -f "${TMP_TARBALL}"
 
+if [[ -d "${DEST_DIR}/scripts" ]]; then
+    chmod +x "${DEST_DIR}/scripts/"*.sh 2>/dev/null || true
+fi
+
 echo "installer.sh: done. Files extracted to ${DEST_DIR}"
-
 echo ""
-if [[ -r /dev/tty ]]; then
-    read -rp "Do you want to start the server now? [y/N]: " START_NOW < /dev/tty
-else
-    START_NOW="n"
-fi
+echo "To install and set up run sudo ./scripts/run.sh"
+echo ""
 
-if [[ "${START_NOW}" =~ ^[Yy]$ ]]; then
-    echo "installer.sh: starting the server now (sudo ./scripts/run.sh)..."
-    cd "${DEST_DIR}/scripts"
-    sudo ./run.sh
-else
-    echo "installer.sh: not starting now."
-    echo ""
-    echo "When you're ready to start the server, run:"
-    echo ""
-    echo "    sudo ./scripts/run.sh"
-    echo ""
-fi
+exit 0

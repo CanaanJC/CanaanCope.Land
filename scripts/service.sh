@@ -3,16 +3,13 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJ_PATH="$(cd "${SCRIPT_DIR}/.." && pwd)"
-CMD="node node.js"
+SERVICE_NAME_FILE="${SCRIPT_DIR}/service-name.txt"
+LEGACY_NAME_FILE="${SCRIPT_DIR}/.service-name"
+SERVICE_META_FILE="${SCRIPT_DIR}/service-meta.env"
 
 if [[ "${EUID}" -ne 0 ]]; then
     echo "service.sh: this script must be run with sudo (systemctl requires root)." >&2
     echo "            try: sudo ./scripts/service.sh" >&2
-    exit 1
-fi
-
-if ! command -v node >/dev/null 2>&1; then
-    echo "service.sh: node is required (used to read siteName from config/master.json)." >&2
     exit 1
 fi
 
@@ -21,176 +18,150 @@ if ! command -v systemctl >/dev/null 2>&1; then
     exit 1
 fi
 
-derive_name() {
-    local master_json="${PROJ_PATH}/config/master.json"
-    local package_json="${PROJ_PATH}/package.json"
-    local name=""
+SERVICE_NAME=""
 
-    if [[ -f "${master_json}" ]]; then
-        name="$(node -e "
-            try {
-                const c = JSON.parse(require('fs').readFileSync('${master_json}', 'utf-8'));
-                if (c && typeof c.siteName === 'string' && c.siteName.trim()) {
-                    process.stdout.write(c.siteName.trim());
-                }
-            } catch {}
-        " 2>/dev/null || true)"
+if [[ -f "${SERVICE_NAME_FILE}" ]]; then
+    SERVICE_NAME="$(tr -d '[:space:]' < "${SERVICE_NAME_FILE}" || true)"
+elif [[ -f "${LEGACY_NAME_FILE}" ]]; then
+    SERVICE_NAME="$(tr -d '[:space:]' < "${LEGACY_NAME_FILE}" || true)"
+    if [[ -n "${SERVICE_NAME}" ]]; then
+        echo "${SERVICE_NAME}" > "${SERVICE_NAME_FILE}"
     fi
+fi
 
-    if [[ -z "${name}" && -f "${package_json}" ]]; then
-        name="$(node -e "
-            try {
-                const p = JSON.parse(require('fs').readFileSync('${package_json}', 'utf-8'));
-                if (p && typeof p.name === 'string' && p.name.trim()) {
-                    process.stdout.write(p.name.trim());
-                }
-            } catch {}
-        " 2>/dev/null || true)"
-    fi
+if [[ -z "${SERVICE_NAME}" ]]; then
+    echo "service.sh: no service name found." >&2
+    echo "            expected ${SERVICE_NAME_FILE}" >&2
+    echo "            run the installer first: sudo ./scripts/run.sh" >&2
+    exit 1
+fi
 
-    if [[ -z "${name}" ]]; then
-        name="$(basename "${PROJ_PATH}")"
-    fi
+UNIT_NAME="${SERVICE_NAME}.service"
+UNIT_FILE="/etc/systemd/system/${UNIT_NAME}"
 
-    if [[ -z "${name}" ]]; then
-        name="node-project"
-    fi
+if [[ ! -f "${UNIT_FILE}" ]]; then
+    echo "service.sh: service \"${SERVICE_NAME}\" is registered here but ${UNIT_FILE} does not exist." >&2
+    echo "            re-run: sudo ./scripts/run.sh" >&2
+    exit 1
+fi
 
-    echo "${name}"
-}
+UNIT_WORKDIR="$(sed -n 's/^WorkingDirectory=//p' "${UNIT_FILE}" | head -n1)"
+UNIT_EXEC="$(sed -n 's/^ExecStart=//p' "${UNIT_FILE}" | head -n1)"
+UNIT_USER="$(sed -n 's/^User=//p' "${UNIT_FILE}" | head -n1)"
 
-NAME="$(derive_name)"
-SLUG="$(echo "${NAME}" | tr '[:upper:]' '[:lower:]' | tr -c '[:alnum:]' '-' | sed 's/-\+/-/g; s/^-//; s/-$//')"
-[[ -z "${SLUG}" ]] && SLUG="node-project"
-SERVICE_NAME="${SLUG}"
-UNIT_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
-
-RUN_AS_USER="${SUDO_USER:-$(logname 2>/dev/null || echo "$USER")}"
-
-resolve_cmd() {
-    local first_word rest resolved
-    first_word="$(echo "${CMD}" | awk '{print $1}')"
-    rest="$(echo "${CMD}" | cut -d' ' -f2-)"
-    if [[ "${rest}" == "${first_word}" ]]; then rest=""; fi
-
-    case "${first_word}" in
-        /*)
-            resolved="${first_word}"
-            ;;
-        ./*|../*)
-            resolved="$(cd "${PROJ_PATH}" && realpath -m "${first_word}")"
-            ;;
-        *)
-            if command -v "${first_word}" >/dev/null 2>&1; then
-                resolved="$(command -v "${first_word}")"
-            else
-                resolved="$(cd "${PROJ_PATH}" && realpath -m "./${first_word}")"
-            fi
-            ;;
-    esac
-
-    if [[ -n "${rest}" ]]; then
-        echo "${resolved} ${rest}"
-    else
-        echo "${resolved}"
-    fi
-}
-
-generate_unit() {
-    local exec_cmd
-    exec_cmd="$(resolve_cmd)"
-
-    tee "${UNIT_FILE}" > /dev/null <<EOF
-[Unit]
-Description=${NAME} service
-After=network.target
-
-[Service]
-Type=simple
-WorkingDirectory=${PROJ_PATH}
-ExecStart=${exec_cmd}
-Restart=on-failure
-RestartSec=3
-KillMode=control-group
-KillSignal=SIGTERM
-TimeoutStopSec=5
-SendSIGKILL=yes
-User=${RUN_AS_USER}
-
-[Install]
-WantedBy=multi-user.target
-EOF
-    systemctl daemon-reload
-}
+META_PROJECT_ROOT=""
+if [[ -f "${SERVICE_META_FILE}" ]]; then
+    META_PROJECT_ROOT="$(sed -n 's/^PROJECT_ROOT=//p' "${SERVICE_META_FILE}" | head -n1)"
+fi
 
 do_start() {
-    generate_unit
     echo "Starting ${SERVICE_NAME}..."
-    systemctl start "${SERVICE_NAME}"
-    systemctl status "${SERVICE_NAME}" --no-pager -l || true
+    systemctl reset-failed "${UNIT_NAME}" 2>/dev/null || true
+    systemctl start "${UNIT_NAME}"
+    systemctl status "${UNIT_NAME}" --no-pager -l || true
 }
 
 do_stop() {
     echo "Stopping ${SERVICE_NAME}..."
-    systemctl stop "${SERVICE_NAME}" 2>/dev/null || true
-    if systemctl is-active --quiet "${SERVICE_NAME}" 2>/dev/null; then
+    systemctl stop "${UNIT_NAME}" 2>/dev/null || true
+    if systemctl is-active --quiet "${UNIT_NAME}" 2>/dev/null; then
         echo "Still running, force killing..."
-        systemctl kill --signal=SIGKILL "${SERVICE_NAME}"
+        systemctl kill --signal=SIGKILL "${UNIT_NAME}" 2>/dev/null || true
+        sleep 1
     fi
-    pkill -9 -f "$(basename "${CMD}")" 2>/dev/null || true
+    systemctl reset-failed "${UNIT_NAME}" 2>/dev/null || true
     echo "Stopped."
 }
 
+do_restart() {
+    echo "Restarting ${SERVICE_NAME}..."
+    systemctl reset-failed "${UNIT_NAME}" 2>/dev/null || true
+    systemctl restart "${UNIT_NAME}"
+    systemctl status "${UNIT_NAME}" --no-pager -l || true
+}
+
 do_enable() {
-    generate_unit
-    systemctl enable "${SERVICE_NAME}"
+    systemctl enable "${UNIT_NAME}"
     echo "Enabled ${SERVICE_NAME} on boot."
 }
 
 do_disable() {
-    systemctl disable "${SERVICE_NAME}" 2>/dev/null || true
+    systemctl disable "${UNIT_NAME}" 2>/dev/null || true
     echo "Disabled ${SERVICE_NAME} from starting on boot."
 }
 
-do_logs() {
-    echo "Tailing logs for ${SERVICE_NAME} (Ctrl+C to exit)..."
-    journalctl -u "${SERVICE_NAME}" -f -n 100
+do_server_logs() {
+    echo "Tailing SERVER output for ${SERVICE_NAME} (node stdout/stderr only, Ctrl+C to exit)..."
+    echo ""
+    journalctl -u "${UNIT_NAME}" -t "${SERVICE_NAME}" -o cat -n 200 -f
+}
+
+do_service_logs() {
+    echo "Tailing SERVICE logs for ${UNIT_NAME} (systemd unit events, Ctrl+C to exit)..."
+    echo ""
+    journalctl -u "${UNIT_NAME}" _COMM=systemd -n 200 -f
 }
 
 do_status() {
-    local active_state enabled_state
-    active_state="$(systemctl is-active "${SERVICE_NAME}" 2>/dev/null || echo "unknown")"
-    enabled_state="$(systemctl is-enabled "${SERVICE_NAME}" 2>/dev/null || echo "not enabled")"
+    local active_state enabled_state main_pid since
+    active_state="$(systemctl is-active "${UNIT_NAME}" 2>/dev/null | head -n1 || echo "unknown")"
+    enabled_state="$(systemctl is-enabled "${UNIT_NAME}" 2>/dev/null | head -n1 || echo "not-enabled")"
+    main_pid="$(systemctl show -p MainPID --value "${UNIT_NAME}" 2>/dev/null || echo "0")"
+    since="$(systemctl show -p ActiveEnterTimestamp --value "${UNIT_NAME}" 2>/dev/null || true)"
+
+    [[ -z "${active_state}" ]] && active_state="unknown"
+    [[ -z "${enabled_state}" ]] && enabled_state="not-enabled"
 
     case "${active_state}" in
-        active) echo "Status: RUNNING" ;;
+        active) echo "Status: RUNNING (pid ${main_pid})" ;;
         *) echo "Status: NOT RUNNING (${active_state})" ;;
     esac
 
     case "${enabled_state}" in
-        enabled) echo "Boot:   ENABLED" ;;
+        enabled|enabled-runtime) echo "Boot:   ENABLED" ;;
         *) echo "Boot:   DISABLED (${enabled_state})" ;;
     esac
+
+    [[ -n "${since}" && "${active_state}" == "active" ]] && echo "Since:  ${since}"
+    echo "Unit:   ${UNIT_FILE}"
 }
 
-echo "Service: ${NAME}"
-echo "Project: ${PROJ_PATH}"
-echo "Command: ${CMD}"
+echo "Service: ${SERVICE_NAME}"
+echo "Unit:    ${UNIT_NAME}"
+echo "Project: ${UNIT_WORKDIR:-${PROJ_PATH}}"
+echo "Command: ${UNIT_EXEC:-unknown}"
+echo "User:    ${UNIT_USER:-root}"
+
+if [[ -n "${UNIT_WORKDIR}" && ! -d "${UNIT_WORKDIR}" ]]; then
+    echo ""
+    echo "WARNING: WorkingDirectory ${UNIT_WORKDIR} does not exist — the service cannot start."
+    echo "         re-run: sudo ./scripts/run.sh"
+fi
+
+if [[ -n "${META_PROJECT_ROOT}" && "${META_PROJECT_ROOT}" != "${PROJ_PATH}" ]]; then
+    echo ""
+    echo "WARNING: this unit was registered for ${META_PROJECT_ROOT} but you are running from ${PROJ_PATH}."
+fi
+
 echo
 echo "1) Stop"
 echo "2) Disable"
 echo "3) Start"
 echo "4) Enable"
-echo "5) View live logs"
-echo "6) Status"
-read -rp "Choose an option [1-6]: " choice
+echo "5) View live server logs"
+echo "6) View live service logs"
+echo "7) Status"
+echo "8) Restart"
+read -rp "Choose an option [1-8]: " choice
 
 case "${choice}" in
     1) do_stop ;;
     2) do_disable ;;
     3) do_start ;;
     4) do_enable ;;
-    5) do_logs ;;
-    6) do_status ;;
+    5) do_server_logs ;;
+    6) do_service_logs ;;
+    7) do_status ;;
+    8) do_restart ;;
     *) echo "Invalid option" ;;
 esac

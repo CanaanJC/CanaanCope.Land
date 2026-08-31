@@ -3,7 +3,9 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 PROJECT_ROOT="$(pwd)"
-SERVICE_NAME_FILE="scripts/.service-name"
+STATE_DIR="${PROJECT_ROOT}/scripts"
+SERVICE_NAME_FILE="${STATE_DIR}/service-name.txt"
+SERVICE_META_FILE="${STATE_DIR}/service-meta.env"
 
 if [[ "${EUID}" -ne 0 ]]; then
     echo "run.sh: this script must be run with sudo (it needs to write to /etc/systemd/system/)." >&2
@@ -111,6 +113,13 @@ fi
 
 echo "run.sh: npm install complete."
 
+PREVIOUS_SERVICE_NAME=""
+if [[ -f "${SERVICE_NAME_FILE}" ]]; then
+    PREVIOUS_SERVICE_NAME="$(tr -d '[:space:]' < "${SERVICE_NAME_FILE}" || true)"
+elif [[ -f "${STATE_DIR}/.service-name" ]]; then
+    PREVIOUS_SERVICE_NAME="$(tr -d '[:space:]' < "${STATE_DIR}/.service-name" || true)"
+fi
+
 echo ""
 read -rp "Enter a name for this service (e.g. \"canaancope\"): " SERVICE_NAME
 
@@ -136,11 +145,46 @@ if [[ -f "${UNIT_PATH}" ]]; then
     fi
 fi
 
-mkdir -p "$(dirname "${SERVICE_NAME_FILE}")"
-echo "${SERVICE_NAME}" > "${SERVICE_NAME_FILE}"
-echo "run.sh: saved service name to ${SERVICE_NAME_FILE}"
+if [[ -n "${PREVIOUS_SERVICE_NAME}" && "${PREVIOUS_SERVICE_NAME}" != "${SERVICE_NAME}" ]]; then
+    OLD_UNIT="/etc/systemd/system/${PREVIOUS_SERVICE_NAME}.service"
+    if [[ -f "${OLD_UNIT}" ]]; then
+        echo ""
+        echo "run.sh: this project was previously registered as \"${PREVIOUS_SERVICE_NAME}\"."
+        read -rp "Stop, disable, and remove the old \"${PREVIOUS_SERVICE_NAME}\" service? [y/N]: " confirm_cleanup
+        if [[ "${confirm_cleanup}" =~ ^[Yy]$ ]]; then
+            systemctl stop "${PREVIOUS_SERVICE_NAME}" 2>/dev/null || true
+            systemctl disable "${PREVIOUS_SERVICE_NAME}" 2>/dev/null || true
+            systemctl reset-failed "${PREVIOUS_SERVICE_NAME}" 2>/dev/null || true
+            rm -f "${OLD_UNIT}"
+            systemctl daemon-reload
+            echo "run.sh: removed ${OLD_UNIT}"
+        else
+            echo "run.sh: leaving the old service in place."
+        fi
+    fi
+fi
 
 NODE_BIN="$(command -v node)"
+EXEC_START="${NODE_BIN} ${PROJECT_ROOT}/node.js"
+
+mkdir -p "${STATE_DIR}"
+echo "${SERVICE_NAME}" > "${SERVICE_NAME_FILE}"
+rm -f "${STATE_DIR}/.service-name"
+
+cat > "${SERVICE_META_FILE}" <<EOF
+SERVICE_NAME=${SERVICE_NAME}
+UNIT_PATH=${UNIT_PATH}
+PROJECT_ROOT=${PROJECT_ROOT}
+RUN_AS_USER=${INVOKING_USER}
+EXEC_START=${EXEC_START}
+EOF
+
+if [[ "${INVOKING_USER}" != "root" ]]; then
+    chown "${INVOKING_USER}:${INVOKING_USER}" "${SERVICE_NAME_FILE}" "${SERVICE_META_FILE}" 2>/dev/null || true
+fi
+
+echo "run.sh: saved service name to ${SERVICE_NAME_FILE}"
+echo "run.sh: saved service metadata to ${SERVICE_META_FILE}"
 
 echo ""
 echo "run.sh: writing ${UNIT_PATH}..."
@@ -155,9 +199,13 @@ Wants=network-online.target
 Type=simple
 User=${INVOKING_USER}
 WorkingDirectory=${PROJECT_ROOT}
-ExecStart=${NODE_BIN} ${PROJECT_ROOT}/node.js
+ExecStart=${EXEC_START}
 Restart=on-failure
 RestartSec=5
+KillMode=control-group
+KillSignal=SIGTERM
+TimeoutStopSec=5
+SendSIGKILL=yes
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=${SERVICE_NAME}
@@ -172,8 +220,9 @@ echo ""
 echo "run.sh: reloading systemd, enabling, and starting \"${SERVICE_NAME}\"..."
 
 systemctl daemon-reload
+systemctl reset-failed "${SERVICE_NAME}" 2>/dev/null || true
 systemctl enable "${SERVICE_NAME}"
-systemctl start "${SERVICE_NAME}"
+systemctl restart "${SERVICE_NAME}"
 
 echo ""
 echo "run.sh: done. Current status:"
