@@ -5,8 +5,8 @@
     "bottomText": "",
     "hosting": {
         "host": "0.0.0.0",
-        "port": 2138,
-        "adminPort": 1832
+        "port": 9138,
+        "adminPort": 9832
     },
     "webhooks": {
         "notFound": "",
