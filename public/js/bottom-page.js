@@ -67,7 +67,7 @@ function buildCreditBlock(version) {
 
     const text = document.createElement("span");
     text.className = "site-credit__text";
-    text.textContent = "Site designed by Canaan Copeland";
+    text.textContent = "Site designed by Canaan Copeland 🇨🇦";
     textWrap.appendChild(text);
 
     link.appendChild(img);
