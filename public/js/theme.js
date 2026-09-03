@@ -5,6 +5,30 @@ const THEME_URL = "/config/theme.json";
 const SYSTEM_FONT_STACK = 'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"';
 const MONO_FONT_STACK   = '"JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace';
 
+/* --- Anti-flicker reveal ---------------------------------------------------
+   base.css hides <html> until we add the .theme-ready class. We reveal the
+   page only AFTER the configured theme has been applied (or after we've
+   fallen back to the built-in defaults), so users never see a flash of the
+   default theme before the real one loads. A safety timeout guarantees the
+   page can never stay hidden forever if the theme fetch hangs. */
+let _revealed = false;
+let _revealTimer = null;
+
+function revealPage() {
+    if (_revealed) return;
+    _revealed = true;
+    if (_revealTimer) {
+        clearTimeout(_revealTimer);
+        _revealTimer = null;
+    }
+    document.documentElement.classList.add("theme-ready");
+}
+
+_revealTimer = setTimeout(() => {
+    console.warn("Theme: reveal safety timeout hit — showing page with whatever theme is applied.");
+    revealPage();
+}, 2500);
+
 function setFavicon(href) {
     if (!href) return;
     let link = document.querySelector('link[rel="icon"]');
@@ -75,9 +99,10 @@ function applyThemeVars(theme) {
     const root = document.documentElement.style;
 
     const body = theme.body || {};
-    setOrClear(root, "--bg",               body.backgroundColor);
-    setOrClear(root, "--page-text-color",  body.textColor);
-    setOrClear(root, "--page-font-size",   px(body.fontSize));
+    setOrClear(root, "--bg",                 body.backgroundColor);
+    setOrClear(root, "--page-text-color",    body.textColor);
+    setOrClear(root, "--page-font-size",     px(body.fontSize));
+    setOrClear(root, "--blog-divider-color", body.dividerColor);
 
     const topbar = theme.topbar || {};
     setOrClear(root, "--topbar-bg",         topbar.backgroundColor);
@@ -122,7 +147,9 @@ async function loadTheme() {
 
         window.__SITE_THEME__ = data;
     } catch (err) {
-        console.error("Theme: failed to load theme.json:", err);
+        console.error("Theme: failed to load theme.json — falling back to defaults:", err);
+    } finally {
+        revealPage();
     }
 }
 

@@ -39,6 +39,8 @@ body.mobile .sidebar {
     display: none !important;
 }
 
+/* The mobile burger is part of the sidebar UI, so it uses the sidebar
+   background, its derived border shade, and its derived highlight shade. */
 .mobile-burger {
     display: none;
 }
@@ -52,8 +54,8 @@ body.mobile .mobile-burger {
     height: var(--mobile-burger-size);
     align-items: center;
     justify-content: center;
-    background: #202020;
-    border: 1px solid #2a2a2a;
+    background: var(--sidebar-bg);
+    border: 1px solid var(--sidebar-border);
     border-radius: 12px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
     cursor: pointer;
@@ -65,7 +67,7 @@ body.mobile .mobile-burger {
 
 body.mobile .mobile-burger:hover,
 body.mobile .mobile-burger:active {
-    background: #2a2a2a;
+    background: var(--sidebar-highlight);
 }
 
 body.mobile .mobile-burger:active {
@@ -84,7 +86,7 @@ body.mobile .mobile-burger:active {
     display: block;
     width: 100%;
     height: 2px;
-    background: var(--text);
+    background: var(--sidebar-text-color, var(--text));
     border-radius: 2px;
 }
 
@@ -109,6 +111,8 @@ body.mobile .mobile-menu-overlay.open {
     pointer-events: all;
 }
 
+/* The mobile menu is the sidebar in a different form — it uses the sidebar's
+   background, border shade, highlight shade, text colour, and font. */
 .mobile-menu {
     display: none;
 }
@@ -121,8 +125,8 @@ body.mobile .mobile-menu {
     left: 0;
     height: 100vh;
     width: var(--mobile-menu-width);
-    background: #202020;
-    border-right: 1px solid #2a2a2a;
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--sidebar-border);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
     z-index: 1900;
     transform: translateX(-100%);
@@ -130,11 +134,12 @@ body.mobile .mobile-menu {
     overflow-y: auto;
     overflow-x: hidden;
     scrollbar-width: thin;
-    scrollbar-color: #555 transparent;
+    scrollbar-color: var(--sidebar-highlight) transparent;
     padding: 12px 12px 12px 12px;
     box-sizing: border-box;
     gap: 4px;
-    font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    color: var(--sidebar-text-color, var(--text));
+    font-family: var(--sidebar-font-family, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji");
 }
 
 body.mobile .mobile-menu.open {
@@ -146,7 +151,7 @@ body.mobile .mobile-menu::-webkit-scrollbar {
 }
 
 body.mobile .mobile-menu::-webkit-scrollbar-thumb {
-    background: #555;
+    background: var(--sidebar-highlight);
     border-radius: 3px;
 }
 
@@ -169,7 +174,7 @@ body.mobile .mobile-menu::-webkit-scrollbar-thumb {
 
 .mobile-menu__logo-img.fallback {
     object-fit: contain;
-    background: #2a2a2a;
+    background: var(--sidebar-highlight);
     padding: 2px;
 }
 
@@ -180,7 +185,7 @@ body.mobile .mobile-menu::-webkit-scrollbar-thumb {
     width: 100%;
     padding: 8px 10px;
     border-radius: 8px;
-    color: var(--text);
+    color: var(--sidebar-text-color, var(--text));
     text-decoration: none;
     font-size: 1rem;
     background: none;
@@ -195,7 +200,7 @@ body.mobile .mobile-menu::-webkit-scrollbar-thumb {
 
 .mobile-menu__item:hover,
 .mobile-menu__item:active {
-    background: #2a2a2a;
+    background: var(--sidebar-highlight);
 }
 
 .mobile-menu__icon-slot {
@@ -216,7 +221,7 @@ body.mobile .mobile-menu::-webkit-scrollbar-thumb {
 
 .mobile-menu__icon.fallback {
     object-fit: contain;
-    background: #2a2a2a;
+    background: var(--sidebar-highlight);
     padding: 2px;
 }
 
@@ -227,140 +232,79 @@ body.mobile .mobile-menu::-webkit-scrollbar-thumb {
     text-overflow: ellipsis;
 }
 
+/* Matches the blog-divider colour, per theme.body.dividerColor. */
 .mobile-menu__divider {
     border: none;
-    border-top: 1px solid #2a2a2a;
+    border-top: 1px solid var(--blog-divider-color, #2a2a2a);
     margin: 6px 4px;
     opacity: 0.7;
 }
 
-.mobile-menu__page-dropdown-slot {
+/* --- Library list (Mode A) -------------------------------------------------
+   Plain, non-collapsible list of every visible library. No title, no
+   dropdown affordance — just the library links themselves. */
+.mobile-menu__library-list {
     display: flex;
     flex-direction: column;
     width: 100%;
 }
 
-.mobile-menu__page-dropdown-slot:empty {
+.mobile-menu__library-list[hidden] {
     display: none;
 }
 
-.mobile-menu__page-dropdown-slot:empty + .mobile-menu__divider {
-    display: none;
-}
-
-.mobile-menu .topbar-dropdown {
-    position: relative;
-    width: 100%;
-    height: auto;
+/* --- Library contents (Mode B) --------------------------------------------
+   Shown once inside a library: a plain themed "title" (actually the
+   Libraries-dropdown label from topbar.json) that swaps back to Mode A when
+   tapped, followed by the flat, non-collapsible folder/blog tree. Neither
+   element is a collapsible dropdown — nothing expands/collapses here. */
+.mobile-menu__contents-view {
     display: flex;
     flex-direction: column;
-}
-
-.mobile-menu .topbar-dropdown__trigger {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: auto;
-    padding: 8px 10px;
-    border-radius: 8px;
-    color: var(--text);
-    font-size: 1rem;
     width: 100%;
-    box-sizing: border-box;
-    background: none;
-    user-select: none;
 }
 
-.mobile-menu .topbar-dropdown__trigger::after {
-    content: "▾";
-    font-size: 0.85em;
-    margin-left: 8px;
-    color: var(--muted);
-    transition: transform 160ms ease;
-}
-
-.mobile-menu .topbar-dropdown.open .topbar-dropdown__trigger::after {
-    transform: rotate(180deg);
-}
-
-.mobile-menu .topbar-dropdown:hover .topbar-dropdown__trigger,
-.mobile-menu .topbar-dropdown.open .topbar-dropdown__trigger {
-    background: #2a2a2a;
-}
-
-.mobile-menu .topbar-dropdown__menu {
-    position: static;
-    top: auto;
-    left: auto;
-    min-width: 0;
-    width: 100%;
-    background: none;
-    border: none;
-    box-shadow: none;
-    border-radius: 0;
+.mobile-menu__contents-view[hidden] {
     display: none;
-    flex-direction: column;
-    padding: 2px 0 2px 12px;
-    opacity: 1;
-    pointer-events: all;
-    transform: none;
-    transition: none;
-    white-space: normal;
 }
 
-.mobile-menu .topbar-dropdown.open .topbar-dropdown__menu {
-    display: flex;
-}
-
-.mobile-menu .topbar-dropdown__item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 10px;
-    color: var(--text);
-    text-decoration: none;
-    font-size: 0.95rem;
-    border-radius: 6px;
-    background: none;
-    border: none;
+.mobile-menu__section-title {
+    display: block;
     width: 100%;
     text-align: left;
+    background: none;
+    border: none;
+    margin: 0 0 4px 0;
+    padding: 8px 10px;
+    border-radius: 8px;
     cursor: pointer;
-    font-family: inherit;
+    font-family: var(--topbar-font-family, inherit);
+    font-size: var(--topbar-font-size, 1rem);
+    font-weight: 700;
+    color: var(--topbar-text-color, var(--text));
     box-sizing: border-box;
     -webkit-tap-highlight-color: transparent;
+    transition: background-color 140ms ease;
 }
 
-.mobile-menu .topbar-dropdown__item:hover,
-.mobile-menu .topbar-dropdown__item:active {
-    background: #2a2a2a;
+.mobile-menu__section-title:hover,
+.mobile-menu__section-title:active {
+    background: var(--sidebar-highlight);
 }
 
-.mobile-menu .topbar-dropdown__icon-slot {
-    width: 18px;
-    height: 18px;
-    flex: 0 0 18px;
+.mobile-menu__tree {
     display: flex;
-    align-items: center;
-    justify-content: center;
+    flex-direction: column;
+    width: 100%;
 }
 
-.mobile-menu .topbar-dropdown__icon {
-    width: 18px;
-    height: 18px;
-    object-fit: cover;
-    border-radius: 3px;
-}
-
-.mobile-menu .topbar-dropdown__icon.fallback {
-    object-fit: contain;
-    background: #2a2a2a;
-    padding: 1px;
-}
-
+/* Folder (group) rows use the full topbar text colour — matching the desktop
+   Libraries dropdown. Blog (leaf) rows use the BLOG DIVIDER colour, matching
+   the divider lines between blogs, and brighten to the topbar text colour on
+   hover/tap for legibility. */
 .mobile-menu .topbar-tree-item--group {
     font-weight: 700;
-    color: var(--text) !important;
+    color: var(--topbar-text-color, var(--text)) !important;
     padding-top: 8px !important;
     font-size: 0.95rem !important;
 }
@@ -372,14 +316,14 @@ body.mobile .mobile-menu::-webkit-scrollbar-thumb {
 .mobile-menu .topbar-tree-item--leaf {
     font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace !important;
     font-weight: 400 !important;
-    color: #888 !important;
+    color: var(--blog-divider-color, #2a2a2a) !important;
     font-size: 0.82rem !important;
     letter-spacing: 0.06em;
 }
 
 .mobile-menu .topbar-tree-item--leaf:hover,
 .mobile-menu .topbar-tree-item--leaf:active {
-    color: var(--muted) !important;
+    color: var(--topbar-text-color, var(--text)) !important;
 }
 
 body.mobile #about-me-content,
@@ -462,6 +406,10 @@ body.mobile .blog-section-title {
 }
 
 body.mobile .blog-divider {
+    margin: 36px 0 !important;
+}
+
+body.mobile .blog-divider--labeled {
     margin: 36px 0 !important;
 }
 

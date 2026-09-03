@@ -4,6 +4,26 @@
     --muted: #bdbdbd;
     --topbar-depth: 56px;
     --page-text-color: #eaeaea;
+
+    /* Colour of the horizontal rule between blogs. Also reused as the colour
+       of blog (leaf) names inside the Contents dropdown. Overridden at runtime
+       by theme.js from theme.body.dividerColor; this is the built-in default
+       (matches the old hard-coded #2a2a2a). */
+    --blog-divider-color: #2a2a2a;
+}
+
+/* Hide everything until theme.js has applied the configured theme (or fallen
+   back to defaults). The whole site is JS-driven, so nothing meaningful
+   renders before scripts run anyway — this simply prevents a flash of the
+   default theme before the real one loads. theme.js adds .theme-ready to
+   <html> once the theme is in place (with a safety timeout so the page can
+   never stay hidden forever). */
+html {
+    visibility: hidden;
+}
+
+html.theme-ready {
+    visibility: visible;
 }
 
 *, *::before, *::after {

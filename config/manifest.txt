@@ -100,8 +100,6 @@ public/404/404.html
 public/404/404.js
 public/404/404.mp4
 public/404/404.png
-public/404/cmpsd/404.avif
-public/404/cmpsd/404.mp4
 public/archive/archive.css
 public/archive/archive.html
 public/archive/archive.js

@@ -43,13 +43,45 @@ body.blog-gallery-open {
 
 .blog-divider {
     border: none;
-    border-top: 1px solid #2a2a2a;
+    border-top: 1px solid var(--blog-divider-color, #2a2a2a);
     margin: 56px 0;
 }
 
 .blog-divider--after-heading {
     margin-top: 0;
     margin-bottom: 56px;
+}
+
+/* --- Folder-boundary divider ----------------------------------------------
+   Used between two consecutive blogs that live in DIFFERENT folders (at any
+   depth). It's the same divider line as .blog-divider, but broken in the
+   middle with the folder title sitting in the gap instead of an unbroken
+   line. The two line segments use the same --blog-divider-color. */
+.blog-divider--labeled {
+    border: none;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 56px 0;
+}
+
+.blog-divider--labeled::before,
+.blog-divider--labeled::after {
+    content: "";
+    flex: 1 1 auto;
+    border-top: 1px solid var(--blog-divider-color, #2a2a2a);
+}
+
+.blog-divider__label {
+    flex: 0 0 auto;
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    white-space: nowrap;
+    max-width: 70%;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .blog-block   { scroll-margin-top: 72px; }

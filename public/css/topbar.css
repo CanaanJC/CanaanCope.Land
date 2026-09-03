@@ -3,6 +3,13 @@
     --topbar-bg: #202020;
     --slogan-font-size: 20px;
     --slogan-color: var(--muted);
+
+    /* Derived, theme-aware shades of the topbar background. These stay in
+       proportion to whatever --topbar-bg is set to (light, dark, or coloured)
+       instead of being hard-coded greys, so borders and hover highlights
+       always read as a subtle variant of the parent surface. */
+    --topbar-border:    color-mix(in srgb, var(--topbar-bg) 86%, #808080);
+    --topbar-highlight: color-mix(in srgb, var(--topbar-bg) 80%, #808080);
 }
 
 .topbar {
@@ -12,7 +19,7 @@
     right: 0;
     height: var(--topbar-depth);
     background: var(--topbar-bg);
-    border-bottom: 1px solid #2a2a2a;
+    border-bottom: 1px solid var(--topbar-border);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
     z-index: 900;
     display: flex;
@@ -55,7 +62,7 @@
 
 .topbar-logo__img.fallback {
     object-fit: contain;
-    background: #2a2a2a;
+    background: var(--topbar-highlight);
     padding: 2px;
 }
 
@@ -83,7 +90,7 @@
 
 .topbar-dropdown:hover .topbar-dropdown__trigger,
 .topbar-dropdown.open .topbar-dropdown__trigger {
-    background: #2a2a2a;
+    background: var(--topbar-highlight);
 }
 
 .topbar-dropdown__menu {
@@ -93,8 +100,8 @@
     width: max-content;
     min-width: 100%;
     max-width: min(480px, 90vw);
-    background: #202020;
-    border: 1px solid #2a2a2a;
+    background: var(--topbar-bg);
+    border: 1px solid var(--topbar-border);
     border-top: none;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
     border-radius: 0 0 8px 8px;
@@ -128,7 +135,7 @@
 }
 
 .topbar-dropdown__item:hover {
-    background: #2a2a2a;
+    background: var(--topbar-highlight);
 }
 
 .topbar-dropdown__icon-slot {
@@ -149,7 +156,7 @@
 
 .topbar-dropdown__icon.fallback {
     object-fit: contain;
-    background: #2a2a2a;
+    background: var(--topbar-highlight);
     padding: 1px;
 }
 
@@ -167,4 +174,36 @@
     white-space: pre;
     pointer-events: none;
     user-select: none;
+}
+
+/* --- Topbar tree nav (the "Contents" / "By Month" dropdown) -----------------
+   Group (folder) rows use the full topbar text colour — matching the Libraries
+   dropdown. Leaf (blog) rows use the BLOG DIVIDER colour instead, so the blog
+   names in the Contents dropdown match the divider colour set in the theme.
+   Hovering a leaf brings it up to the full topbar text colour for legibility. */
+.topbar-tree-item {
+    display: block;
+    white-space: nowrap;
+}
+
+.topbar-tree-item--group {
+    font-weight: 700;
+    color: var(--topbar-text-color, var(--text)) !important;
+    padding-top: 10px !important;
+}
+
+.topbar-tree-item--group:first-child {
+    padding-top: 8px !important;
+}
+
+.topbar-tree-item--leaf {
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace !important;
+    font-weight: 400 !important;
+    color: var(--blog-divider-color, #2a2a2a) !important;
+    font-size: 0.85rem !important;
+    letter-spacing: 0.06em;
+}
+
+.topbar-tree-item--leaf:hover {
+    color: var(--topbar-text-color, var(--text)) !important;
 }

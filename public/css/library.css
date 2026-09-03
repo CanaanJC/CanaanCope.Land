@@ -41,7 +41,7 @@ body::-webkit-scrollbar {
 
 .topbar-tree-item--group {
     font-weight: 700;
-    color: var(--text) !important;
+    color: var(--topbar-text-color, var(--text)) !important;
     padding-top: 10px !important;
 }
 
@@ -52,13 +52,13 @@ body::-webkit-scrollbar {
 .topbar-tree-item--leaf {
     font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace !important;
     font-weight: 400 !important;
-    color: #666 !important;
+    color: var(--blog-divider-color, #2a2a2a) !important;
     font-size: 0.85rem !important;
     letter-spacing: 0.06em;
 }
 
 .topbar-tree-item--leaf:hover {
-    color: var(--muted) !important;
+    color: var(--topbar-text-color, var(--text)) !important;
 }
 
 .topbar-tree-item[data-level="0"] { padding-left: 12px !important; }

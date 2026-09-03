@@ -10,6 +10,7 @@ import {
     sortManifestEntries,
     buildNavItems,
     navTriggerLabel,
+    folderLabel,
 } from "./lib-nav.js";
 
 console.log("Library module loaded");
@@ -69,6 +70,48 @@ function buildEntryBlock(library, slugPath, config, rawMd) {
         mediaBaseUrl:   `${base}/media`,
         listingBaseUrl: `${base}/media-listing`,
     });
+}
+
+/* --- Dividers --------------------------------------------------------------
+   A plain divider is the usual line. A "folder" divider is used when two
+   consecutive blogs live in different folders (at ANY depth): it's the same
+   line, but broken in the middle with the folder title sitting in the gap. */
+function buildPlainDivider() {
+    const hr = document.createElement("hr");
+    hr.className = "blog-divider";
+    return hr;
+}
+
+function buildFolderDivider(title) {
+    const div = document.createElement("div");
+    div.className = "blog-divider blog-divider--labeled";
+    div.setAttribute("role", "separator");
+
+    const label = document.createElement("span");
+    label.className = "blog-divider__label";
+    label.textContent = title;
+    div.appendChild(label);
+
+    return div;
+}
+
+// If prev and cur blogs share the same parent folder path, returns null (plain
+// divider). Otherwise returns the label of the FIRST folder level at which they
+// diverge — i.e. the title of the folder boundary being crossed.
+function folderDividerLabel(prev, cur) {
+    const a = Array.isArray(prev.slugPath) ? prev.slugPath : [];
+    const b = Array.isArray(cur.slugPath)  ? cur.slugPath  : [];
+    const parentLen = b.length - 1; // exclude the blog folder itself
+
+    for (let i = 0; i < parentLen; i++) {
+        if (a[i] !== b[i]) return folderLabel(b[i]);
+    }
+    return null;
+}
+
+function appendDivider(container, prevEntry, curEntry) {
+    const label = prevEntry ? folderDividerLabel(prevEntry, curEntry) : null;
+    container.appendChild(label ? buildFolderDivider(label) : buildPlainDivider());
 }
 
 function waitForTopbarReady(maxMs = 4000) {
@@ -253,9 +296,7 @@ async function loadLibrary(library) {
         const id    = entryId(entry.slugPath);
 
         if (i > 0) {
-            const hr = document.createElement("hr");
-            hr.className = "blog-divider";
-            container.appendChild(hr);
+            appendDivider(container, manifest[i - 1], entry);
         }
 
         const eager = eagerResults.find(r => r.id === id);

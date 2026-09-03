@@ -1,1 +1,11 @@
-[]
+[
+    {
+        "id": "test",
+        "name": "test",
+        "path": "test",
+        "depth": 3,
+        "useDates": false,
+        "hidden": false,
+        "icon": ""
+    }
+]

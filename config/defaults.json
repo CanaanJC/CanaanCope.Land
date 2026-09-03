@@ -57,7 +57,8 @@
             "backgroundColor": "#181818",
             "font": "",
             "fontSize": 16,
-            "textColor": "#eaeaea"
+            "textColor": "#eaeaea",
+            "dividerColor": "#545454"
         },
         "bottomText": {
             "font": "",

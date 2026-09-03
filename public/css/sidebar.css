@@ -3,6 +3,14 @@
     --sidebar-expanded: 320px;
     --icon-size: 36px;
     --sidebar-bg: #202020;
+
+    /* Derived, theme-aware shades of the sidebar background — used for the
+       divider line, hover highlights, and icon placeholders so they always
+       track the sidebar colour instead of being fixed greys. Shared by the
+       mobile menu and mobile burger, which are treated as part of the sidebar. */
+    --sidebar-border:    color-mix(in srgb, var(--sidebar-bg) 86%, #808080);
+    --sidebar-highlight: color-mix(in srgb, var(--sidebar-bg) 80%, #808080);
+    --sidebar-icon-bg:   color-mix(in srgb, var(--sidebar-bg) 80%, #808080);
 }
 
 .sidebar {
@@ -12,7 +20,7 @@
     height: 100vh;
     width: var(--sidebar-collapsed);
     background: var(--sidebar-bg);
-    border-left: 1px solid #2a2a2a;
+    border-left: 1px solid var(--sidebar-border);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
     transition: width 200ms ease;
     overflow-x: hidden;
@@ -33,7 +41,7 @@
     height: 100%;
     min-width: max-content;
     scrollbar-width: thin;
-    scrollbar-color: #555 transparent;
+    scrollbar-color: var(--sidebar-highlight) transparent;
     cursor: pointer;
 }
 
@@ -46,7 +54,7 @@
 }
 
 .sidebar-inner::-webkit-scrollbar-thumb {
-    background: #555;
+    background: var(--sidebar-highlight);
     border-radius: 4px;
 }
 
@@ -67,7 +75,7 @@
 
 .sidebar-item:hover,
 .sidebar-item:focus-visible {
-    background: #2a2a2a;
+    background: var(--sidebar-highlight);
 }
 
 .sidebar-item__icon {
@@ -76,14 +84,14 @@
     flex: 0 0 var(--sidebar-icon-size, var(--icon-size));
     border-radius: 6px;
     object-fit: cover;
-    background: #303030;
+    background: var(--sidebar-icon-bg);
     cursor: pointer;
 }
 
 .sidebar-item__icon.fallback {
     object-fit: contain;
     padding: 4px;
-    background: #2a2a2a;
+    background: var(--sidebar-highlight);
 }
 
 .sidebar-item__text {

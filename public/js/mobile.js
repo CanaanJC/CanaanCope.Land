@@ -13,12 +13,11 @@ import {
     buildNavItems,
 } from "./lib-nav.js";
 
-console.log("Mobile module loaded");
-
 const MOBILE_BREAKPOINT   = 768;
-const LOGO_URL            = "/media/logo.png";
 const LIBRARIES_DATA_URL  = "/config/libraries.json";
 const SIDEBAR_DATA_URL    = "/json/sidebar.json";
+const TOPBAR_DATA_URL     = "/json/topbar.json";
+const THEME_DATA_URL      = "/config/theme.json";
 
 const FALLBACK_ICON =
     'data:image/svg+xml;charset=UTF-8,' +
@@ -152,6 +151,7 @@ function getMenu()         { return document.getElementById("mobileMenu"); }
 function getMenuOverlay()  { return document.getElementById("mobileMenuOverlay"); }
 function getProjectsSlot() { return document.getElementById("mobileMenuProjectsSlot"); }
 function getSidebarSlot()  { return document.getElementById("mobileMenuSidebarSlot"); }
+function getLogoImg()      { return document.getElementById("mobileMenuLogoImg"); }
 
 function buildBurger() {
     if (getBurger()) return;
@@ -200,15 +200,15 @@ function buildMenuShell() {
     logoLink.id = "mobileMenuLogo";
     logoLink.setAttribute("aria-label", "Home");
     const logoImg = document.createElement("img");
+    logoImg.id = "mobileMenuLogoImg";
     logoImg.className = "mobile-menu__logo-img";
     logoImg.alt = "Site logo";
-    logoImg.src = LOGO_URL;
+    logoImg.src = FALLBACK_ICON;
     logoImg.addEventListener("error", () => {
         logoImg.src = FALLBACK_ICON;
         logoImg.classList.add("fallback");
     });
     logoLink.appendChild(logoImg);
-    logoLink.addEventListener("click", handleNavClick);
     menu.appendChild(logoLink);
 
     const projectsSlot = document.createElement("div");
@@ -226,27 +226,32 @@ function buildMenuShell() {
     document.body.appendChild(menu);
 }
 
-function scrollToMobileId(id) {
-    if (!id) {
-        closeMenu();
-        return;
-    }
-    closeMenu();
-    setTimeout(() => {
+function scrollToMobileId(id, isLeaf) {
+    const doScroll = () => {
+        if (!id) return;
         const el = document.getElementById(id) || document.getElementById(`placeholder-${id}`);
         if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 260);
+    };
+
+    if (isLeaf) {
+        closeMenu();
+        setTimeout(doScroll, 260);
+    } else {
+        doScroll();
+    }
 }
 
 function renderMobileNavItems(items, container) {
     for (const item of items) {
         const btn = document.createElement("button");
+        btn.type = "button";
         btn.className = `mobile-menu__item topbar-tree-item ${item.isLeaf ? "topbar-tree-item--leaf" : "topbar-tree-item--group"}`;
         btn.dataset.level = String(item.level);
         btn.textContent = item.label;
         btn.addEventListener("click", (e) => {
             e.preventDefault();
-            scrollToMobileId(item.targetId);
+            e.stopPropagation();
+            scrollToMobileId(item.targetId, item.isLeaf);
         });
         container.appendChild(btn);
     }
@@ -259,7 +264,17 @@ function getCurrentLibrary(libraries) {
     return libraries.find(l => l.path === seg) || null;
 }
 
-async function populateLibraryNav(container, library) {
+async function fetchJson(url) {
+    try {
+        const res = await fetch(`${url}?_=${Date.now()}`, { cache: "no-store" });
+        return res.ok ? await res.json() : null;
+    } catch (err) {
+        console.error(`Mobile: failed to load ${url}:`, err);
+        return null;
+    }
+}
+
+async function populateLibraryTree(container, library) {
     try {
         const res = await fetch(`/${library.path}/manifest.json?_=${Date.now()}`, { cache: "no-store" });
         if (!res.ok) throw new Error(`manifest HTTP ${res.status}`);
@@ -273,53 +288,132 @@ async function populateLibraryNav(container, library) {
     }
 }
 
-async function populateMenu() {
-    const projectsSlot = getProjectsSlot();
-    try {
-        const res = await fetch(`${LIBRARIES_DATA_URL}?_=${Date.now()}`, { cache: "no-store" });
-        const libraries = res.ok ? await res.json() : [];
+async function buildContentsView(library, librariesTitle, libraryListView) {
+    const contentsView = document.createElement("div");
+    contentsView.className = "mobile-menu__contents-view";
 
-        if (projectsSlot && Array.isArray(libraries)) {
-            projectsSlot.innerHTML = "";
+    const title = document.createElement("button");
+    title.type = "button";
+    title.className = "mobile-menu__section-title";
+    title.textContent = librariesTitle;
+    title.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        contentsView.hidden = true;
+        libraryListView.hidden = false;
+    });
+    contentsView.appendChild(title);
 
-            const currentLibrary = getCurrentLibrary(libraries);
-            if (currentLibrary) {
-                await populateLibraryNav(projectsSlot, currentLibrary);
-            } else {
-                const visibleLibraries = libraries.filter(lib => lib && !lib.hidden);
-                for (const lib of visibleLibraries) {
-                    if (!lib.path) continue;
-                    projectsSlot.appendChild(buildMenuLink({
-                        name: lib.name || lib.path,
-                        link: `/${lib.path}`,
-                        icon: lib.icon,
-                    }));
-                }
-            }
+    const tree = document.createElement("div");
+    tree.className = "mobile-menu__tree";
+    await populateLibraryTree(tree, library);
+    contentsView.appendChild(tree);
+
+    return contentsView;
+}
+
+function buildLibraryListView(visibleLibraries, librariesTitle, projectsSlot) {
+    const view = document.createElement("div");
+    view.className = "mobile-menu__library-list";
+
+    for (const lib of visibleLibraries) {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.className = "mobile-menu__item";
+
+        const iconSlot = document.createElement("span");
+        iconSlot.className = "mobile-menu__icon-slot";
+        if (lib.icon && typeof lib.icon === "string" && lib.icon.trim() !== "") {
+            const img = document.createElement("img");
+            img.className = "mobile-menu__icon";
+            img.alt = lib.name || "";
+            img.src = lib.icon;
+            img.addEventListener("error", () => {
+                img.src = FALLBACK_ICON;
+                img.classList.add("fallback");
+            });
+            iconSlot.appendChild(img);
         }
-    } catch (err) {
-        console.error("Mobile: failed to load libraries.json:", err);
+
+        const label = document.createElement("span");
+        label.className = "mobile-menu__label";
+        label.textContent = lib.name || lib.path;
+
+        item.appendChild(iconSlot);
+        item.appendChild(label);
+
+        item.addEventListener("click", async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const newPath = `/${lib.path}`;
+            if (window.location.pathname !== newPath) {
+                window.history.pushState({}, "", newPath);
+                window.__LIBRARY_BLOCKED_PATH__ = lib.path;
+            }
+
+            let contentsView = projectsSlot.querySelector(".mobile-menu__contents-view");
+            if (contentsView) contentsView.remove();
+
+            contentsView = await buildContentsView(lib, librariesTitle, view);
+            projectsSlot.insertBefore(contentsView, view);
+
+            view.hidden = true;
+            contentsView.hidden = false;
+        });
+
+        view.appendChild(item);
     }
 
-    try {
-        const res = await fetch(`${SIDEBAR_DATA_URL}?_=${Date.now()}`, { cache: "no-store" });
-        if (res.ok) {
-            const data = await res.json();
-            const sidebarSlot = getSidebarSlot();
-            if (sidebarSlot && Array.isArray(data)) {
-                sidebarSlot.innerHTML = "";
-                for (const item of data) {
-                    if (!item || !item.link) continue;
-                    sidebarSlot.appendChild(buildMenuLink({
-                        name: item.text,
-                        link: item.link,
-                        icon: item.image,
-                    }));
-                }
-            }
+    return view;
+}
+
+async function populateMenu() {
+    const projectsSlot = getProjectsSlot();
+
+    const [libraries, topbarData, themeData] = await Promise.all([
+        fetchJson(LIBRARIES_DATA_URL),
+        fetchJson(TOPBAR_DATA_URL),
+        fetchJson(THEME_DATA_URL),
+    ]);
+
+    const logoImg = getLogoImg();
+    if (logoImg) {
+        const iconUrl = themeData && themeData.theme && themeData.theme.topbar && themeData.theme.topbar.icon;
+        logoImg.src = iconUrl || FALLBACK_ICON;
+    }
+
+    const librariesTitle = (topbarData && topbarData.librariesDropdownTitle) || "Projects";
+
+    if (projectsSlot && Array.isArray(libraries)) {
+        projectsSlot.innerHTML = "";
+
+        const visibleLibraries = libraries.filter(lib => lib && !lib.hidden && lib.path);
+        const currentLibrary   = getCurrentLibrary(libraries);
+        const libraryListView  = buildLibraryListView(visibleLibraries, librariesTitle, projectsSlot);
+
+        if (currentLibrary) {
+            const contentsView = await buildContentsView(currentLibrary, librariesTitle, libraryListView);
+            libraryListView.hidden = true;
+            projectsSlot.appendChild(contentsView);
+            projectsSlot.appendChild(libraryListView);
+        } else {
+            projectsSlot.appendChild(libraryListView);
         }
-    } catch (err) {
-        console.error("Mobile: failed to load sidebar.json:", err);
+    }
+
+    const sidebarData = await fetchJson(SIDEBAR_DATA_URL);
+    const sidebarSlot = getSidebarSlot();
+    if (sidebarSlot && Array.isArray(sidebarData)) {
+        sidebarSlot.innerHTML = "";
+        for (const item of sidebarData) {
+            if (!item || !item.link) continue;
+            sidebarSlot.appendChild(buildMenuLink({
+                name: item.text,
+                link: item.link,
+                icon: item.image,
+            }));
+        }
     }
 }
 
@@ -353,13 +447,8 @@ function buildMenuLink(item) {
 
     a.appendChild(iconSlot);
     a.appendChild(label);
-    a.addEventListener("click", handleNavClick);
 
     return a;
-}
-
-function handleNavClick() {
-    closeMenu();
 }
 
 function openMenu() {
