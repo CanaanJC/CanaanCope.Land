@@ -5,7 +5,7 @@ console.log("About-me module loaded");
 if (window.location.pathname !== "/") {
     throw new Error("[about-me.js] Not the homepage, halting module.");
 }
-
+//.
 const MEDIA_BASE   = "/aboutme/media";
 const LISTING_BASE = "/aboutme/media-listing";
 
