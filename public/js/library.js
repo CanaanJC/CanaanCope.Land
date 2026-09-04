@@ -16,11 +16,13 @@ import {
 console.log("Library module loaded");
 
 const PRELOAD_AHEAD = 2;
+const TOPBAR_DATA_URL = "/json/topbar.json";
 
 const _pathParts   = window.location.pathname.split("/").filter(Boolean);
 const IS_BLOCKED   = !!window.__LIBRARY_BLOCKED_PATH__;
 
 let _librariesCache = null;
+let _contentsTitleCache = null;
 
 async function fetchLibraries() {
     if (_librariesCache) return _librariesCache;
@@ -33,6 +35,19 @@ async function fetchLibraries() {
         _librariesCache = [];
     }
     return _librariesCache;
+}
+
+async function fetchContentsTitle() {
+    if (_contentsTitleCache !== null) return _contentsTitleCache;
+    try {
+        const res = await fetch(`${TOPBAR_DATA_URL}?_=${Date.now()}`, { cache: "no-store" });
+        const data = res.ok ? await res.json() : {};
+        _contentsTitleCache = (data && data.contentsDropdownTitle) || "Contents";
+    } catch (err) {
+        console.error("Library: failed to load topbar.json:", err);
+        _contentsTitleCache = "Contents";
+    }
+    return _contentsTitleCache;
 }
 
 async function resolveLibrary() {
@@ -124,14 +139,14 @@ function scrollToId(id, behavior = "smooth") {
     if (el) el.scrollIntoView({ behavior, block: "start" });
 }
 
-function buildTopbarNav(library, sortedManifest) {
+function buildTopbarNav(library, sortedManifest, contentsTitle) {
     const wrapper = document.createElement("div");
     wrapper.className = "topbar-dropdown";
     wrapper.id = "library-nav-dropdown";
 
     const trigger = document.createElement("span");
     trigger.className = "topbar-dropdown__trigger";
-    trigger.textContent = navTriggerLabel(library);
+    trigger.textContent = navTriggerLabel(library, contentsTitle);
     wrapper.appendChild(trigger);
 
     const menu = document.createElement("div");
@@ -158,13 +173,16 @@ function buildTopbarNav(library, sortedManifest) {
 
 async function injectNav(library, sortedManifest) {
     if (!sortedManifest.length) return;
-    const topbar = await waitForTopbarReady();
+    const [topbar, contentsTitle] = await Promise.all([
+        waitForTopbarReady(),
+        fetchContentsTitle(),
+    ]);
     if (!topbar) return;
 
     const existing = topbar.querySelector("#library-nav-dropdown");
     if (existing) existing.remove();
 
-    const nav = buildTopbarNav(library, sortedManifest);
+    const nav = buildTopbarNav(library, sortedManifest, contentsTitle);
 
     const librariesDropdown = topbar.querySelector("#libraries-nav-dropdown");
     const logo = topbar.querySelector(".topbar-logo");

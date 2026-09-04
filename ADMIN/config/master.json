@@ -1,16 +1,16 @@
 {
     "columns": [
         [
-            "master.json",
+            "Master",
             "Theme",
             "update-checker"
         ],
         [
             "archive",
-            "sidebar.json",
-            "library-editor",
-            "topbar.json",
-            "admin-master.json",
+            "SideBar",
+            "Libraries",
+            "TopBar",
+            "pannel_config",
             "logo-uploader",
             "library-explorer-config"
         ]

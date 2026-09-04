@@ -457,7 +457,7 @@ StartLimitBurst=5
 
 [Service]
 Type=simple
-User=${INVOKING_USER}
+User=root
 WorkingDirectory=${PROJECT_ROOT}
 ExecStart=${EXEC_START}
 Restart=on-failure

@@ -157,6 +157,16 @@ merge_json_file() {
     fi
 }
 
+overwrite_json_file() {
+    local rel="$1"
+    local src="${EXTRACTED_ROOT}/${rel}"
+    local dest="${PROJECT_ROOT}/${rel}"
+
+    mkdir -p "$(dirname "${dest}")"
+    cp -f "${src}" "${dest}"
+    vecho "  overwritten (no merge, always replaced): ${rel}"
+}
+
 LOCAL_VERSION="0.0.0"
 if [[ -f "${VERSION_FILE}" ]]; then
     LOCAL_VERSION="$(tr -d '[:space:]' < "${VERSION_FILE}")"
@@ -391,7 +401,7 @@ if [[ -n "${REMOVED_FILES}" ]]; then
 fi
 
 vecho ""
-vecho "update.sh: syncing files (JSON files are order-preserving deep-merged; everything else is added/overwritten)..."
+vecho "update.sh: syncing files (config/defaults.json is always fully overwritten; other JSON files are order-preserving deep-merged; everything else is added/overwritten)..."
 
 SYNCED_COUNT=0
 
@@ -420,7 +430,9 @@ while IFS= read -r rel; do
         continue
     fi
 
-    if [[ "${rel}" == *.json ]]; then
+    if [[ "${rel}" == "config/defaults.json" ]]; then
+        overwrite_json_file "${rel}"
+    elif [[ "${rel}" == *.json ]]; then
         merge_json_file "${rel}"
     else
         mkdir -p "$(dirname "${DEST}")"

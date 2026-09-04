@@ -41,7 +41,7 @@ body.blog-gallery-open {
 
 .blog-divider {
     border: none;
-    border-top: 1px solid var(--blog-divider-color, #2a2a2a);
+    border-top: var(--blog-divider-weight, 1px) solid var(--blog-divider-color, #545454);
     margin: 56px 0;
 }
 
@@ -62,7 +62,7 @@ body.blog-gallery-open {
 .blog-divider--labeled::after {
     content: "";
     flex: 1 1 auto;
-    border-top: 1px solid var(--blog-divider-color, #2a2a2a);
+    border-top: var(--blog-divider-weight, 1px) solid var(--blog-divider-color, #545454);
 }
 
 .blog-divider__label {

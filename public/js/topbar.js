@@ -45,7 +45,7 @@ function createLibrariesDropdown(title, libraries) {
 
     for (const lib of libraries) {
         const a = document.createElement("a");
-        a.className = "topbar-dropdown__item";
+        a.className = "topbar-dropdown__item topbar-dropdown__item--library";
         a.href = `/${lib.path}`;
 
         const iconSlot = document.createElement("span");

@@ -1,5 +1,3 @@
-
-
 html, body {
     scrollbar-width: none;
     -ms-overflow-style: none;
@@ -41,7 +39,9 @@ body::-webkit-scrollbar {
 
 .topbar-tree-item--group {
     font-weight: 700;
-    color: var(--topbar-text-color, var(--text)) !important;
+    color: var(--dropdown-folder-color, var(--topbar-text-color, var(--text))) !important;
+    font-family: var(--dropdown-folder-font-family, inherit) !important;
+    font-size: var(--dropdown-folder-font-size, inherit) !important;
     padding-top: 10px !important;
 }
 
@@ -50,15 +50,15 @@ body::-webkit-scrollbar {
 }
 
 .topbar-tree-item--leaf {
-    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace !important;
+    font-family: var(--dropdown-blog-font-family, "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace) !important;
     font-weight: 400 !important;
-    color: var(--blog-divider-color, #2a2a2a) !important;
-    font-size: 0.85rem !important;
+    color: var(--dropdown-blog-color, var(--blog-divider-color, #2a2a2a)) !important;
+    font-size: var(--dropdown-blog-font-size, 0.85rem) !important;
     letter-spacing: 0.06em;
 }
 
 .topbar-tree-item--leaf:hover {
-    color: var(--topbar-text-color, var(--text)) !important;
+    color: var(--dropdown-folder-color, var(--topbar-text-color, var(--text))) !important;
 }
 
 .topbar-tree-item[data-level="0"] { padding-left: 12px !important; }

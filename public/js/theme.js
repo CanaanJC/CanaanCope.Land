@@ -5,12 +5,6 @@ const THEME_URL = "/config/theme.json";
 const SYSTEM_FONT_STACK = 'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"';
 const MONO_FONT_STACK   = '"JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace';
 
-/* --- Anti-flicker reveal ---------------------------------------------------
-   base.css hides <html> until we add the .theme-ready class. We reveal the
-   page only AFTER the configured theme has been applied (or after we've
-   fallen back to the built-in defaults), so users never see a flash of the
-   default theme before the real one loads. A safety timeout guarantees the
-   page can never stay hidden forever if the theme fetch hangs. */
 let _revealed = false;
 let _revealTimer = null;
 
@@ -41,12 +35,14 @@ function setFavicon(href) {
 }
 
 const FONT_VAR_MAP = {
-    body:       { varName: "--page-font-family",        stack: SYSTEM_FONT_STACK },
-    topbar:     { varName: "--topbar-font-family",       stack: SYSTEM_FONT_STACK },
-    slogan:     { varName: "--slogan-font-family",       stack: SYSTEM_FONT_STACK },
-    sidebar:    { varName: "--sidebar-font-family",      stack: SYSTEM_FONT_STACK },
-    bottomText: { varName: "--bottom-text-font-family",  stack: SYSTEM_FONT_STACK },
-    code:       { varName: "--md-code-font-family",      stack: MONO_FONT_STACK },
+    body:           { varName: "--page-font-family",         stack: SYSTEM_FONT_STACK },
+    topbar:         { varName: "--topbar-font-family",        stack: SYSTEM_FONT_STACK },
+    slogan:         { varName: "--slogan-font-family",        stack: SYSTEM_FONT_STACK },
+    sidebar:        { varName: "--sidebar-font-family",       stack: SYSTEM_FONT_STACK },
+    bottomText:     { varName: "--bottom-text-font-family",   stack: SYSTEM_FONT_STACK },
+    code:           { varName: "--md-code-font-family",       stack: MONO_FONT_STACK },
+    dropdownFolder: { varName: "--dropdown-folder-font-family", stack: SYSTEM_FONT_STACK },
+    dropdownBlog:   { varName: "--dropdown-blog-font-family",   stack: MONO_FONT_STACK },
 };
 
 let _fontStyleEl = null;
@@ -99,10 +95,23 @@ function applyThemeVars(theme) {
     const root = document.documentElement.style;
 
     const body = theme.body || {};
-    setOrClear(root, "--bg",                 body.backgroundColor);
-    setOrClear(root, "--page-text-color",    body.textColor);
-    setOrClear(root, "--page-font-size",     px(body.fontSize));
-    setOrClear(root, "--blog-divider-color", body.dividerColor);
+    setOrClear(root, "--bg",              body.backgroundColor);
+    setOrClear(root, "--page-text-color", body.textColor);
+    setOrClear(root, "--page-font-size",  px(body.fontSize));
+
+    const dropdown = theme.dropdown || {};
+    setOrClear(root, "--blog-divider-color", dropdown.dividerColor);
+    if (dropdown.dividerWeight != null) root.setProperty("--blog-divider-weight", px(dropdown.dividerWeight));
+
+    const dropdownFolder = dropdown.folder || {};
+    setOrClear(root, "--dropdown-folder-color",        dropdownFolder.textColor);
+    setOrClear(root, "--dropdown-folder-mobile-color", dropdownFolder.mobileTextColor);
+    setOrClear(root, "--dropdown-folder-font-size",    px(dropdownFolder.fontSize));
+
+    const dropdownBlog = dropdown.blog || {};
+    setOrClear(root, "--dropdown-blog-color",        dropdownBlog.textColor);
+    setOrClear(root, "--dropdown-blog-mobile-color", dropdownBlog.mobileTextColor);
+    setOrClear(root, "--dropdown-blog-font-size",    px(dropdownBlog.fontSize));
 
     const topbar = theme.topbar || {};
     setOrClear(root, "--topbar-bg",         topbar.backgroundColor);

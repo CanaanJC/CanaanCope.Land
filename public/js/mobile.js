@@ -215,10 +215,6 @@ function buildMenuShell() {
     projectsSlot.id = "mobileMenuProjectsSlot";
     menu.appendChild(projectsSlot);
 
-    const div1 = document.createElement("hr");
-    div1.className = "mobile-menu__divider";
-    menu.appendChild(div1);
-
     const sidebarSlot = document.createElement("div");
     sidebarSlot.id = "mobileMenuSidebarSlot";
     menu.appendChild(sidebarSlot);
@@ -301,6 +297,17 @@ async function populateLibraryTree(container, library) {
     }
 }
 
+function buildSectionTitleIcon() {
+    const icon = document.createElement("span");
+    icon.className = "mobile-menu__section-title-icon";
+    for (let i = 0; i < 3; i++) {
+        const bar = document.createElement("span");
+        bar.className = "mobile-menu__section-title-bar";
+        icon.appendChild(bar);
+    }
+    return icon;
+}
+
 async function buildContentsView(library, librariesTitle, libraryListView) {
     const contentsView = document.createElement("div");
     contentsView.className = "mobile-menu__contents-view";
@@ -308,7 +315,13 @@ async function buildContentsView(library, librariesTitle, libraryListView) {
     const title = document.createElement("button");
     title.type = "button";
     title.className = "mobile-menu__section-title";
-    title.textContent = librariesTitle;
+    title.appendChild(buildSectionTitleIcon());
+
+    const label = document.createElement("span");
+    label.className = "mobile-menu__section-title-label";
+    label.textContent = librariesTitle;
+    title.appendChild(label);
+
     title.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -349,7 +362,7 @@ function buildLibraryListView(visibleLibraries, librariesTitle, projectsSlot) {
         }
 
         const label = document.createElement("span");
-        label.className = "mobile-menu__label";
+        label.className = "mobile-menu__label mobile-menu__label--library";
         label.textContent = lib.name || lib.path;
 
         item.appendChild(iconSlot);

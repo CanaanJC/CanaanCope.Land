@@ -1,9 +1,5 @@
 ADMIN/config/master.json
 ADMIN/css/admin.css
-ADMIN/elements/Admin/config.json
-ADMIN/elements/Admin/element.css
-ADMIN/elements/Admin/element.html
-ADMIN/elements/Admin/element.js
 ADMIN/elements/archive/element.css
 ADMIN/elements/archive/element.html
 ADMIN/elements/archive/element.js
@@ -18,6 +14,10 @@ ADMIN/elements/logo-uploader/element.html
 ADMIN/elements/logo-uploader/element.js
 ADMIN/elements/Master/config.json
 ADMIN/elements/Master/element.html
+ADMIN/elements/pannel_config/config.json
+ADMIN/elements/pannel_config/element.css
+ADMIN/elements/pannel_config/element.html
+ADMIN/elements/pannel_config/element.js
 ADMIN/elements/SideBar/config.json
 ADMIN/elements/SideBar/element.html
 ADMIN/elements/SideBar/element.js
@@ -63,7 +63,6 @@ ADMIN/template/index.html
 config/defaults.json
 config/libraries.json
 config/manifest.txt
-config/theme-defaults.json
 config/update-notes/26.8.1.md
 config/update-notes/26.8.3.md
 config/update-notes/26.8.4.md

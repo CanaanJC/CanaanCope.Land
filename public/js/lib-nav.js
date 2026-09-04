@@ -174,6 +174,6 @@ export function buildNavItems(library, sortedManifest) {
         : buildTreeNavItems(sortedManifest);
 }
 
-export function navTriggerLabel(library) {
-    return libraryUsesDates(library) ? "By Month" : "Contents";
+export function navTriggerLabel(library, contentsTitle) {
+    return libraryUsesDates(library) ? "By Month" : (contentsTitle || "Contents");
 }

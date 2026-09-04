@@ -1,5 +1,3 @@
-
-
 body.mobile {
     --mobile-burger-size: 56px;
     --mobile-menu-width: min(320px, 80vw);
@@ -39,8 +37,6 @@ body.mobile .sidebar {
     display: none !important;
 }
 
-/* The mobile burger is part of the sidebar UI, so it uses the sidebar
-   background, its derived border shade, and its derived highlight shade. */
 .mobile-burger {
     display: none;
 }
@@ -111,8 +107,6 @@ body.mobile .mobile-menu-overlay.open {
     pointer-events: all;
 }
 
-/* The mobile menu is the sidebar in a different form — it uses the sidebar's
-   background, border shade, highlight shade, text colour, and font. */
 .mobile-menu {
     display: none;
 }
@@ -232,17 +226,19 @@ body.mobile .mobile-menu::-webkit-scrollbar-thumb {
     text-overflow: ellipsis;
 }
 
-/* Matches the blog-divider colour, per theme.body.dividerColor. */
+.mobile-menu__label--library {
+    color: var(--dropdown-folder-mobile-color, var(--dropdown-folder-color, var(--topbar-text-color, var(--text))));
+    font-family: var(--dropdown-folder-font-family, inherit);
+    font-size: var(--dropdown-folder-font-size, inherit);
+}
+
 .mobile-menu__divider {
     border: none;
-    border-top: 1px solid var(--blog-divider-color, #2a2a2a);
+    border-top: var(--blog-divider-weight, 1px) solid var(--blog-divider-color, #545454);
     margin: 6px 4px;
     opacity: 0.7;
 }
 
-/* --- Library list (Mode A) -------------------------------------------------
-   Plain, non-collapsible list of every visible library. No title, no
-   dropdown affordance — just the library links themselves. */
 .mobile-menu__library-list {
     display: flex;
     flex-direction: column;
@@ -253,11 +249,6 @@ body.mobile .mobile-menu::-webkit-scrollbar-thumb {
     display: none;
 }
 
-/* --- Library contents (Mode B) --------------------------------------------
-   Shown once inside a library: a plain themed "title" (actually the
-   Libraries-dropdown label from topbar.json) that swaps back to Mode A when
-   tapped, followed by the flat, non-collapsible folder/blog tree. Neither
-   element is a collapsible dropdown — nothing expands/collapses here. */
 .mobile-menu__contents-view {
     display: flex;
     flex-direction: column;
@@ -269,7 +260,9 @@ body.mobile .mobile-menu::-webkit-scrollbar-thumb {
 }
 
 .mobile-menu__section-title {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 10px;
     width: 100%;
     text-align: left;
     background: none;
@@ -278,10 +271,6 @@ body.mobile .mobile-menu::-webkit-scrollbar-thumb {
     padding: 8px 10px;
     border-radius: 8px;
     cursor: pointer;
-    font-family: var(--topbar-font-family, inherit);
-    font-size: var(--topbar-font-size, 1rem);
-    font-weight: 700;
-    color: var(--topbar-text-color, var(--text));
     box-sizing: border-box;
     -webkit-tap-highlight-color: transparent;
     transition: background-color 140ms ease;
@@ -292,21 +281,46 @@ body.mobile .mobile-menu::-webkit-scrollbar-thumb {
     background: var(--sidebar-highlight);
 }
 
+.mobile-menu__section-title-icon {
+    width: 18px;
+    height: 14px;
+    flex: 0 0 18px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.mobile-menu__section-title-bar {
+    display: block;
+    width: 100%;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--dropdown-folder-mobile-color, var(--dropdown-folder-color, var(--topbar-text-color, var(--text))));
+}
+
+.mobile-menu__section-title-label {
+    flex: 1 1 auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 700;
+    color: var(--dropdown-folder-mobile-color, var(--dropdown-folder-color, var(--topbar-text-color, var(--text))));
+    font-family: var(--dropdown-folder-font-family, inherit);
+    font-size: var(--dropdown-folder-font-size, 1rem);
+}
+
 .mobile-menu__tree {
     display: flex;
     flex-direction: column;
     width: 100%;
 }
 
-/* Folder (group) rows use the full topbar text colour — matching the desktop
-   Libraries dropdown. Blog (leaf) rows use the BLOG DIVIDER colour, matching
-   the divider lines between blogs, and brighten to the topbar text colour on
-   hover/tap for legibility. */
 .mobile-menu .topbar-tree-item--group {
     font-weight: 700;
-    color: var(--topbar-text-color, var(--text)) !important;
+    color: var(--dropdown-folder-mobile-color, var(--dropdown-folder-color, var(--topbar-text-color, var(--text)))) !important;
+    font-family: var(--dropdown-folder-font-family, inherit) !important;
+    font-size: var(--dropdown-folder-font-size, 0.95rem) !important;
     padding-top: 8px !important;
-    font-size: 0.95rem !important;
 }
 
 .mobile-menu .topbar-tree-item--group:first-child {
@@ -314,16 +328,16 @@ body.mobile .mobile-menu::-webkit-scrollbar-thumb {
 }
 
 .mobile-menu .topbar-tree-item--leaf {
-    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace !important;
+    font-family: var(--dropdown-blog-font-family, "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace) !important;
     font-weight: 400 !important;
-    color: var(--blog-divider-color, #2a2a2a) !important;
-    font-size: 0.82rem !important;
+    color: var(--dropdown-blog-mobile-color, var(--dropdown-blog-color, var(--blog-divider-color, #2a2a2a))) !important;
+    font-size: var(--dropdown-blog-font-size, 0.82rem) !important;
     letter-spacing: 0.06em;
 }
 
 .mobile-menu .topbar-tree-item--leaf:hover,
 .mobile-menu .topbar-tree-item--leaf:active {
-    color: var(--topbar-text-color, var(--text)) !important;
+    color: var(--dropdown-folder-mobile-color, var(--dropdown-folder-color, var(--topbar-text-color, var(--text)))) !important;
 }
 
 body.mobile #about-me-content,

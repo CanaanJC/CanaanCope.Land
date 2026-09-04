@@ -4,10 +4,6 @@
     --slogan-font-size: 20px;
     --slogan-color: var(--muted);
 
-    /* Derived, theme-aware shades of the topbar background. These stay in
-       proportion to whatever --topbar-bg is set to (light, dark, or coloured)
-       instead of being hard-coded greys, so borders and hover highlights
-       always read as a subtle variant of the parent surface. */
     --topbar-border:    color-mix(in srgb, var(--topbar-bg) 86%, #808080);
     --topbar-highlight: color-mix(in srgb, var(--topbar-bg) 80%, #808080);
 }
@@ -164,6 +160,12 @@
     flex: 1 1 auto;
 }
 
+.topbar-dropdown__item--library .topbar-dropdown__name {
+    color: var(--dropdown-folder-color, var(--topbar-text-color, var(--text)));
+    font-family: var(--dropdown-folder-font-family, inherit);
+    font-size: var(--dropdown-folder-font-size, inherit);
+}
+
 .topbar-slogan {
     position: absolute;
     left: 50%;
@@ -176,11 +178,6 @@
     user-select: none;
 }
 
-/* --- Topbar tree nav (the "Contents" / "By Month" dropdown) -----------------
-   Group (folder) rows use the full topbar text colour — matching the Libraries
-   dropdown. Leaf (blog) rows use the BLOG DIVIDER colour instead, so the blog
-   names in the Contents dropdown match the divider colour set in the theme.
-   Hovering a leaf brings it up to the full topbar text colour for legibility. */
 .topbar-tree-item {
     display: block;
     white-space: nowrap;
@@ -188,7 +185,9 @@
 
 .topbar-tree-item--group {
     font-weight: 700;
-    color: var(--topbar-text-color, var(--text)) !important;
+    color: var(--dropdown-folder-color, var(--topbar-text-color, var(--text))) !important;
+    font-family: var(--dropdown-folder-font-family, inherit) !important;
+    font-size: var(--dropdown-folder-font-size, inherit) !important;
     padding-top: 10px !important;
 }
 
@@ -197,13 +196,13 @@
 }
 
 .topbar-tree-item--leaf {
-    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace !important;
+    font-family: var(--dropdown-blog-font-family, "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace) !important;
     font-weight: 400 !important;
-    color: var(--blog-divider-color, #2a2a2a) !important;
-    font-size: 0.85rem !important;
+    color: var(--dropdown-blog-color, var(--blog-divider-color, #2a2a2a)) !important;
+    font-size: var(--dropdown-blog-font-size, 0.85rem) !important;
     letter-spacing: 0.06em;
 }
 
 .topbar-tree-item--leaf:hover {
-    color: var(--topbar-text-color, var(--text)) !important;
+    color: var(--dropdown-folder-color, var(--topbar-text-color, var(--text))) !important;
 }
