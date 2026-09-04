@@ -2,6 +2,7 @@
     "columns": [
         [
             "master.json",
+            "Theme",
             "update-checker"
         ],
         [

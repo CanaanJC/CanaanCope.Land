@@ -19,11 +19,12 @@ MANIFEST_FILE="config/manifest.txt"
 MASTER_CONFIG_FILE="config/master.json"
 SELF_REL_PATH="scripts/update.sh"
 TMP_DIR="scripts/.tmp-update"
-BACKUP_TIMEOUT_SECS=600     # 10 minutes — hard cap; treated as a failure if exceeded
-DOWNLOAD_CONNECT_TIMEOUT=15 # seconds to establish connection before giving up
-DOWNLOAD_MAX_TIME=300       # 5 minutes hard cap on the whole download
+HELPERS_DIR="scripts/helpers"
+BACKUP_TIMEOUT_SECS=600
+DOWNLOAD_CONNECT_TIMEOUT=15
+DOWNLOAD_MAX_TIME=300
 
-VERBOSE=false # default verbosity — set to true to always print full detail
+VERBOSE=false
 
 if [[ "${1:-}" == "verbose" ]]; then
     VERBOSE=true
@@ -33,6 +34,14 @@ vecho() {
     if [[ "${VERBOSE}" == true ]]; then
         echo "$@"
     fi
+}
+
+version_gt() {
+    local a="$1" b="$2"
+    if [[ "${a}" == "${b}" ]]; then return 1; fi
+    local higher
+    higher="$(printf '%s\n%s\n' "${a}" "${b}" | sort -V | tail -n1)"
+    [[ "${higher}" == "${a}" ]]
 }
 
 in_version_range() {
@@ -156,39 +165,50 @@ fi
 
 vecho ""
 vecho "update.sh: local version is ${LOCAL_VERSION}"
-vecho "update.sh: checking latest release on GitHub (${GITHUB_OWNER}/${GITHUB_REPO})..."
+vecho "update.sh: fetching all releases from GitHub (${GITHUB_OWNER}/${GITHUB_REPO})..."
 
-RELEASE_JSON="$(curl -fsSL "https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest")" || {
+RELEASES_JSON="$(curl -fsSL "https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases?per_page=100")" || {
     echo "update.sh: failed to reach GitHub API — check your connection." >&2
     exit 1
 }
 
-REMOTE_TAG="$(echo "${RELEASE_JSON}" | jq -r '.tag_name // empty')"
+mapfile -t ALL_VERSIONS < <(echo "${RELEASES_JSON}" | jq -r '.[].tag_name' | sed 's/^v//' | sort -V -u)
 
-if [[ -z "${REMOTE_TAG}" ]]; then
-    echo "update.sh: could not determine latest release tag — does this repo have any releases?" >&2
+if [[ ${#ALL_VERSIONS[@]} -eq 0 ]]; then
+    echo "update.sh: no releases found for ${GITHUB_OWNER}/${GITHUB_REPO} — aborting." >&2
     exit 1
 fi
 
-REMOTE_VERSION="${REMOTE_TAG#v}" # strip a leading "v" if the tag uses one
+NEWER_VERSIONS=()
+for v in "${ALL_VERSIONS[@]}"; do
+    if version_gt "${v}" "${LOCAL_VERSION}"; then
+        NEWER_VERSIONS+=("${v}")
+    fi
+done
 
-vecho "update.sh: latest release tag is \"${REMOTE_TAG}\" (version ${REMOTE_VERSION})"
-
-if [[ "${LOCAL_VERSION}" == "${REMOTE_VERSION}" ]]; then
+if [[ ${#NEWER_VERSIONS[@]} -eq 0 ]]; then
     echo "update.sh: already up to date (${LOCAL_VERSION})."
     exit 0
 fi
 
-HIGHEST="$(printf '%s\n%s\n' "${LOCAL_VERSION}" "${REMOTE_VERSION}" | sort -V | tail -n1)"
+mapfile -t NEWER_VERSIONS < <(printf '%s\n' "${NEWER_VERSIONS[@]}" | sort -V)
 
-if [[ "${HIGHEST}" == "${LOCAL_VERSION}" ]]; then
-    echo "update.sh: local version (${LOCAL_VERSION}) is newer than the latest release — nothing to do."
-    exit 0
+NEXT_VERSION="${NEWER_VERSIONS[0]}"
+TOTAL_NEWER=${#NEWER_VERSIONS[@]}
+REMAINING_AFTER=$(( TOTAL_NEWER - 1 ))
+
+NEXT_TAG="$(echo "${RELEASES_JSON}" | jq -r --arg v "${NEXT_VERSION}" '.[] | select((.tag_name | sub("^v";""))==$v) | .tag_name' | head -n1)"
+
+if [[ -z "${NEXT_TAG}" ]]; then
+    echo "update.sh: could not resolve a release tag for version ${NEXT_VERSION} — aborting." >&2
+    exit 1
 fi
 
+vecho "update.sh: next version in line is ${NEXT_VERSION} (tag ${NEXT_TAG}) — ${TOTAL_NEWER} version(s) newer than local in total"
+
 echo ""
-echo "update.sh: update available: ${LOCAL_VERSION} → ${REMOTE_VERSION}"
-read -rp "Proceed with update? [y/N]: " confirm_update
+echo "update.sh: update available: ${LOCAL_VERSION} → ${NEXT_VERSION} (next of ${TOTAL_NEWER} available update(s))"
+read -rp "Proceed with this update? [y/N]: " confirm_update
 if [[ ! "${confirm_update}" =~ ^[Yy]$ ]]; then
     echo "update.sh: cancelled — no changes made."
     exit 0
@@ -222,7 +242,7 @@ echo "backing up"
 vecho "update.sh: backup destination is \"${BACKUP_PATH_CONFIGURED}\" — running backup now"
 vecho "update.sh: (hard timeout: ${BACKUP_TIMEOUT_SECS}s — treated as a failure if exceeded)"
 
-BACKUP_TAG="update from ${LOCAL_VERSION} to ${REMOTE_VERSION}"
+BACKUP_TAG="update from ${LOCAL_VERSION} to ${NEXT_VERSION}"
 BACKUP_LOG="$(mktemp)"
 
 set +e
@@ -299,9 +319,9 @@ vecho ""
 vecho "update.sh: scratch/temp files for this run live at ${PROJECT_ROOT}/${TMP_DIR} (auto-deleted on exit, including Ctrl-C)"
 
 vecho ""
-vecho "update.sh: downloading release ${REMOTE_TAG}..."
+vecho "update.sh: downloading release ${NEXT_TAG}..."
 
-TARBALL_URL="https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/archive/refs/tags/${REMOTE_TAG}.tar.gz"
+TARBALL_URL="https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/archive/refs/tags/${NEXT_TAG}.tar.gz"
 TARBALL_PATH="${TMP_DIR}/release.tar.gz"
 
 CURL_DOWNLOAD_FLAGS=(-fL)
@@ -337,7 +357,7 @@ if [[ ! -f "${EXTRACTED_ROOT}/${MANIFEST_FILE}" ]]; then
 fi
 
 echo ""
-echo "update.sh: checking for files removed in the new release..."
+echo "update.sh: checking for files removed in this release..."
 
 REMOVED_FILES=""
 
@@ -355,7 +375,7 @@ fi
 
 if [[ -n "${REMOVED_FILES}" ]]; then
     echo ""
-    echo "update.sh: the files listed above no longer exist in the new release."
+    echo "update.sh: the files listed above no longer exist in this release."
     read -rp "Delete all of these files locally? [y/N]: " confirm_delete
     if [[ "${confirm_delete}" =~ ^[Yy]$ ]]; then
         while IFS= read -r rel; do
@@ -427,8 +447,8 @@ if [[ -f "${VERSION_FILE}" ]]; then
     ON_DISK_VERSION="$(tr -d '[:space:]' < "${VERSION_FILE}")"
 fi
 
-if [[ "${ON_DISK_VERSION}" != "${REMOTE_VERSION}" ]]; then
-    echo "  warning: ${VERSION_FILE} reads \"${ON_DISK_VERSION}\", expected \"${REMOTE_VERSION}\"" >&2
+if [[ "${ON_DISK_VERSION}" != "${NEXT_VERSION}" ]]; then
+    echo "  warning: ${VERSION_FILE} reads \"${ON_DISK_VERSION}\", expected \"${NEXT_VERSION}\"" >&2
     VERIFY_OK=0
 fi
 
@@ -451,6 +471,20 @@ else
     echo "update.sh: verification found issues (see warnings above) — review before trusting this update." >&2
 fi
 
+echo ""
+HELPER_SCRIPT="${PROJECT_ROOT}/${HELPERS_DIR}/${NEXT_VERSION}.sh"
+if [[ -f "${HELPER_SCRIPT}" ]]; then
+    echo "update.sh: running helper script for ${NEXT_VERSION}..."
+    chmod +x "${HELPER_SCRIPT}" 2>/dev/null || true
+    if bash "${HELPER_SCRIPT}"; then
+        echo "update.sh: helper script completed successfully."
+    else
+        echo "update.sh: WARNING — helper script for ${NEXT_VERSION} exited with a non-zero status." >&2
+    fi
+else
+    echo "update.sh: no helper script for ${NEXT_VERSION} (expected at ${HELPERS_DIR}/${NEXT_VERSION}.sh) — nothing extra to run."
+fi
+
 NOTES_FOUND=0
 NOTES_DIR="${PROJECT_ROOT}/config/update-notes"
 
@@ -459,7 +493,7 @@ if [[ -d "${NOTES_DIR}" ]]; then
         find "${NOTES_DIR}" -maxdepth 1 -type f -name '*.md' -exec basename {} .md \; \
         | while IFS= read -r ver; do
             [[ -z "${ver}" ]] && continue
-            if in_version_range "${ver}" "${LOCAL_VERSION}" "${REMOTE_VERSION}"; then
+            if in_version_range "${ver}" "${LOCAL_VERSION}" "${NEXT_VERSION}"; then
                 printf '%s\n' "${ver}"
             fi
         done | sort -V
@@ -470,7 +504,7 @@ if [[ -d "${NOTES_DIR}" ]]; then
             [[ -z "${ver}" ]] && continue
             notes_rel="config/update-notes/${ver}.md"
             notes_path="${NOTES_DIR}/${ver}.md"
-            notes_blob_url="https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/blob/${REMOTE_TAG}/${notes_rel}"
+            notes_blob_url="https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/blob/${NEXT_TAG}/${notes_rel}"
 
             if [[ -f "${notes_path}" ]]; then
                 NOTES_FOUND=$((NOTES_FOUND + 1))
@@ -488,11 +522,17 @@ if [[ -d "${NOTES_DIR}" ]]; then
 fi
 
 if [[ ${NOTES_FOUND} -eq 0 ]]; then
-    echo "update.sh: no update instructions found for any version between ${LOCAL_VERSION} and ${REMOTE_VERSION}."
+    echo "update.sh: no update instructions found for version ${NEXT_VERSION}."
 else
     echo ""
     echo "update.sh: ${NOTES_FOUND} update note(s) found above — review in order for anything requiring manual steps."
 fi
 
 echo ""
-echo "update.sh: done."
+echo "update.sh: updated from ${LOCAL_VERSION} to ${NEXT_VERSION}."
+
+if [[ ${REMAINING_AFTER} -gt 0 ]]; then
+    echo "update.sh: there are ${REMAINING_AFTER} more version(s) still available. Run this script again to update to the next version."
+else
+    echo "update.sh: you are now fully up to date."
+fi

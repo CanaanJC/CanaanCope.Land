@@ -226,10 +226,7 @@ function buildMenuShell() {
     document.body.appendChild(menu);
 }
 
-function scrollToMobileId(id, isLeaf) {
-    // Close the menu first for both folders and blogs, then scroll once
-    // the slide-out transition has finished so content isn't hidden
-    // behind the still-open overlay/menu.
+function scrollToMobileId(id) {
     closeMenu();
     setTimeout(() => {
         if (!id) return;
@@ -238,9 +235,24 @@ function scrollToMobileId(id, isLeaf) {
     }, 260);
 }
 
+function navigateOrScrollMobile(library, targetId) {
+    if (!targetId) {
+        closeMenu();
+        return;
+    }
 
+    const onThisLibrary = window.__CURRENT_LIBRARY_PATH__ === library.path;
 
-function renderMobileNavItems(items, container) {
+    if (onThisLibrary) {
+        scrollToMobileId(targetId);
+        return;
+    }
+
+    closeMenu();
+    window.location.href = `/${library.path}#${targetId}`;
+}
+
+function renderMobileNavItems(items, container, library) {
     for (const item of items) {
         const btn = document.createElement("button");
         btn.type = "button";
@@ -250,17 +262,19 @@ function renderMobileNavItems(items, container) {
         btn.addEventListener("click", (e) => {
             e.preventDefault();
             e.stopPropagation();
-            scrollToMobileId(item.targetId, item.isLeaf);
+            navigateOrScrollMobile(library, item.targetId);
         });
         container.appendChild(btn);
     }
 }
 
 function getCurrentLibrary(libraries) {
+    if (window.__CURRENT_LIBRARY_PATH__) {
+        return libraries.find(l => l.path === window.__CURRENT_LIBRARY_PATH__) || null;
+    }
     const blockedPath = window.__LIBRARY_BLOCKED_PATH__;
     if (blockedPath) return libraries.find(l => l.path === blockedPath) || null;
-    const seg = window.location.pathname.split("/").filter(Boolean)[0];
-    return libraries.find(l => l.path === seg) || null;
+    return null;
 }
 
 async function fetchJson(url) {
@@ -281,7 +295,7 @@ async function populateLibraryTree(container, library) {
         if (!Array.isArray(manifest) || manifest.length === 0) return;
 
         manifest = sortManifestEntries(library, manifest);
-        renderMobileNavItems(buildNavItems(library, manifest), container);
+        renderMobileNavItems(buildNavItems(library, manifest), container, library);
     } catch (err) {
         console.error(`Mobile: failed to load manifest for "${library.path}":`, err);
     }
@@ -344,12 +358,6 @@ function buildLibraryListView(visibleLibraries, librariesTitle, projectsSlot) {
         item.addEventListener("click", async (e) => {
             e.preventDefault();
             e.stopPropagation();
-
-            const newPath = `/${lib.path}`;
-            if (window.location.pathname !== newPath) {
-                window.history.pushState({}, "", newPath);
-                window.__LIBRARY_BLOCKED_PATH__ = lib.path;
-            }
 
             let contentsView = projectsSlot.querySelector(".mobile-menu__contents-view");
             if (contentsView) contentsView.remove();

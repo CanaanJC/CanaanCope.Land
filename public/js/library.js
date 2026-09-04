@@ -72,10 +72,6 @@ function buildEntryBlock(library, slugPath, config, rawMd) {
     });
 }
 
-/* --- Dividers --------------------------------------------------------------
-   A plain divider is the usual line. A "folder" divider is used when two
-   consecutive blogs live in different folders (at ANY depth): it's the same
-   line, but broken in the middle with the folder title sitting in the gap. */
 function buildPlainDivider() {
     const hr = document.createElement("hr");
     hr.className = "blog-divider";
@@ -95,13 +91,10 @@ function buildFolderDivider(title) {
     return div;
 }
 
-// If prev and cur blogs share the same parent folder path, returns null (plain
-// divider). Otherwise returns the label of the FIRST folder level at which they
-// diverge — i.e. the title of the folder boundary being crossed.
 function folderDividerLabel(prev, cur) {
     const a = Array.isArray(prev.slugPath) ? prev.slugPath : [];
     const b = Array.isArray(cur.slugPath)  ? cur.slugPath  : [];
-    const parentLen = b.length - 1; // exclude the blog folder itself
+    const parentLen = b.length - 1;
 
     for (let i = 0; i < parentLen; i++) {
         if (a[i] !== b[i]) return folderLabel(b[i]);
@@ -323,6 +316,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
     }
     applyLibraryTitle(library);
-    if (IS_BLOCKED) loadBlockedEntry(library);
-    else loadLibrary(library);
+    if (IS_BLOCKED) {
+        loadBlockedEntry(library);
+    } else {
+        window.__CURRENT_LIBRARY_PATH__ = library.path;
+        loadLibrary(library);
+    }
 });

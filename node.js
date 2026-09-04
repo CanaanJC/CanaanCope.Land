@@ -6,7 +6,7 @@ const { startStatCachePruner } = require("./lib/fsCache");
 const { handleRoutes } = require("./lib/routes");
 const { serveStaticFile } = require("./lib/staticFile");
 const { loadExtensions, runExtensions } = require("./lib/extensions");
-const { ensureMasterConfig } = require("./lib/siteConfig");
+const { ensureMasterConfig, ensureThemeConfig } = require("./lib/siteConfig");
 const { ensureFavicon } = require("./lib/favicon");
 const { ensureAboutMe } = require("./lib/aboutMe");
 const { startBackupScheduler, startTerminalCommands } = require("./lib/backup");
@@ -14,6 +14,7 @@ const { startAdminServer } = require("./lib/adminServer");
 const { startUpdateChecker } = require("./lib/updateChecker");
 
 ensureMasterConfig();
+ensureThemeConfig();
 
 async function boot() {
     await ensureFavicon();
@@ -55,11 +56,11 @@ async function boot() {
         serveStaticFile(req, res, safePath, stdHeaders);
     });
 
-    server.keepAliveTimeout = 65000;  // ms — must be > Caddy's keep-alive timeout
+    server.keepAliveTimeout = 65000;
     server.headersTimeout   = 70000;
 
-    server.maxRequestsPerSocket = 0; // unlimited
-    server.requestTimeout       = 0; // disable per-request timeout (large media)
+    server.maxRequestsPerSocket = 0;
+    server.requestTimeout       = 0;
 
     server.listen(PORT, HOST, () => {
         console.log(`Server running at http://localhost:${PORT}`);
