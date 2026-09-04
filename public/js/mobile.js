@@ -227,19 +227,18 @@ function buildMenuShell() {
 }
 
 function scrollToMobileId(id, isLeaf) {
-    const doScroll = () => {
+    // Close the menu first for both folders and blogs, then scroll once
+    // the slide-out transition has finished so content isn't hidden
+    // behind the still-open overlay/menu.
+    closeMenu();
+    setTimeout(() => {
         if (!id) return;
         const el = document.getElementById(id) || document.getElementById(`placeholder-${id}`);
         if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-    };
-
-    if (isLeaf) {
-        closeMenu();
-        setTimeout(doScroll, 260);
-    } else {
-        doScroll();
-    }
+    }, 260);
 }
+
+
 
 function renderMobileNavItems(items, container) {
     for (const item of items) {

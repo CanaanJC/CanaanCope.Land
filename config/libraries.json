@@ -1,9 +1,9 @@
 [
     {
-        "id": "test",
-        "name": "test",
-        "path": "test",
-        "depth": 3,
+        "id": "1",
+        "name": "1",
+        "path": "1",
+        "depth": 1,
         "useDates": false,
         "hidden": false,
         "icon": ""

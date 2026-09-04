@@ -1,5 +1,3 @@
-
-
 body.blog-gallery-open {
     overflow: hidden;
 }
@@ -52,11 +50,6 @@ body.blog-gallery-open {
     margin-bottom: 56px;
 }
 
-/* --- Folder-boundary divider ----------------------------------------------
-   Used between two consecutive blogs that live in DIFFERENT folders (at any
-   depth). It's the same divider line as .blog-divider, but broken in the
-   middle with the folder title sitting in the gap instead of an unbroken
-   line. The two line segments use the same --blog-divider-color. */
 .blog-divider--labeled {
     border: none;
     display: flex;
@@ -77,7 +70,7 @@ body.blog-gallery-open {
     font-size: 0.95rem;
     font-weight: 600;
     letter-spacing: 0.04em;
-    color: var(--muted);
+    color: var(--page-text-color, var(--text));
     white-space: nowrap;
     max-width: 70%;
     overflow: hidden;
