@@ -248,8 +248,8 @@ body.blog-gallery-open {
 }
 
 .blog-md-content code {
-    background: var(--md-code-bg, #252525);
-    border: 1px solid var(--md-code-border, #333);
+    background: var(--md-inline-bg, #252525);
+    border: 1px solid var(--md-inline-border, #333);
     border-radius: 4px;
     padding: 1px 5px;
     font-size: var(--md-code-font-size, 0.875em);
@@ -297,7 +297,7 @@ body.blog-gallery-open {
 }
 
 .blog-md-content th {
-    background: var(--md-code-bg, #232323);
+    background: var(--md-inline-bg, #232323);
     color: var(--page-text-color, var(--text));
     font-weight: 600;
 }

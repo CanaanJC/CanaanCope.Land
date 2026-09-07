@@ -136,12 +136,12 @@ function applyThemeVars(theme) {
     setOrClear(root, "--bottom-text-font-size", px(bottomText.fontSize));
 
     const code = theme.code || {};
-    setOrClear(root, "--md-code-bg",          code.backgroundColor);
-    setOrClear(root, "--md-code-border",      code.borderColor);
-    setOrClear(root, "--md-code-text",        code.textColor);
-    setOrClear(root, "--md-block-bg",         code.blockBackgroundColor);
-    setOrClear(root, "--md-block-border",     code.blockBorderColor);
-    setOrClear(root, "--md-code-font-size",   px(code.fontSize));
+    setOrClear(root, "--md-inline-bg",       code.inlineBackgroundColor);
+    setOrClear(root, "--md-inline-border",   code.inlineBorderColor);
+    setOrClear(root, "--md-code-text",       code.textColor);
+    setOrClear(root, "--md-block-bg",        code.blockBackgroundColor);
+    setOrClear(root, "--md-block-border",    code.blockBorderColor);
+    setOrClear(root, "--md-code-font-size",  px(code.fontSize));
 }
 
 async function loadTheme() {
