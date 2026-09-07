@@ -1,4 +1,3 @@
-
 console.log("lib-blog module loaded");
 
 const MARKED_CDN = "https://cdn.jsdelivr.net/npm/marked@12/marked.min.js";
@@ -72,8 +71,8 @@ function isAudioFile(filename) {
 }
 
 export function parseContentMd(raw) {
-    const blockRegex   = /\[P([^\]]+)\]([\s\S]*?)\[\/P\1\]/g;
-    const innerMRegex  = /\[M([^\]]+)\]([\s\S]*?)\[\/M\1\]/g;
+    const blockRegex = /\[P([^\]]+)\]([\s\S]*?)\[\/P\1\]/g;
+    const innerMRegex = /\[M([^\]]+)\]([\s\S]*?)\[\/M\1\]/g;
     const blocks = [];
     let match;
     while ((match = blockRegex.exec(raw)) !== null) {
@@ -89,8 +88,8 @@ export function parseAllBlocks(raw) {
     let match;
     while ((match = blockRegex.exec(raw)) !== null) {
         blocks.push({
-            kind:    match[1],
-            tag:     match[2].trim(),
+            kind: match[1],
+            tag: match[2].trim(),
             content: match[3].trim(),
         });
     }
@@ -102,7 +101,7 @@ export function groupIntoRows(blocks) {
     for (const block of blocks) {
         const m = block.tag.match(/^(\d+)([ab]?)$/);
         if (!m) continue;
-        const num  = m[1];
+        const num = m[1];
         const side = m[2] || "full";
         if (!rowMap.has(num)) rowMap.set(num, {});
         rowMap.get(num)[side] = block.content;
@@ -137,15 +136,15 @@ export function parseInlineToken(raw) {
     }
 
     if (/^stl:/i.test(value)) {
-        const rest  = value.slice(4).trim();
+        const rest = value.slice(4).trim();
         const parts = rest.split("|").map(p => p.trim());
         if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) return null;
         return { type: "stl", file: parts[0], bgColor: parts[1], modelColor: parts[2] };
     }
 
     const loopMatch = value.match(/^([\w\-./]+\.[a-z0-9]+)\s+loop$/i);
-    const filename  = loopMatch ? loopMatch[1] : value;
-    const loop      = !!loopMatch;
+    const filename = loopMatch ? loopMatch[1] : value;
+    const loop = !!loopMatch;
 
     if (isImageFile(filename)) return { type: "image", file: filename };
     if (isVideoFile(filename)) return { type: "video", file: filename, loop };
@@ -162,7 +161,7 @@ export function extractInlineSegments(text) {
 
     while ((m = regex.exec(text)) !== null) {
         const token = parseInlineToken(m[1]);
-        if (!token) continue; // leave unrecognized bracket text embedded in the surrounding text
+        if (!token) continue;
 
         if (m.index > lastIndex) {
             segments.push({ type: "text", value: text.substring(lastIndex, m.index) });
@@ -212,31 +211,46 @@ function buildLoopVideoEl(src, file, isGif, className) {
     video.setAttribute("disablepictureinpicture", "");
 
     const source = document.createElement("source");
-    source.src  = src;
+    source.src = src;
     source.type = /\.webm$/i.test(file) ? "video/webm" : "video/mp4";
     video.appendChild(source);
 
     let fallbackTimer = null;
 
-    const kickPlay = () => { video.play().catch(() => {}); };
+    const kickPlay = () => {
+        video.play().catch(() => {});
+    };
 
     video.addEventListener("loadeddata", () => {
-        if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+        if (fallbackTimer) {
+            clearTimeout(fallbackTimer);
+            fallbackTimer = null;
+        }
         kickPlay();
     });
+
     video.addEventListener("canplay", kickPlay);
 
     if (isGif) {
         let swapped = false;
+
         const swapToImg = () => {
             if (swapped) return;
             swapped = true;
-            if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+
+            if (fallbackTimer) {
+                clearTimeout(fallbackTimer);
+                fallbackTimer = null;
+            }
+
             const img = document.createElement("img");
-            img.className = "blog-image";
-            img.src = src;   // same .gif URL — plays natively as an animated image
+            img.className = video.classList.contains("blog-gallery-media")
+                ? "blog-gallery-media"
+                : "blog-image";
+            img.src = src;
             img.alt = file;
-            img.loading = "lazy";
+            img.loading = video.classList.contains("blog-gallery-media") ? "eager" : "lazy";
+
             if (video.parentNode) video.replaceWith(img);
         };
 
@@ -255,6 +269,28 @@ function makeLoopWrap(src, file, isGif) {
     const wrap = document.createElement("span");
     wrap.className = "blog-image-wrap blog-video-wrap blog-loop-wrap";
     wrap.appendChild(buildLoopVideoEl(src, file, isGif, "blog-video blog-loop-video"));
+    return wrap;
+}
+
+function makeImageZoomable(wrap, file, mediaBaseUrl) {
+    wrap.classList.add("blog-image-wrap--zoomable");
+    wrap.tabIndex = 0;
+    wrap.setAttribute("role", "button");
+    wrap.setAttribute("aria-haspopup", "dialog");
+    wrap.setAttribute("aria-label", `Open image: ${file}`);
+
+    wrap.addEventListener("click", (e) => {
+        e.preventDefault();
+        openGalleryModal([file], mediaBaseUrl, wrap);
+    });
+
+    wrap.addEventListener("keydown", (e) => {
+        if (e.target !== wrap || (e.key !== "Enter" && e.key !== " ")) return;
+        e.preventDefault();
+        if (e.repeat) return;
+        openGalleryModal([file], mediaBaseUrl, wrap);
+    });
+
     return wrap;
 }
 
@@ -302,10 +338,12 @@ function renderLinkEmbed(url, interactive) {
     iframe.className = "blog-link-iframe";
     iframe.loading = "lazy";
     iframe.referrerPolicy = "no-referrer-when-downgrade";
+
     if (!interactive) {
         iframe.tabIndex = -1;
         iframe.setAttribute("aria-hidden", "true");
     }
+
     wrap.appendChild(iframe);
 
     if (interactive) {
@@ -321,7 +359,9 @@ function renderLinkEmbed(url, interactive) {
     }
 
     fetch(url, { mode: "no-cors" })
-        .then(() => { iframe.src = url; })
+        .then(() => {
+            iframe.src = url;
+        })
         .catch(() => {
             wrap.innerHTML = "";
             wrap.appendChild(buildLinkErrorCard(url));
@@ -332,10 +372,11 @@ function renderLinkEmbed(url, interactive) {
 
 let _threePromise = null;
 
-const STL_FILL_FRACTION = 0.9; // ← model's diameter fills this fraction of the viewport
+const STL_FILL_FRACTION = 0.9;
 
 function loadThreeStack() {
     if (_threePromise) return _threePromise;
+
     _threePromise = Promise.all([
         import("https://cdn.jsdelivr.net/npm/three@0.160.0/+esm"),
         import("https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/STLLoader.js/+esm"),
@@ -345,6 +386,7 @@ function loadThreeStack() {
         STLLoader: STLLoaderMod.STLLoader,
         OrbitControls: OrbitControlsMod.OrbitControls,
     }));
+
     return _threePromise;
 }
 
@@ -353,7 +395,7 @@ function renderStlViewer(url, bgColor, modelColor) {
     wrap.className = "blog-stl-wrap";
 
     loadThreeStack().then(({ THREE, STLLoader, OrbitControls }) => {
-        const width  = wrap.clientWidth  || 300;
+        const width = wrap.clientWidth || 300;
         const height = wrap.clientHeight || 300;
 
         const scene = new THREE.Scene();
@@ -367,6 +409,7 @@ function renderStlViewer(url, bgColor, modelColor) {
         wrap.appendChild(renderer.domElement);
 
         scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+
         const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
         dirLight.position.set(1, 1, 1);
         scene.add(dirLight);
@@ -377,11 +420,11 @@ function renderStlViewer(url, bgColor, modelColor) {
         controls.enablePan = false;
 
         const loader = new STLLoader();
+
         loader.load(
             url,
             (geometry) => {
                 geometry.rotateX(-Math.PI / 2);
-
                 geometry.computeVertexNormals();
                 geometry.computeBoundingSphere();
 
@@ -389,9 +432,11 @@ function renderStlViewer(url, bgColor, modelColor) {
                 const mesh = new THREE.Mesh(geometry, material);
 
                 const sphere = geometry.boundingSphere;
+
                 if (sphere) {
                     mesh.position.set(-sphere.center.x, -sphere.center.y, -sphere.center.z);
                 }
+
                 scene.add(mesh);
 
                 const radius = (sphere && sphere.radius) || 1;
@@ -410,12 +455,13 @@ function renderStlViewer(url, bgColor, modelColor) {
         );
 
         const resizeObserver = new ResizeObserver(() => {
-            const w = wrap.clientWidth  || 300;
+            const w = wrap.clientWidth || 300;
             const h = wrap.clientHeight || 300;
             renderer.setSize(w, h);
             camera.aspect = w / h;
             camera.updateProjectionMatrix();
         });
+
         resizeObserver.observe(wrap);
 
         function animate() {
@@ -423,6 +469,7 @@ function renderStlViewer(url, bgColor, modelColor) {
             controls.update();
             renderer.render(scene, camera);
         }
+
         animate();
     }).catch((err) => {
         console.error("STL: failed to load three.js:", err);
@@ -432,36 +479,60 @@ function renderStlViewer(url, bgColor, modelColor) {
 }
 
 let _escListener = null;
+let _galleryReturnFocus = null;
 
 export function closeGalleryModal() {
     const overlay = document.getElementById("blog-gallery-modal-overlay");
-    if (overlay) overlay.remove();
+
+    if (overlay) {
+        overlay.querySelectorAll("video, audio").forEach(media => media.pause());
+        overlay.remove();
+    }
+
     document.body.classList.remove("blog-gallery-open");
+
     if (_escListener) {
         document.removeEventListener("keydown", _escListener);
         _escListener = null;
     }
+
+    const returnFocus = _galleryReturnFocus;
+    _galleryReturnFocus = null;
+
+    if (returnFocus && returnFocus.isConnected && typeof returnFocus.focus === "function") {
+        returnFocus.focus({ preventScroll: true });
+    }
 }
 
-export function openGalleryModal(files, mediaBaseUrl) {
+export function openGalleryModal(files, mediaBaseUrl, trigger = null) {
+    if (!Array.isArray(files) || files.length === 0) return;
+
     closeGalleryModal();
 
+    _galleryReturnFocus = trigger || document.activeElement;
+
     const colCount = Math.min(files.length, 3);
+    const singleImage = files.length === 1 && isImageFile(files[0]);
 
     const overlay = document.createElement("div");
     overlay.id = "blog-gallery-modal-overlay";
     overlay.className = "blog-gallery-overlay";
+
     overlay.addEventListener("click", (e) => {
         if (e.target === overlay) closeGalleryModal();
     });
 
     const card = document.createElement("div");
-    card.className = "blog-gallery-card";
+    card.className = "blog-gallery-card" + (singleImage ? " blog-gallery-card--single" : "");
+    card.setAttribute("role", "dialog");
+    card.setAttribute("aria-modal", "true");
+    card.setAttribute("aria-label", singleImage ? `Image: ${files[0]}` : "Media gallery");
 
     const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
     closeBtn.className = "blog-gallery-close";
-    closeBtn.setAttribute("aria-label", "Close gallery");
-    closeBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" fill="none">
+    closeBtn.setAttribute("aria-label", singleImage ? "Close image" : "Close gallery");
+    closeBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
         <line x1="2" y1="2" x2="16" y2="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
         <line x1="16" y1="2" x2="2" y2="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
     </svg>`;
@@ -481,28 +552,40 @@ export function openGalleryModal(files, mediaBaseUrl) {
         item.className = "blog-gallery-item";
 
         if (isGifFile(file)) {
-            item.appendChild(buildLoopVideoEl(`${mediaBaseUrl}/${file}`, file, true, "blog-gallery-media blog-loop-video"));
+            item.appendChild(
+                buildLoopVideoEl(
+                    `${mediaBaseUrl}/${file}`,
+                    file,
+                    true,
+                    "blog-gallery-media blog-loop-video"
+                )
+            );
         } else if (isVideoFile(file)) {
             const video = document.createElement("video");
             video.className = "blog-gallery-media";
             video.controls = true;
             video.preload = "metadata";
             video.playsInline = true;
+
             const source = document.createElement("source");
-            source.src  = `${mediaBaseUrl}/${file}`;
+            source.src = `${mediaBaseUrl}/${file}`;
             source.type = /\.webm$/i.test(file) ? "video/webm" : "video/mp4";
+
             video.appendChild(source);
             item.appendChild(video);
         } else if (isAudioFile(file)) {
             const wrap = document.createElement("div");
             wrap.className = "blog-audio-wrap";
+
             const audio = document.createElement("audio");
             audio.className = "blog-audio";
             audio.controls = true;
             audio.preload = "metadata";
+
             const source = document.createElement("source");
-            source.src  = `${mediaBaseUrl}/${file}`;
+            source.src = `${mediaBaseUrl}/${file}`;
             source.type = /\.wav$/i.test(file) ? "audio/wav" : "audio/mpeg";
+
             audio.appendChild(source);
             wrap.appendChild(audio);
             item.appendChild(wrap);
@@ -511,7 +594,8 @@ export function openGalleryModal(files, mediaBaseUrl) {
             img.className = "blog-gallery-media";
             img.src = `${mediaBaseUrl}/${file}`;
             img.alt = file;
-            img.loading = "lazy";
+            img.loading = singleImage ? "eager" : "lazy";
+
             item.appendChild(img);
         }
 
@@ -525,8 +609,39 @@ export function openGalleryModal(files, mediaBaseUrl) {
     document.body.appendChild(overlay);
     document.body.classList.add("blog-gallery-open");
 
-    _escListener = (e) => { if (e.key === "Escape") closeGalleryModal(); };
+    _escListener = (e) => {
+        if (e.key === "Escape") {
+            e.preventDefault();
+            closeGalleryModal();
+            return;
+        }
+
+        if (e.key !== "Tab") return;
+
+        const focusable = Array.from(
+            card.querySelectorAll(
+                'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), video[controls], audio[controls], [tabindex]:not([tabindex="-1"])'
+            )
+        ).filter(el => el.tabIndex >= 0 && el.getClientRects().length > 0);
+
+        const first = focusable[0] || closeBtn;
+        const last = focusable[focusable.length - 1] || closeBtn;
+        const active = document.activeElement;
+
+        if (!card.contains(active)) {
+            e.preventDefault();
+            (e.shiftKey ? last : first).focus();
+        } else if (e.shiftKey && active === first) {
+            e.preventDefault();
+            last.focus();
+        } else if (!e.shiftKey && active === last) {
+            e.preventDefault();
+            first.focus();
+        }
+    };
+
     document.addEventListener("keydown", _escListener);
+    closeBtn.focus({ preventScroll: true });
 }
 
 export function renderFolderCell(folderName, mediaBaseUrl, listingUrl) {
@@ -538,41 +653,54 @@ export function renderFolderCell(folderName, mediaBaseUrl, listingUrl) {
 
     const wrap = document.createElement("span");
     wrap.className = "blog-image-wrap";
+
     outer.appendChild(wrap);
     cell.appendChild(outer);
 
     fetch(`${listingUrl}?_=${Date.now()}`, { cache: "no-store" })
         .then(r => r.json())
         .then(files => {
-            if (!files.length) return;
+            if (!Array.isArray(files) || !files.length) return;
 
-            const first           = files[0];
-            const remaining       = files.length - 1;
+            const first = files[0];
+            const remaining = files.length - 1;
             const folderMediaBase = `${mediaBaseUrl}/${folderName}`;
 
             if (isGifFile(first)) {
-                wrap.appendChild(buildLoopVideoEl(`${folderMediaBase}/${first}`, first, true, "blog-video blog-loop-video"));
+                wrap.appendChild(
+                    buildLoopVideoEl(
+                        `${folderMediaBase}/${first}`,
+                        first,
+                        true,
+                        "blog-video blog-loop-video"
+                    )
+                );
             } else if (isVideoFile(first)) {
                 const video = document.createElement("video");
                 video.className = "blog-video";
                 video.controls = true;
                 video.preload = "auto";
                 video.playsInline = true;
+
                 const source = document.createElement("source");
-                source.src  = `${folderMediaBase}/${first}`;
+                source.src = `${folderMediaBase}/${first}`;
                 source.type = /\.webm$/i.test(first) ? "video/webm" : "video/mp4";
+
                 video.appendChild(source);
                 wrap.appendChild(video);
             } else if (isAudioFile(first)) {
                 const audioWrap = document.createElement("div");
                 audioWrap.className = "blog-audio-wrap";
+
                 const audio = document.createElement("audio");
                 audio.className = "blog-audio";
                 audio.controls = true;
                 audio.preload = "metadata";
+
                 const source = document.createElement("source");
-                source.src  = `${folderMediaBase}/${first}`;
+                source.src = `${folderMediaBase}/${first}`;
                 source.type = /\.wav$/i.test(first) ? "audio/wav" : "audio/mpeg";
+
                 audio.appendChild(source);
                 audioWrap.appendChild(audio);
                 wrap.appendChild(audioWrap);
@@ -582,11 +710,26 @@ export function renderFolderCell(folderName, mediaBaseUrl, listingUrl) {
                 img.src = `${folderMediaBase}/${first}`;
                 img.alt = first;
                 img.loading = "lazy";
+
                 wrap.appendChild(img);
             }
 
             outer.style.cursor = "pointer";
-            outer.addEventListener("click", () => openGalleryModal(files, folderMediaBase));
+            outer.tabIndex = 0;
+            outer.setAttribute("role", "button");
+            outer.setAttribute("aria-haspopup", "dialog");
+            outer.setAttribute("aria-label", `Open gallery: ${folderName}`);
+
+            outer.addEventListener("click", () => {
+                openGalleryModal(files, folderMediaBase, outer);
+            });
+
+            outer.addEventListener("keydown", (e) => {
+                if (e.target !== outer || (e.key !== "Enter" && e.key !== " ")) return;
+                e.preventDefault();
+                if (e.repeat) return;
+                openGalleryModal(files, folderMediaBase, outer);
+            });
 
             if (remaining > 0) {
                 const badge = document.createElement("span");
@@ -613,50 +756,64 @@ export function renderMediaToken(token, mediaBaseUrl, listingBaseUrl) {
 
         case "image": {
             if (isGifFile(token.file)) {
-                return makeLoopWrap(`${mediaBaseUrl}/${token.file}`, token.file, true);
+                const wrap = makeLoopWrap(`${mediaBaseUrl}/${token.file}`, token.file, true);
+                return makeImageZoomable(wrap, token.file, mediaBaseUrl);
             }
+
             const wrap = document.createElement("span");
             wrap.className = "blog-image-wrap";
+
             const img = document.createElement("img");
             img.className = "blog-image";
             img.src = `${mediaBaseUrl}/${token.file}`;
             img.alt = token.file;
             img.loading = "lazy";
+
             wrap.appendChild(img);
-            return wrap;
+
+            return makeImageZoomable(wrap, token.file, mediaBaseUrl);
         }
 
         case "video": {
             if (token.loop) {
                 return makeLoopWrap(`${mediaBaseUrl}/${token.file}`, token.file, false);
             }
+
             const wrap = document.createElement("span");
             wrap.className = "blog-image-wrap blog-video-wrap";
+
             const video = document.createElement("video");
             video.className = "blog-video";
             video.controls = true;
             video.preload = "auto";
             video.playsInline = true;
+
             const source = document.createElement("source");
-            source.src  = `${mediaBaseUrl}/${token.file}`;
+            source.src = `${mediaBaseUrl}/${token.file}`;
             source.type = /\.webm$/i.test(token.file) ? "video/webm" : "video/mp4";
+
             video.appendChild(source);
             wrap.appendChild(video);
+
             return wrap;
         }
 
         case "audio": {
             const wrap = document.createElement("div");
             wrap.className = "blog-audio-wrap";
+
             const audio = document.createElement("audio");
             audio.className = "blog-audio";
             audio.controls = true;
             audio.preload = "metadata";
+
             const source = document.createElement("source");
-            source.src  = `${mediaBaseUrl}/${token.file}`;
+            source.src = `${mediaBaseUrl}/${token.file}`;
             source.type = /\.wav$/i.test(token.file) ? "audio/wav" : "audio/mpeg";
+
             audio.appendChild(source);
             wrap.appendChild(audio);
+
             return wrap;
         }
 
@@ -670,24 +827,30 @@ export function renderCell(content, mediaBaseUrl, listingBaseUrl) {
     cell.className = "blog-cell";
 
     const stack = parseMultiMediaBlock(content);
+
     if (stack) {
         cell.classList.add("blog-cell--image-left", "blog-media-stack");
+
         for (const token of stack) {
             const item = document.createElement("div");
             item.className = "blog-media-stack-item";
             item.appendChild(renderMediaToken(token, mediaBaseUrl, listingBaseUrl));
             cell.appendChild(item);
         }
+
         return cell;
     }
 
     const sole = isSoleToken(content);
+
     if (sole) {
         if (sole.type === "folder") {
             return renderFolderCell(sole.folder, mediaBaseUrl, `${listingBaseUrl}/${sole.folder}`);
         }
+
         cell.classList.add("blog-cell--image-left");
         cell.appendChild(renderMediaToken(sole, mediaBaseUrl, listingBaseUrl));
+
         return cell;
     }
 
@@ -702,20 +865,26 @@ export function renderCell(content, mediaBaseUrl, listingBaseUrl) {
             if (seg.type === "text") {
                 const textDiv = document.createElement("div");
                 textDiv.innerHTML = window.marked.parse(seg.value);
-                while (textDiv.firstChild) container.appendChild(textDiv.firstChild);
+
+                while (textDiv.firstChild) {
+                    container.appendChild(textDiv.firstChild);
+                }
             } else {
                 container.appendChild(renderMediaToken(seg.token, mediaBaseUrl, listingBaseUrl));
             }
         }
 
         cell.appendChild(container);
+
         return cell;
     }
 
     const div = document.createElement("div");
     div.className = "blog-md-content";
     div.innerHTML = window.marked.parse(content);
+
     cell.appendChild(div);
+
     return cell;
 }
 
@@ -729,6 +898,7 @@ function _renderRowsFragment(rawMd, mediaBaseUrl, listingBaseUrl) {
     if (document.body.classList.contains("mobile") && _mobileRowsBuilder) {
         return _mobileRowsBuilder(rawMd, mediaBaseUrl, listingBaseUrl);
     }
+
     return _buildDesktopRowsFragment(rawMd, mediaBaseUrl, listingBaseUrl);
 }
 
@@ -743,10 +913,14 @@ function _buildDesktopRowsFragment(rawMd, mediaBaseUrl, listingBaseUrl) {
 
         if (sides.full !== undefined) {
             rowEl.classList.add("blog-row--full");
-            const cell = renderCell(sides.full, mediaBaseUrl, listingBaseUrl);
-            if (isMediaOnlyBlock(sides.full)) cell.classList.add("blog-cell--image-left");
-            rowEl.appendChild(cell);
 
+            const cell = renderCell(sides.full, mediaBaseUrl, listingBaseUrl);
+
+            if (isMediaOnlyBlock(sides.full)) {
+                cell.classList.add("blog-cell--image-left");
+            }
+
+            rowEl.appendChild(cell);
         } else {
             rowEl.classList.add("blog-row--half");
 
@@ -757,8 +931,13 @@ function _buildDesktopRowsFragment(rawMd, mediaBaseUrl, listingBaseUrl) {
 
             if (hasA) {
                 const cellA = renderCell(sides.a, mediaBaseUrl, listingBaseUrl);
-                if (aIsMedia)              cellA.classList.add("blog-cell--image-left");
-                else if (hasB && bIsMedia) cellA.classList.add("blog-cell--text-beside-image");
+
+                if (aIsMedia) {
+                    cellA.classList.add("blog-cell--image-left");
+                } else if (hasB && bIsMedia) {
+                    cellA.classList.add("blog-cell--text-beside-image");
+                }
+
                 rowEl.appendChild(cellA);
             } else {
                 const empty = document.createElement("div");
@@ -768,8 +947,13 @@ function _buildDesktopRowsFragment(rawMd, mediaBaseUrl, listingBaseUrl) {
 
             if (hasB) {
                 const cellB = renderCell(sides.b, mediaBaseUrl, listingBaseUrl);
-                if (bIsMedia)              cellB.classList.add("blog-cell--image-right");
-                else if (hasA && aIsMedia) cellB.classList.add("blog-cell--text-beside-image");
+
+                if (bIsMedia) {
+                    cellB.classList.add("blog-cell--image-right");
+                } else if (hasA && aIsMedia) {
+                    cellB.classList.add("blog-cell--text-beside-image");
+                }
+
                 rowEl.appendChild(cellB);
             } else {
                 const empty = document.createElement("div");
@@ -790,15 +974,21 @@ export function buildRows(rawMd, mediaBaseUrl, listingBaseUrl) {
     wrapper.style.display = "contents";
     wrapper.__blogRenderArgs = { rawMd, mediaBaseUrl, listingBaseUrl };
     wrapper.appendChild(_renderRowsFragment(rawMd, mediaBaseUrl, listingBaseUrl));
+
     return wrapper;
 }
 
 export function rerenderAllBlogContent() {
     const wrappers = document.querySelectorAll(`.${BLOG_ROWS_WRAPPER_CLASS}`);
+
     for (const wrapper of wrappers) {
         const args = wrapper.__blogRenderArgs;
         if (!args) continue;
-        while (wrapper.firstChild) wrapper.removeChild(wrapper.firstChild);
+
+        while (wrapper.firstChild) {
+            wrapper.removeChild(wrapper.firstChild);
+        }
+
         wrapper.appendChild(_renderRowsFragment(args.rawMd, args.mediaBaseUrl, args.listingBaseUrl));
     }
 }
@@ -815,6 +1005,7 @@ export function buildProjectBlock(options) {
 
     const article = document.createElement("article");
     article.className = "blog-block";
+
     if (elementId) article.id = elementId;
 
     const header = document.createElement("div");
@@ -823,12 +1014,14 @@ export function buildProjectBlock(options) {
     const titleEl = document.createElement("h2");
     titleEl.className = "blog-title";
     titleEl.textContent = title;
+
     header.appendChild(titleEl);
 
     if (date) {
         const dateEl = document.createElement("div");
         dateEl.className = "blog-date";
         dateEl.textContent = Array.isArray(date) ? formatDateRanges(date) : date;
+
         header.appendChild(dateEl);
     }
 
@@ -844,19 +1037,25 @@ export function createPlaceholder(elementId, minHeight = 400) {
     div.id = `placeholder-${elementId}`;
     div.dataset.slug = elementId;
     div.style.minHeight = `${minHeight}px`;
+
     return div;
 }
 
 export function setupLazyLoading(slugs, loadFn, preloadAhead = 2) {
     const preloadMargin = `${preloadAhead * 100}%`;
+
     const observer = new IntersectionObserver(
         (entries) => {
             for (const entry of entries) {
                 if (!entry.isIntersecting) continue;
+
                 const placeholder = entry.target;
                 const slug = placeholder.dataset.slug;
+
                 if (!slug) continue;
+
                 observer.unobserve(placeholder);
+
                 Promise.resolve(loadFn(slug)).then(dom => {
                     if (dom && placeholder.parentNode) placeholder.replaceWith(dom);
                 });
@@ -864,9 +1063,11 @@ export function setupLazyLoading(slugs, loadFn, preloadAhead = 2) {
         },
         { rootMargin: `0px 0px ${preloadMargin} 0px`, threshold: 0 }
     );
+
     for (const slug of slugs) {
         const placeholder = document.getElementById(`placeholder-${slug}`);
         if (placeholder) observer.observe(placeholder);
     }
+
     return observer;
 }
