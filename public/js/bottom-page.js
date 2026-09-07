@@ -10,6 +10,10 @@ const THEME_URL   = "/config/theme.json";
 const VERSION_URL = "/config/version.txt";
 const DEFAULT_LOAD_DELAY_MS = 2000;
 
+const SITE_URL    = "https://canaancope.land/";
+const REPO_URL    = "https://github.com/CanaanJC/CanaanCope.Land";
+const LICENSE_URL = "https://raw.githubusercontent.com/CanaanJC/CanaanCope.Land/refs/heads/main/LICENSE.md";
+
 async function fetchTheme() {
     try {
         const res = await fetch(`${THEME_URL}?_=${Date.now()}`, { cache: "no-store" });
@@ -41,13 +45,39 @@ function buildBottomTextBlock(bottomText) {
     return el;
 }
 
+function buildVersionLink(text, href) {
+    const a = document.createElement("a");
+    a.className = "site-credit__version-link";
+    a.href = href;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.textContent = text;
+    return a;
+}
+
+function buildVersionLine(version) {
+    const versionLine = document.createElement("span");
+    versionLine.className = "site-credit__version";
+
+    versionLine.appendChild(buildVersionLink(`v${version}`, `${REPO_URL}/releases/tag/${version}`));
+    versionLine.appendChild(document.createTextNode(" \u00B7 "));
+    versionLine.appendChild(buildVersionLink("Source", REPO_URL));
+    versionLine.appendChild(document.createTextNode(" \u00B7 "));
+    versionLine.appendChild(buildVersionLink("AGPLv3", LICENSE_URL));
+
+    return versionLine;
+}
+
 function buildCreditBlock(version) {
-    const link = document.createElement("a");
-    link.id = "site-credit";
-    link.className = "site-credit";
-    link.href = "https://canaancope.land/";
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
+    const wrap = document.createElement("div");
+    wrap.id = "site-credit";
+    wrap.className = "site-credit";
+
+    const iconLink = document.createElement("a");
+    iconLink.className = "site-credit__icon-link";
+    iconLink.href = SITE_URL;
+    iconLink.target = "_blank";
+    iconLink.rel = "noopener noreferrer";
 
     const img = document.createElement("img");
     img.className = "site-credit__icon";
@@ -55,24 +85,30 @@ function buildCreditBlock(version) {
     img.alt = "Canaan Copeland";
     img.loading = "lazy";
 
+    iconLink.appendChild(img);
+
     const textWrap = document.createElement("span");
     textWrap.className = "site-credit__text-wrap";
 
     if (version) {
-        const versionLine = document.createElement("span");
-        versionLine.className = "site-credit__version";
-        versionLine.textContent = `v${version}`;
-        textWrap.appendChild(versionLine);
+        textWrap.appendChild(buildVersionLine(version));
     }
+
+    const textLink = document.createElement("a");
+    textLink.className = "site-credit__text-link";
+    textLink.href = SITE_URL;
+    textLink.target = "_blank";
+    textLink.rel = "noopener noreferrer";
 
     const text = document.createElement("span");
     text.className = "site-credit__text";
     text.textContent = "Site designed by Canaan Copeland 🇨🇦";
-    textWrap.appendChild(text);
+    textLink.appendChild(text);
+    textWrap.appendChild(textLink);
 
-    link.appendChild(img);
-    link.appendChild(textWrap);
-    return link;
+    wrap.appendChild(iconLink);
+    wrap.appendChild(textWrap);
+    return wrap;
 }
 
 function buildGroup(bottomText, version) {
