@@ -1079,20 +1079,6 @@ export function copyTextToClipboard(text) {
     return legacyCopyText(value);
 }
 
-function flashCopyState(el, state, label) {
-    el.classList.remove("is-copied", "is-copy-failed");
-    el.classList.add(state === "ok" ? "is-copied" : "is-copy-failed");
-    el.setAttribute("data-copy-label", label);
-
-    if (el._copyResetTimer) clearTimeout(el._copyResetTimer);
-
-    el._copyResetTimer = setTimeout(() => {
-        el.classList.remove("is-copied", "is-copy-failed");
-        el.removeAttribute("data-copy-label");
-        el._copyResetTimer = null;
-    }, 1400);
-}
-
 function buildDateLinkIcon(href, label) {
     const a = document.createElement("a");
     a.className = "blog-date__link";
@@ -1112,10 +1098,9 @@ function buildDateLinkIcon(href, label) {
 
         const url = a.dataset.copyLink || a.href;
 
-        copyTextToClipboard(url).then(
-            () => flashCopyState(a, "ok", "Copied"),
-            () => flashCopyState(a, "fail", "Copy failed")
-        );
+        copyTextToClipboard(url).catch((err) => {
+            console.error("Blog: failed to copy permalink to clipboard:", err);
+        });
     });
 
     a.addEventListener("keydown", (e) => {
