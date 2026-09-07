@@ -24,3 +24,4 @@ config/backup/
 public/template/
 public/libraries/
 config/theme.json
+public/404/cmpsd/
