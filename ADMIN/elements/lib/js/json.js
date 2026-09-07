@@ -9,6 +9,8 @@ const FALLBACK_ICON =
   <circle cx="9" cy="9" r="1.25" fill="#cfcfcf"/>
 </svg>`);
 
+const ICON_UPLOAD_ACCEPT = ".png,.jpg,.jpeg,.webp,.svg,.avif,.gif,.ico,.bmp";
+
 function autoGrow(textarea) {
     textarea.style.height = "auto";
     textarea.style.height = `${textarea.scrollHeight}px`;
@@ -85,6 +87,11 @@ function getResolvedImageUrl(value) {
     const promise = resolveImageUrl(trimmed);
     _imageResolveCache.set(trimmed, promise);
     return promise;
+}
+
+function forgetResolvedImage(value) {
+    const trimmed = (value || "").trim();
+    if (trimmed) _imageResolveCache.delete(trimmed);
 }
 
 const FONT_EXT_FORMATS = {
@@ -222,6 +229,72 @@ function attachFontUpload(row, field) {
         }
 
         if (confirm(`A different font file already exists ("${oldFilename}"). Delete it?`)) {
+            doUpload(file, oldFilename, true);
+        } else {
+            doUpload(file, oldFilename, false);
+        }
+    });
+
+    row.appendChild(uploadBtn);
+    row.appendChild(fileInput);
+}
+
+function attachIconUpload(row, field) {
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = ICON_UPLOAD_ACCEPT;
+    fileInput.hidden = true;
+
+    const uploadBtn = document.createElement("button");
+    uploadBtn.type = "button";
+    uploadBtn.className = "admin-icon-upload-btn";
+    uploadBtn.title = "Upload icon image";
+    uploadBtn.textContent = "⬆";
+
+    uploadBtn.addEventListener("click", () => fileInput.click());
+
+    function doUpload(file, oldFilename, deleteOld) {
+        file.arrayBuffer()
+            .then((buf) => {
+                const params = new URLSearchParams({ filename: file.name, deleteOld: deleteOld ? "true" : "false" });
+                if (oldFilename) params.set("oldFilename", oldFilename);
+                return fetch(`/api/upload/icon?${params.toString()}`, {
+                    method: "POST",
+                    headers: { "Content-Type": file.type || "application/octet-stream" },
+                    body: buf,
+                });
+            })
+            .then(async (res) => {
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+                forgetResolvedImage(data.path);
+                field.setValue(data.path);
+            })
+            .catch((e) => alert(`Icon upload failed: ${e.message}`));
+    }
+
+    fileInput.addEventListener("change", () => {
+        const file = fileInput.files[0];
+        fileInput.value = "";
+        if (!file) return;
+
+        const oldValue    = (field.getValue() || "").trim();
+        const oldFilename = oldValue ? oldValue.split(/[\\/]+/).pop() : "";
+        const newFilename = file.name;
+
+        if (!oldFilename) {
+            doUpload(file, "", false);
+            return;
+        }
+
+        if (oldFilename.toLowerCase() === newFilename.toLowerCase()) {
+            if (confirm(`"${oldFilename}" already exists. Overwrite it?`)) {
+                doUpload(file, oldFilename, false);
+            }
+            return;
+        }
+
+        if (confirm(`A different icon file already exists ("${oldFilename}"). Delete it?`)) {
             doUpload(file, oldFilename, true);
         } else {
             doUpload(file, oldFilename, false);
@@ -575,6 +648,10 @@ function resolveEndpoint(elementConfig) {
     return { get: url, put: url };
 }
 
+function isIconKey(key) {
+    return String(key || "").trim().toLowerCase() === "icon";
+}
+
 function renderObject(obj, container, pathPrefix, data, fieldHooks, isBlogEditor) {
     for (const key of Object.keys(obj)) {
         const value = obj[key];
@@ -645,6 +722,10 @@ function renderObject(obj, container, pathPrefix, data, fieldHooks, isBlogEditor
 
         if (key === "font") {
             attachFontUpload(row, field);
+        }
+
+        if (isIconKey(key)) {
+            attachIconUpload(row, field);
         }
 
         const hooks = fieldHooks.get(key);
@@ -759,6 +840,10 @@ export default function initJsonEditor(root, elementConfig) {
 
         if (fieldDef.key === "font") {
             attachFontUpload(row, field);
+        }
+
+        if (isIconKey(fieldDef.key)) {
+            attachIconUpload(row, field);
         }
 
         const hooks = fieldHooks.get(fieldDef.key);

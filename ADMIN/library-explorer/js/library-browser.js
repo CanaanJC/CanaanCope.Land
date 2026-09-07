@@ -271,6 +271,14 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
         return currentSub;
     }
 
+    function blogUrlPathFor(item) {
+        if (item && item.urlPath) return item.urlPath;
+        const lib = libPathFor(item);
+        if (!lib) return "";
+        const sub = subFor(item);
+        return [lib, ...String(sub || "").split("/").filter(Boolean), item.name].join("/");
+    }
+
     function rowKeyFor(type, name, urlPath) {
         if (type === "library") return `lib:${name}`;
         if (urlPath) return `blog:${urlPath}`;
@@ -639,6 +647,7 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
             type: "blog",
             name: ABOUT_ME_URL_PATH,
             displayName: ABOUT_ME_NAME,
+            subLabel: `public/${ABOUT_ME_URL_PATH}`,
             urlPath: ABOUT_ME_URL_PATH,
             iconEl: icon,
             onClick: guarded(() => {
@@ -702,6 +711,7 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
                         type: "library",
                         name: lib.path,
                         displayName: `${lib.name || lib.path}${isHidden ? "  (hidden)" : ""}`,
+                        subLabel: lib.path,
                         iconEl: icon,
                         dimmed: isHidden,
                         contextItems,
@@ -731,8 +741,6 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
             return;
         }
 
-        const virtual = isVirtualLib(currentLib);
-
         for (const item of currentData.items) {
             const isBlog = currentData.type === "blogs";
             const icon = document.createElement("div");
@@ -749,7 +757,7 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
                 type: rowType,
                 name: item.name,
                 displayName: item.displayName || item.name,
-                subLabel: virtual ? item.urlPath : null,
+                subLabel: isBlog ? blogUrlPathFor(item) : null,
                 urlPath: item.urlPath,
                 iconEl: icon,
                 contextItems,
@@ -758,7 +766,7 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
                         selectedBlogItem = {
                             name: item.name,
                             displayName: item.displayName,
-                            urlPath: item.urlPath,
+                            urlPath: blogUrlPathFor(item),
                             lib: item.lib,
                             sub: item.sub,
                         };

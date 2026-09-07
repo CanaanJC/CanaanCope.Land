@@ -72,7 +72,7 @@ function tagExists(text, openTag) {
 function suggestNextParagraph(text) {
     const re = /\[P(\d+)([abAB]?)\]/g;
     let match;
-    const numbers = new Map(); // num -> { a: bool, b: bool, full: bool }
+    const numbers = new Map();
 
     while ((match = re.exec(text)) !== null) {
         const num = parseInt(match[1], 10);
@@ -208,7 +208,7 @@ function openLinkDialog(getTextarea) {
             if (!textarea) return false;
 
             const tag = interactInput.checked
-                ? `<link:${url}|interactive>`
+                ? `<link:${url}|click>`
                 : `<link:${url}>`;
 
             insertAtCursor(textarea, tag);

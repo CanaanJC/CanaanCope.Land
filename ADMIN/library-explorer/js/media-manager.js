@@ -8,9 +8,31 @@ export function getExt(name) {
     return (String(name || "").split(".").pop() || "").toLowerCase();
 }
 
+const VALID_UPLOAD_EXTS = new Set([
+    "png", "jpg", "jpeg", "webp", "svg", "avif", "gif",
+    "mp4", "webm", "mp3", "wav", "stl",
+]);
+
 const UPLOAD_ACCEPT = ".png,.jpg,.jpeg,.webp,.svg,.avif,.gif,.mp4,.webm,.mp3,.wav,.stl";
 
+const MIME_EXT_FALLBACK = {
+    "image/png": "png",
+    "image/jpeg": "jpg",
+    "image/webp": "webp",
+    "image/svg+xml": "svg",
+    "image/avif": "avif",
+    "image/gif": "gif",
+    "video/mp4": "mp4",
+    "video/webm": "webm",
+    "audio/mpeg": "mp3",
+    "audio/mp3": "mp3",
+    "audio/wav": "wav",
+    "audio/x-wav": "wav",
+    "model/stl": "stl",
+};
+
 let _prevSelectionUnsub = null;
+let _prevPasteHandler = null;
 
 function blankCard(label) {
     const card = document.createElement("div");
@@ -22,6 +44,32 @@ function blankCard(label) {
 function withParam(url, key, value) {
     const sep = url.includes("?") ? "&" : "?";
     return `${url}${sep}${key}=${value}`;
+}
+
+function pad2(n) {
+    return String(n).padStart(2, "0");
+}
+
+function pastedFileName(file) {
+    const ext = getExt(file.name) || MIME_EXT_FALLBACK[file.type] || "";
+    if (file.name && getExt(file.name)) return file.name;
+    const d = new Date();
+    const stamp = `${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}-${pad2(d.getHours())}${pad2(d.getMinutes())}${pad2(d.getSeconds())}`;
+    return ext ? `pasted-${stamp}.${ext}` : `pasted-${stamp}`;
+}
+
+function normalizeFile(file) {
+    const name = pastedFileName(file);
+    if (name === file.name) return file;
+    try {
+        return new File([file], name, { type: file.type });
+    } catch {
+        return file;
+    }
+}
+
+function isValidUploadFile(file) {
+    return VALID_UPLOAD_EXTS.has(getExt(file.name));
 }
 
 function attachMediaFallback(el, url) {
@@ -220,8 +268,13 @@ export function mountMediaManager(container, blog) {
     let currentSub = "";
     let dragData = null;
     let mediaVersion = Date.now();
+    let dropDepth = 0;
 
     if (_prevSelectionUnsub) _prevSelectionUnsub();
+    if (_prevPasteHandler) {
+        document.removeEventListener("paste", _prevPasteHandler);
+        _prevPasteHandler = null;
+    }
 
     container.innerHTML = `
         <div class="be-media-actions">
@@ -298,6 +351,7 @@ export function mountMediaManager(container, blog) {
     function wireBreadcrumbDropTargets() {
         for (const crumb of breadcrumbEl.querySelectorAll(".be-media-crumb")) {
             crumb.addEventListener("dragover", (e) => {
+                if (!dragData) return;
                 e.preventDefault();
                 crumb.classList.add("be-media-crumb--dragover");
             });
@@ -305,9 +359,10 @@ export function mountMediaManager(container, blog) {
                 crumb.classList.remove("be-media-crumb--dragover");
             });
             crumb.addEventListener("drop", (e) => {
-                e.preventDefault();
-                crumb.classList.remove("be-media-crumb--dragover");
                 if (!dragData) return;
+                e.preventDefault();
+                e.stopPropagation();
+                crumb.classList.remove("be-media-crumb--dragover");
                 const toSub = crumb.dataset.sub || "";
                 if (toSub === dragData.fromSub) return;
                 doMove(dragData, toSub);
@@ -451,7 +506,16 @@ export function mountMediaManager(container, blog) {
             });
             tile.addEventListener("drop", (e) => {
                 e.preventDefault();
+                e.stopPropagation();
                 tile.classList.remove("be-media-tile--dragover");
+
+                const external = [...(e.dataTransfer ? e.dataTransfer.files : [])];
+                if (!dragData && external.length > 0) {
+                    const targetSub = currentSub ? `${currentSub}/${item.name}` : item.name;
+                    handleExternalFiles(external, targetSub);
+                    return;
+                }
+
                 if (!dragData) return;
                 if (dragData.name === item.name && dragData.fromSub === currentSub) return;
                 const toSub = currentSub ? `${currentSub}/${item.name}` : item.name;
@@ -533,7 +597,7 @@ export function mountMediaManager(container, blog) {
                 if (items.length === 0) {
                     const empty = document.createElement("div");
                     empty.className = "be-media-empty";
-                    empty.textContent = "This folder is empty.";
+                    empty.textContent = "This folder is empty. Drop or paste files here to upload.";
                     gridEl.appendChild(empty);
                 } else {
                     for (const item of items) gridEl.appendChild(buildTile(item));
@@ -605,13 +669,13 @@ export function mountMediaManager(container, blog) {
             .catch((e) => setStatus(`Move failed: ${e.message}`, "error"));
     }
 
-    function doUpload(file, overwrite, next) {
+    function doUpload(file, targetSub, overwrite, next) {
         setStatus(`Uploading ${file.name}…`);
         file.arrayBuffer()
             .then((buf) => {
                 const params = new URLSearchParams({
                     path: blog.urlPath,
-                    sub: currentSub,
+                    sub: targetSub,
                     filename: file.name,
                     overwrite: overwrite ? "true" : "false",
                 });
@@ -625,7 +689,7 @@ export function mountMediaManager(container, blog) {
                 const data = await res.json().catch(() => ({}));
                 if (res.status === 409 && data.exists) {
                     if (confirm(`"${file.name}" already exists in this folder. Overwrite it?`)) {
-                        doUpload(file, true, next);
+                        doUpload(file, targetSub, true, next);
                     } else {
                         next();
                     }
@@ -640,17 +704,92 @@ export function mountMediaManager(container, blog) {
             });
     }
 
-    function uploadNext(files, index) {
+    function uploadNext(files, index, targetSub) {
         if (index >= files.length) { load(); return; }
-        doUpload(files[index], false, () => uploadNext(files, index + 1));
+        doUpload(files[index], targetSub, false, () => uploadNext(files, index + 1, targetSub));
     }
+
+    function handleExternalFiles(rawFiles, targetSub) {
+        const normalized = rawFiles.map(normalizeFile);
+        const valid   = normalized.filter(isValidUploadFile);
+        const skipped = normalized.length - valid.length;
+
+        if (valid.length === 0) {
+            setStatus("Nothing uploaded — unsupported file type(s).", "error");
+            return;
+        }
+        if (skipped > 0) {
+            setStatus(`Skipping ${skipped} unsupported file(s)…`);
+        }
+
+        uploadNext(valid, 0, typeof targetSub === "string" ? targetSub : currentSub);
+    }
+
+    function setDropHighlight(on) {
+        container.style.outline = on ? "2px dashed #4a6a3a" : "";
+        container.style.outlineOffset = on ? "-6px" : "";
+    }
+
+    container.addEventListener("dragenter", (e) => {
+        if (dragData) return;
+        if (!e.dataTransfer || ![...e.dataTransfer.types].includes("Files")) return;
+        e.preventDefault();
+        dropDepth += 1;
+        setDropHighlight(true);
+    });
+
+    container.addEventListener("dragover", (e) => {
+        if (dragData) return;
+        if (!e.dataTransfer || ![...e.dataTransfer.types].includes("Files")) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+    });
+
+    container.addEventListener("dragleave", () => {
+        if (dragData) return;
+        dropDepth = Math.max(0, dropDepth - 1);
+        if (dropDepth === 0) setDropHighlight(false);
+    });
+
+    container.addEventListener("drop", (e) => {
+        if (dragData) return;
+        const files = [...(e.dataTransfer ? e.dataTransfer.files : [])];
+        if (files.length === 0) return;
+        e.preventDefault();
+        dropDepth = 0;
+        setDropHighlight(false);
+        handleExternalFiles(files, currentSub);
+    });
+
+    function onPaste(e) {
+        if (!container.isConnected || container.hidden) return;
+
+        const active = document.activeElement;
+        if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.isContentEditable)) {
+            if (!container.contains(active)) return;
+        }
+
+        const items = e.clipboardData ? [...e.clipboardData.items] : [];
+        const files = items
+            .filter((it) => it.kind === "file")
+            .map((it) => it.getAsFile())
+            .filter(Boolean);
+
+        if (files.length === 0) return;
+
+        e.preventDefault();
+        handleExternalFiles(files, currentSub);
+    }
+
+    document.addEventListener("paste", onPaste);
+    _prevPasteHandler = onPaste;
 
     uploadBtn.addEventListener("click", () => fileInput.click());
     fileInput.addEventListener("change", () => {
         const files = [...fileInput.files];
         fileInput.value = "";
         if (files.length === 0) return;
-        uploadNext(files, 0);
+        handleExternalFiles(files, currentSub);
     });
 
     folderBtn.addEventListener("click", () => {

@@ -38,4 +38,3 @@ Audio           : .mp3, .wav
 3D model        : .stl
 Folder gallery  : any folder containing a mix of the media files
 Link embed      : any http:// or https:// URL
-
