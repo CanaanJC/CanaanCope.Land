@@ -993,6 +993,169 @@ export function rerenderAllBlogContent() {
     }
 }
 
+export function blogPermalinkFromMediaBase(mediaBaseUrl) {
+    const base = String(mediaBaseUrl || "").replace(/\/+$/, "");
+    const stripped = base.replace(/\/media$/, "");
+    const path = stripped || "/";
+
+    try {
+        return new URL(path, window.location.href).href;
+    } catch (e) {
+        return path;
+    }
+}
+
+function legacyCopyText(text) {
+    return new Promise((resolve, reject) => {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.setAttribute("readonly", "");
+        ta.setAttribute("aria-hidden", "true");
+        ta.style.position = "fixed";
+        ta.style.top = "0";
+        ta.style.left = "0";
+        ta.style.width = "1px";
+        ta.style.height = "1px";
+        ta.style.padding = "0";
+        ta.style.border = "none";
+        ta.style.outline = "none";
+        ta.style.boxShadow = "none";
+        ta.style.background = "transparent";
+        ta.style.opacity = "0";
+
+        document.body.appendChild(ta);
+
+        const selection = document.getSelection();
+        const previousRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+        const previousActive = document.activeElement;
+
+        let ok = false;
+
+        try {
+            if (/ipad|iphone|ipod/i.test(navigator.userAgent)) {
+                const range = document.createRange();
+                range.selectNodeContents(ta);
+
+                if (selection) {
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                }
+
+                ta.setSelectionRange(0, text.length);
+            } else {
+                ta.focus({ preventScroll: true });
+                ta.select();
+                ta.setSelectionRange(0, text.length);
+            }
+
+            ok = document.execCommand("copy");
+        } catch (e) {
+            ok = false;
+        }
+
+        document.body.removeChild(ta);
+
+        if (selection) {
+            selection.removeAllRanges();
+            if (previousRange) selection.addRange(previousRange);
+        }
+
+        if (previousActive && typeof previousActive.focus === "function") {
+            previousActive.focus({ preventScroll: true });
+        }
+
+        if (ok) resolve();
+        else reject(new Error("execCommand copy failed"));
+    });
+}
+
+export function copyTextToClipboard(text) {
+    const value = String(text || "");
+
+    if (navigator.clipboard && window.isSecureContext && typeof navigator.clipboard.writeText === "function") {
+        return navigator.clipboard.writeText(value).catch(() => legacyCopyText(value));
+    }
+
+    return legacyCopyText(value);
+}
+
+function flashCopyState(el, state, label) {
+    el.classList.remove("is-copied", "is-copy-failed");
+    el.classList.add(state === "ok" ? "is-copied" : "is-copy-failed");
+    el.setAttribute("data-copy-label", label);
+
+    if (el._copyResetTimer) clearTimeout(el._copyResetTimer);
+
+    el._copyResetTimer = setTimeout(() => {
+        el.classList.remove("is-copied", "is-copy-failed");
+        el.removeAttribute("data-copy-label");
+        el._copyResetTimer = null;
+    }, 1400);
+}
+
+function buildDateLinkIcon(href, label) {
+    const a = document.createElement("a");
+    a.className = "blog-date__link";
+    a.href = href;
+    a.title = "Copy link";
+    a.dataset.copyLink = href;
+    a.setAttribute("aria-label", label ? `Copy link: ${label}` : "Copy link");
+    a.innerHTML = `<svg class="blog-date__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+        <path d="M10.5 13.5a4 4 0 0 0 5.66 0l2.34-2.34a4 4 0 0 0-5.66-5.66l-1.17 1.17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M13.5 10.5a4 4 0 0 0-5.66 0L5.5 12.84a4 4 0 0 0 5.66 5.66l1.17-1.17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`;
+
+    a.addEventListener("click", (e) => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+
+        e.preventDefault();
+
+        const url = a.dataset.copyLink || a.href;
+
+        copyTextToClipboard(url).then(
+            () => flashCopyState(a, "ok", "Copied"),
+            () => flashCopyState(a, "fail", "Copy failed")
+        );
+    });
+
+    a.addEventListener("keydown", (e) => {
+        if (e.key !== " " && e.key !== "Spacebar") return;
+        e.preventDefault();
+        if (e.repeat) return;
+        a.click();
+    });
+
+    return a;
+}
+
+function buildDateRow(date, permalink, label) {
+    const dateEl = document.createElement("div");
+    dateEl.className = "blog-date";
+
+    const inner = document.createElement("span");
+    inner.className = "blog-date__inner";
+
+    const hasDate = Array.isArray(date) ? date.length > 0 : !!date;
+
+    if (hasDate) {
+        const text = document.createElement("span");
+        text.className = "blog-date__text";
+        text.textContent = Array.isArray(date) ? formatDateRanges(date) : date;
+        inner.appendChild(text);
+
+        const sep = document.createElement("span");
+        sep.className = "blog-date__sep";
+        sep.setAttribute("aria-hidden", "true");
+        sep.textContent = "\u00B7";
+        inner.appendChild(sep);
+    }
+
+    inner.appendChild(buildDateLinkIcon(permalink, label));
+    dateEl.appendChild(inner);
+
+    return dateEl;
+}
+
 export function buildProjectBlock(options) {
     const {
         elementId,
@@ -1001,6 +1164,7 @@ export function buildProjectBlock(options) {
         rawMd,
         mediaBaseUrl,
         listingBaseUrl,
+        permalink,
     } = options;
 
     const article = document.createElement("article");
@@ -1017,13 +1181,8 @@ export function buildProjectBlock(options) {
 
     header.appendChild(titleEl);
 
-    if (date) {
-        const dateEl = document.createElement("div");
-        dateEl.className = "blog-date";
-        dateEl.textContent = Array.isArray(date) ? formatDateRanges(date) : date;
-
-        header.appendChild(dateEl);
-    }
+    const href = permalink || blogPermalinkFromMediaBase(mediaBaseUrl);
+    header.appendChild(buildDateRow(date, href, title));
 
     article.appendChild(header);
     article.appendChild(buildRows(rawMd, mediaBaseUrl, listingBaseUrl));
