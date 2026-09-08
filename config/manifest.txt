@@ -78,6 +78,7 @@ config/update-notes/26.8.3.md
 config/update-notes/26.8.4.md
 config/update-notes/26.8.5.md
 config/update-notes/26.9.0.md
+config/update-notes/26.9.1.md
 config/version.txt
 .gitignore
 lib/aboutMe.js
@@ -149,6 +150,7 @@ public/js/twemoji-init.js
 README.md
 scripts/git.sh
 scripts/helpers/26.9.0.sh
+scripts/helpers/26.9.1.sh
 scripts/run.sh
 scripts/.service-name
 scripts/service.sh
