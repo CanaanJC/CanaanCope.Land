@@ -1,0 +1,128 @@
+{
+    "version": 1,
+    "entries": {
+        "404/404.mp4": {
+            "hash": "6969c7eb3c64fb1259f53c1683a32e2705ff3362c0db9f19c819b5e8f32f2b6c",
+            "size": 91525168,
+            "mtimeMs": 1787541864583.0264,
+            "variant": "404/cmpsd/404.mp4",
+            "variantSize": 86668732,
+            "builtAt": "2026-09-08T03:32:41.040Z",
+            "adopted": true
+        },
+        "404/404.png": {
+            "hash": "0030cec4b03273d732dc313a881c022a8ef95e9b11d177c7fa9e0557966b1f13",
+            "size": 1298205,
+            "mtimeMs": 1787541864487.0266,
+            "variant": "404/cmpsd/404.avif",
+            "variantSize": 38692,
+            "builtAt": "2026-09-08T03:32:41.046Z",
+            "adopted": true
+        },
+        "libraries/resources/0_canaancope.land/0_Setup/0_installation/media/folder1/fig2.png": {
+            "hash": "1fa81e906b01238681712d94d40e23bd7e2377fae6a5e07b914d97b3d4ad0be3",
+            "size": 25989,
+            "mtimeMs": 1788541198333.0613,
+            "variant": "libraries/resources/0_canaancope.land/0_Setup/0_installation/media/folder1/cmpsd/fig2.avif",
+            "variantSize": 11626,
+            "builtAt": "2026-09-08T03:32:41.046Z",
+            "adopted": true
+        },
+        "libraries/resources/0_canaancope.land/0_Setup/0_installation/media/folder1/fig3.png": {
+            "hash": "2db32b69d3148d20da4acc5c6838379b4c0305b592627f93329750f0d65f6c81",
+            "size": 92444,
+            "mtimeMs": 1788541201785.3203,
+            "variant": "libraries/resources/0_canaancope.land/0_Setup/0_installation/media/folder1/cmpsd/fig3.avif",
+            "variantSize": 12061,
+            "builtAt": "2026-09-08T03:32:41.047Z",
+            "adopted": true
+        },
+        "libraries/resources/0_canaancope.land/0_Setup/0_installation/media/folder1/thumb.png": {
+            "hash": "3c3600556969e852f0a6fea38d62de046eced389ba00aadebb1c03ae7cf290dc",
+            "size": 97570,
+            "mtimeMs": 1788541204854.6567,
+            "variant": "libraries/resources/0_canaancope.land/0_Setup/0_installation/media/folder1/cmpsd/thumb.avif",
+            "variantSize": 41678,
+            "builtAt": "2026-09-08T03:32:41.048Z",
+            "adopted": true
+        },
+        "libraries/resources/0_canaancope.land/0_Setup/2_admin_portal/media/fig1.png": {
+            "hash": "b24c1227b3763f5c3a6c23ca066173f2e69af21b680ab389b6cb8f8c9926612f",
+            "size": 248445,
+            "mtimeMs": 1788541230040.4465,
+            "variant": "libraries/resources/0_canaancope.land/0_Setup/2_admin_portal/media/cmpsd/fig1.avif",
+            "variantSize": 53048,
+            "builtAt": "2026-09-08T03:32:41.049Z",
+            "adopted": true
+        },
+        "libraries/resources/0_canaancope.land/0_Setup/2_admin_portal/media/fig2.png": {
+            "hash": "5c79de41d0a3a8586be89a50763ce9196770bdbeee982656f48ba2b637ef6a88",
+            "size": 38948,
+            "mtimeMs": 1788541233315.9983,
+            "variant": "libraries/resources/0_canaancope.land/0_Setup/2_admin_portal/media/cmpsd/fig2.avif",
+            "variantSize": 10652,
+            "builtAt": "2026-09-08T03:32:41.052Z",
+            "adopted": true
+        },
+        "libraries/resources/0_canaancope.land/1_Configuration/0_master.json/media/images.png": {
+            "hash": "4e0c4bf3bd702240715895ab86fc25cfcb9cab779729a6a05b34f7312969b34d",
+            "size": 3981,
+            "mtimeMs": 1788825035851.639,
+            "variant": "libraries/resources/0_canaancope.land/1_Configuration/0_master.json/media/cmpsd/images.avif",
+            "variantSize": 5892,
+            "builtAt": "2026-09-08T03:32:41.053Z",
+            "adopted": true
+        },
+        "libraries/resources/0_canaancope.land/1_Configuration/1_contact_info/media/contact_info.png": {
+            "hash": "423c30c134fcfbd101ae4bbf92a0a3aa0d5799719c665c3f28ac8efe37c76f9c",
+            "size": 105005,
+            "mtimeMs": 1788541259393.0403,
+            "variant": "libraries/resources/0_canaancope.land/1_Configuration/1_contact_info/media/cmpsd/contact_info.avif",
+            "variantSize": 21519,
+            "builtAt": "2026-09-08T03:32:41.053Z",
+            "adopted": true
+        },
+        "libraries/resources/0_canaancope.land/1_Configuration/2_topbar.json/media/topbar.png": {
+            "hash": "913296e0ced725439ebadccaadcd3d5bd1519ee1cfed0f09cc05ce789fb14c7e",
+            "size": 44108,
+            "mtimeMs": 1788541273663.333,
+            "variant": "libraries/resources/0_canaancope.land/1_Configuration/2_topbar.json/media/cmpsd/topbar.avif",
+            "variantSize": 6635,
+            "builtAt": "2026-09-08T03:32:41.054Z",
+            "adopted": true
+        },
+        "media/logo.png": {
+            "hash": "ce4e6268e6b34a997cbd25375214a0ae6b3651b3bec5ad3e9dcf705bc35b1f6e",
+            "size": 721,
+            "mtimeMs": 1788497844418.2542,
+            "variant": "media/cmpsd/logo.avif",
+            "variantSize": 562,
+            "builtAt": "2026-09-08T03:32:41.074Z",
+            "adopted": true
+        },
+        "media/favicon/favicon.png": {
+            "hash": "5d9c17887c8905e5b60cd3266522b391c4c5326ebd0bb360053f3a0ebac33824",
+            "size": 1131,
+            "mtimeMs": 1788838382099.103,
+            "variant": "media/favicon/cmpsd/favicon.avif",
+            "variantSize": 594,
+            "builtAt": "2026-09-08T03:33:07.484Z"
+        },
+        "media/favicon/apple-touch-icon.png": {
+            "hash": "2c4fd7173e5fd0c28b5411dcf6a6eafb49b767cfc57680d062f9f1393449ac30",
+            "size": 5480,
+            "mtimeMs": 1788838382103.103,
+            "variant": "media/favicon/cmpsd/apple-touch-icon.avif",
+            "variantSize": 820,
+            "builtAt": "2026-09-08T03:33:07.490Z"
+        },
+        "media/libraries/template.png": {
+            "hash": "176ac763677f358a1862a1283ce772bf540c99888e8af20ae5a3c126d3de7028",
+            "size": 1357227,
+            "mtimeMs": 1787717451587.1326,
+            "variant": "media/libraries/cmpsd/template.avif",
+            "variantSize": 58041,
+            "builtAt": "2026-09-08T03:32:41.744Z"
+        }
+    }
+}

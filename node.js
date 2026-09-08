@@ -12,6 +12,7 @@ const { ensureAboutMe } = require("./lib/aboutMe");
 const { startBackupScheduler, startTerminalCommands } = require("./lib/backup");
 const { startAdminServer } = require("./lib/adminServer");
 const { startUpdateChecker } = require("./lib/updateChecker");
+const { cleanupOrphanedVariants, startHashScanner } = require("./lib/compression");
 
 ensureMasterConfig();
 ensureThemeConfig();
@@ -22,6 +23,11 @@ async function boot() {
     ensureAboutMe();
 
     startStatCachePruner();
+
+    if (COMPRESS_ENABLED) {
+        cleanupOrphanedVariants();
+        startHashScanner();
+    }
 
     loadExtensions();
 

@@ -64,6 +64,7 @@ ADMIN/template/blog/config.json
 ADMIN/template/blog/content.md
 ADMIN/template/blog/index.html
 ADMIN/template/index.html
+config/compression-state.json
 config/defaults.json
 config/libraries.json
 config/manifest.txt
