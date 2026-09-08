@@ -117,6 +117,7 @@ function setHelpButtonsForView(view) {
 
 function showLibraryBrowserView() {
     currentView = "browser";
+    preview.reset();
     libraryBrowserEl.hidden = false;
     editorViewEl.hidden = true;
     previewViewEl.hidden = true;
@@ -130,10 +131,12 @@ function showLibraryBrowserView() {
 
 function showEditorView() {
     currentView = "editor";
+    preview.reset();
     libraryBrowserEl.hidden = true;
     editorViewEl.hidden = false;
     previewViewEl.hidden = true;
     previewToggleBtn.hidden = false;
+    if (deviceToggleGroup) deviceToggleGroup.hidden = true;
     modeToggleGroup.hidden = isAboutMeBlog(selectedBlog);
     saveBtn.hidden = false;
     setHelpButtonsForView("editor");
@@ -369,7 +372,6 @@ async function selectBlog(blog, { pushUrl = false } = {}) {
 
     clearDirty();
     applyModeVisibility();
-    preview.refreshIfOn();
 }
 
 mainBtn.addEventListener("click", () => {

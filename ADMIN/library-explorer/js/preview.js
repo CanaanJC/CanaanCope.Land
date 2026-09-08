@@ -48,6 +48,15 @@ export function createPreview({
     if (deviceDesktopBtn) deviceDesktopBtn.addEventListener("click", () => setDevice("desktop"));
     if (deviceMobileBtn)  deviceMobileBtn.addEventListener("click", () => setDevice("mobile"));
 
+    function applyOffButtonState() {
+        previewOn = false;
+        toggleBtn.textContent = "Show Preview";
+        toggleBtn.classList.remove("be-toggle-btn--active");
+        device = "desktop";
+        applyDeviceClass();
+        previewIframeEl.src = "about:blank";
+    }
+
     function enter() {
         previewOn = true;
         toggleBtn.textContent = "Hide Preview";
@@ -65,16 +74,18 @@ export function createPreview({
     }
 
     function exit() {
-        previewOn = false;
-        toggleBtn.textContent = "Show Preview";
-        toggleBtn.classList.remove("be-toggle-btn--active");
+        applyOffButtonState();
         editorViewEl.hidden  = false;
         previewViewEl.hidden = true;
         modeToggleGroup.hidden = isAboutMeBlog(getSelectedBlog());
         if (deviceToggleGroup) deviceToggleGroup.hidden = true;
         saveBtn.hidden = false;
         saveBtn.disabled = !getSelectedBlog();
-        previewIframeEl.src = "about:blank";
+    }
+
+    function reset() {
+        applyOffButtonState();
+        if (deviceToggleGroup) deviceToggleGroup.hidden = true;
     }
 
     toggleBtn.addEventListener("click", () => {
@@ -86,6 +97,7 @@ export function createPreview({
         isOn: () => previewOn,
         getDevice: () => device,
         refreshIfOn: () => { if (previewOn) updateSrc(); },
+        reset,
         buildArticleUrl,
     };
 }
