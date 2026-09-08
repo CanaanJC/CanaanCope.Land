@@ -81,7 +81,7 @@
     cursor: pointer;
     user-select: none;
     -webkit-user-select: none;
-    transition: background-color 120ms ease, box-shadow 120ms ease;
+    transition: background-color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
 }
 
 .be-lib-row:hover {
@@ -96,6 +96,15 @@
 .be-lib-row--move-flagged {
     box-shadow: 0 0 0 2px #d8b04a;
     background: rgba(216, 176, 74, 0.08);
+}
+
+.be-lib-row--dragging {
+    opacity: 0.4;
+}
+
+.be-lib-row--dragover {
+    background: #22281f;
+    box-shadow: 0 0 0 2px #4a6a3a;
 }
 
 .be-lib-icon {

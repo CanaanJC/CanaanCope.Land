@@ -53,13 +53,14 @@ function createSmallModal({ title, bodyBuilder, onSubmit }) {
     return { close };
 }
 
-function insertAtCursor(textarea, text) {
+function insertAtCursor(textarea, text, cursorOffset) {
     const start = textarea.selectionStart ?? textarea.value.length;
     const end   = textarea.selectionEnd ?? textarea.value.length;
     const before = textarea.value.slice(0, start);
     const after  = textarea.value.slice(end);
     textarea.value = `${before}${text}${after}`;
-    const newPos = start + text.length;
+    const offset = typeof cursorOffset === "number" ? cursorOffset : text.length;
+    const newPos = start + offset;
     textarea.selectionStart = textarea.selectionEnd = newPos;
     textarea.dispatchEvent(new Event("input", { bubbles: true }));
     textarea.focus();
@@ -89,10 +90,14 @@ function suggestNextParagraph(text) {
     }
 
     const maxNum = Math.max(...numbers.keys());
-    const entry = numbers.get(maxNum);
 
-    if (entry.a && !entry.b) {
-        return { num: maxNum, align: "Right" };
+    for (let n = 1; n <= maxNum; n++) {
+        const entry = numbers.get(n);
+        if (!entry) return { num: n, align: "Left" };
+        if (entry.full) continue;
+        if (entry.a && entry.b) continue;
+        if (entry.a && !entry.b) return { num: n, align: "Right" };
+        if (!entry.a && entry.b) return { num: n, align: "Left" };
     }
 
     return { num: maxNum + 1, align: "Left" };
@@ -161,7 +166,7 @@ function openParagraphDialog(getTextarea) {
                 return false;
             }
 
-            insertAtCursor(textarea, `${openTag}\n\n${closeTag}`);
+            insertAtCursor(textarea, `${openTag}\n\n${closeTag}`, openTag.length + 1);
             return true;
         },
     });
@@ -371,7 +376,7 @@ export function initToolbar({ toolbarEl, tagsHelpBtnEl, mediaHelpBtnEl, getTexta
         if (!isMarkdownMode()) return;
         const textarea = getTextarea();
         if (!textarea) return;
-        insertAtCursor(textarea, "[M1]\n\n[/M1]");
+        insertAtCursor(textarea, "[M1]\n\n[/M1]", "[M1]\n".length);
     });
 
     const linkBtn = document.createElement("button");

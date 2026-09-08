@@ -158,6 +158,7 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
     let selectedBlogItem = null;
     let moveFlag = null;
     let configMountToken = 0;
+    let dragLibIndex = null;
 
     containerEl.innerHTML = `
         <div class="be-lib-left">
@@ -303,7 +304,7 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
         if (!currentLib) {
             const p = document.createElement("p");
             p.className = "be-lib-details-empty";
-            p.textContent = "Select a library on the left to browse its contents. Right-click a library to open its page, rename, hide or delete it.";
+            p.textContent = "Select a library on the left to browse its contents. Right-click a library to open its page, rename, hide or delete it. Drag libraries to reorder them.";
             detailsEl.appendChild(p);
             return;
         }
@@ -621,6 +622,60 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
         return row;
     }
 
+    function saveLibrariesOrder() {
+        fetch(`/api/libraries`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(libraries),
+        })
+            .then((r) => r.json())
+            .then((res) => { if (res.error) throw new Error(res.error); })
+            .catch((e) => alert(`Failed to save library order: ${e.message}`));
+    }
+
+    function wireLibraryRowDrag(row, index) {
+        row.draggable = true;
+
+        row.addEventListener("dragstart", (e) => {
+            dragLibIndex = index;
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("text/plain", String(index));
+            row.classList.add("be-lib-row--dragging");
+        });
+
+        row.addEventListener("dragend", () => {
+            dragLibIndex = null;
+            row.classList.remove("be-lib-row--dragging");
+        });
+
+        row.addEventListener("dragover", (e) => {
+            if (dragLibIndex === null) return;
+            e.preventDefault();
+            row.classList.add("be-lib-row--dragover");
+        });
+
+        row.addEventListener("dragleave", () => {
+            row.classList.remove("be-lib-row--dragover");
+        });
+
+        row.addEventListener("drop", (e) => {
+            if (dragLibIndex === null) return;
+            e.preventDefault();
+            e.stopPropagation();
+            row.classList.remove("be-lib-row--dragover");
+
+            const toIndex = index;
+            const fromIndex = dragLibIndex;
+            dragLibIndex = null;
+            if (toIndex === fromIndex) return;
+
+            const [moved] = libraries.splice(fromIndex, 1);
+            libraries.splice(toIndex, 0, moved);
+            renderList();
+            saveLibrariesOrder();
+        });
+    }
+
     function appendAllBlogsRow() {
         const icon = document.createElement("div");
         icon.className = "be-lib-icon be-lib-icon--folder";
@@ -678,7 +733,7 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
                 empty.textContent = "No libraries yet — create one on the right.";
                 listEl.appendChild(empty);
             } else {
-                for (const lib of libraries) {
+                libraries.forEach((lib, index) => {
                     const icon = document.createElement("div");
                     icon.className = "be-lib-icon";
                     if (lib.icon) {
@@ -707,7 +762,7 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
                         },
                     ];
 
-                    listEl.appendChild(buildRow({
+                    const row = buildRow({
                         type: "library",
                         name: lib.path,
                         displayName: `${lib.name || lib.path}${isHidden ? "  (hidden)" : ""}`,
@@ -721,8 +776,11 @@ export function createLibraryBrowser({ containerEl, libraryHelpBtnEl, onOpenBlog
                             selectedBlogItem = null;
                             loadLevel();
                         }),
-                    }));
-                }
+                    });
+
+                    wireLibraryRowDrag(row, index);
+                    listEl.appendChild(row);
+                });
             }
 
             appendAboutMeRow();
