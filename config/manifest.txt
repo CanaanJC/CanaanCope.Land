@@ -13,7 +13,9 @@ ADMIN/elements/logo-uploader/element.css
 ADMIN/elements/logo-uploader/element.html
 ADMIN/elements/logo-uploader/element.js
 ADMIN/elements/Master/config.json
+ADMIN/elements/Master/element.css
 ADMIN/elements/Master/element.html
+ADMIN/elements/Master/element.js
 ADMIN/elements/pannel_config/config.json
 ADMIN/elements/pannel_config/element.css
 ADMIN/elements/pannel_config/element.html
@@ -22,7 +24,9 @@ ADMIN/elements/SideBar/config.json
 ADMIN/elements/SideBar/element.html
 ADMIN/elements/SideBar/element.js
 ADMIN/elements/Theme/config.json
+ADMIN/elements/Theme/element.css
 ADMIN/elements/Theme/element.html
+ADMIN/elements/Theme/element.js
 ADMIN/elements/TopBar/config.json
 ADMIN/elements/TopBar/element.html
 ADMIN/elements/update-checker/config.json

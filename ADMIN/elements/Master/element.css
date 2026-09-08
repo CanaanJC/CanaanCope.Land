@@ -1,0 +1,33 @@
+.admin-field-reset-btn {
+    flex: 0 0 auto;
+    margin-left: auto;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    border-radius: 4px;
+    color: #7a7a7a;
+    cursor: pointer;
+    font-size: 0.9rem;
+    line-height: 1;
+    padding: 0;
+    align-self: flex-start;
+    margin-top: 5px;
+    transition: color 120ms ease, background-color 120ms ease;
+}
+
+.admin-field-reset-btn:hover {
+    color: var(--admin-text);
+    background: #2a2a2a;
+}
+
+.admin-field-reset-btn:active {
+    transform: scale(0.92);
+}
+
+.admin-field-reset-btn[hidden] {
+    display: none !important;
+}
