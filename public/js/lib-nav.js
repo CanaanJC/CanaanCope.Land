@@ -1,4 +1,4 @@
-import { getEndDate, sortByEndDate } from "./lib-blog.js";
+import { getEndDate } from "./lib-blog.js";
 
 console.log("lib-nav module loaded");
 
@@ -6,33 +6,14 @@ export function naturalCompare(a, b) {
     return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
 }
 
-export function splitFolderName(folderName) {
-    const raw = folderName === undefined || folderName === null ? "" : String(folderName);
-    const idx = raw.indexOf("_");
-    if (idx === -1) return { prefix: raw, label: raw, raw };
-    return { prefix: raw.slice(0, idx), label: raw.slice(idx + 1), raw };
-}
-
-export function prettifyLabel(label) {
-    return String(label === undefined || label === null ? "" : label).replace(/_/g, " ");
-}
-
-export function folderLabel(folderName) {
-    return prettifyLabel(splitFolderName(folderName).label);
-}
-
-export function compareFolderNames(a, b) {
-    const A = splitFolderName(a);
-    const B = splitFolderName(b);
-    let c = naturalCompare(A.prefix, B.prefix);
-    if (c !== 0) return c;
-    c = naturalCompare(A.label, B.label);
-    if (c !== 0) return c;
-    return naturalCompare(A.raw, B.raw);
+export function folderLabel(folderName, metaName) {
+    const name = typeof metaName === "string" ? metaName.trim() : "";
+    if (name) return name;
+    return String(folderName === undefined || folderName === null ? "" : folderName);
 }
 
 export function entryId(slugPath) {
-    return slugPath.join("--");
+    return (Array.isArray(slugPath) ? slugPath : []).join("--");
 }
 
 export function libraryUsesDates(library) {
@@ -42,76 +23,70 @@ export function libraryUsesDates(library) {
 export function getEntrySegments(entry) {
     if (!entry) return [];
     if (Array.isArray(entry.slugPath)) return entry.slugPath;
-    if (Array.isArray(entry.segments)) {
-        return entry.segments.map(s => (typeof s === "string" ? s : s && s.slug));
-    }
+    if (Array.isArray(entry.segments)) return entry.segments;
     return [];
 }
 
-export function compareEntries(a, b) {
-    const sa = getEntrySegments(a);
-    const sb = getEntrySegments(b);
-    const len = Math.max(sa.length, sb.length);
-    for (let i = 0; i < len; i++) {
-        if (sa[i] === undefined) return -1;
-        if (sb[i] === undefined) return 1;
-        const c = compareFolderNames(sa[i], sb[i]);
-        if (c !== 0) return c;
-    }
-    return 0;
+export function sortManifestEntries(library, manifest) {
+    return Array.isArray(manifest) ? [...manifest] : [];
 }
 
-export function sortManifestEntries(library, manifest) {
-    if (!Array.isArray(manifest)) return [];
-    if (libraryUsesDates(library)) return sortByEndDate(manifest);
-    return [...manifest].sort(compareEntries);
+export function entryLabel(entry) {
+    const name = entry && typeof entry.name === "string" ? entry.name.trim() : "";
+    if (name) return name;
+    const segs = getEntrySegments(entry);
+    return segs.length ? String(segs[segs.length - 1]) : "";
+}
+
+export function entryParentMeta(entry, level) {
+    const parents = entry && Array.isArray(entry.parents) ? entry.parents : [];
+    return parents[level] || null;
 }
 
 export function buildTree(manifest) {
-    const root = { slug: null, children: new Map(), entry: null };
+    const root = { slug: null, name: null, children: new Map(), entry: null };
+
     for (const entry of manifest) {
         const segments = getEntrySegments(entry);
         if (!segments.length) continue;
+
         let node = root;
-        for (const slug of segments) {
+        for (let i = 0; i < segments.length; i++) {
+            const slug = segments[i];
             if (!node.children.has(slug)) {
-                node.children.set(slug, { slug, children: new Map(), entry: null });
+                const isLeaf = i === segments.length - 1;
+                const meta = isLeaf ? null : entryParentMeta(entry, i);
+                node.children.set(slug, {
+                    slug,
+                    name: isLeaf ? entryLabel(entry) : folderLabel(slug, meta && meta.name),
+                    children: new Map(),
+                    entry: null,
+                });
             }
             node = node.children.get(slug);
         }
         node.entry = entry;
     }
-    return root;
-}
 
-function sortedChildren(node) {
-    return [...node.children.values()].sort((a, b) => compareFolderNames(a.slug, b.slug));
+    return root;
 }
 
 export function firstLeafSlugPath(node) {
     if (node.entry) return getEntrySegments(node.entry);
-    for (const child of sortedChildren(node)) {
+    for (const child of node.children.values()) {
         const found = firstLeafSlugPath(child);
         if (found && found.length) return found;
     }
     return null;
 }
 
-function nodeLabel(node) {
-    if (node.entry) {
-        const name = node.entry.name;
-        if (typeof name === "string" && name.trim() !== "") return prettifyLabel(name);
-    }
-    return folderLabel(node.slug);
-}
-
 function collectTreeItems(node, level, out) {
-    for (const child of sortedChildren(node)) {
+    for (const child of node.children.values()) {
         const isLeaf = child.children.size === 0;
         const slugPath = isLeaf ? getEntrySegments(child.entry) : firstLeafSlugPath(child);
 
         out.push({
-            label: nodeLabel(child),
+            label: child.name || child.slug,
             level,
             isLeaf,
             targetId: slugPath && slugPath.length ? entryId(slugPath) : null,
@@ -135,7 +110,7 @@ export function buildDateNavItems(sortedManifest) {
     for (const entry of sortedManifest) {
         const endDate = getEndDate(entry.date);
         if (!endDate) continue;
-        const parts = String(endDate).split("/");
+        const parts = String(endDate).split(/[/-]/);
         if (parts.length < 2) continue;
         const year = parts[0];
         const month = parts[1].padStart(2, "0");

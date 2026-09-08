@@ -45,6 +45,11 @@ ADMIN/library-explorer/css/toolbar.css
 ADMIN/library-explorer/css/topbar.css
 ADMIN/library-explorer/index.html
 ADMIN/library-explorer/js/about-me.js
+ADMIN/library-explorer/js/browser-actions.js
+ADMIN/library-explorer/js/browser-api.js
+ADMIN/library-explorer/js/browser-details.js
+ADMIN/library-explorer/js/browser-drag.js
+ADMIN/library-explorer/js/browser-ui.js
 ADMIN/library-explorer/js/config-editor.js
 ADMIN/library-explorer/js/dropdown.js
 ADMIN/library-explorer/js/highlight.js
@@ -84,12 +89,14 @@ lib/adminRoutes/index.js
 lib/adminRoutes/layoutRoutes.js
 lib/adminRoutes/libraryFsRoutes.js
 lib/adminRoutes/libraryRoutes.js
+lib/adminRoutes/libraryTree.js
 lib/adminRoutes/shared.js
 lib/adminRoutes/siteConfigRoutes.js
 lib/adminRoutes/uploadRoutes.js
 lib/adminServer.js
 lib/archiveManager.js
 lib/backup.js
+lib/blogConfig.js
 lib/compression.js
 lib/constants.js
 lib/embed.js
@@ -99,6 +106,7 @@ lib/fsCache.js
 lib/manifest.js
 lib/routes.js
 lib/siteConfig.js
+lib/sortOrder.js
 lib/staticFile.js
 lib/updateChecker.js
 lib/utils.js

@@ -416,7 +416,7 @@ async function populateMenu() {
     if (projectsSlot && Array.isArray(libraries)) {
         projectsSlot.innerHTML = "";
 
-        const visibleLibraries = libraries.filter(lib => lib && !lib.hidden && lib.path);
+        const visibleLibraries = libraries.filter(lib => lib && lib.private !== true && lib.path);
         const currentLibrary   = getCurrentLibrary(libraries);
         const libraryListView  = buildLibraryListView(visibleLibraries, librariesTitle, projectsSlot);
 

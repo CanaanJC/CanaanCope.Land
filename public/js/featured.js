@@ -6,7 +6,7 @@ import {
     setupLazyLoading,
 } from "./lib-blog.js";
 
-import { libraryUsesDates, compareFolderNames } from "./lib-nav.js";
+import { libraryUsesDates, getEntrySegments } from "./lib-nav.js";
 
 console.log("Featured module loaded");
 
@@ -38,18 +38,19 @@ function parseFlexibleDate(dateStr) {
     return new Date(y, m - 1, d);
 }
 
-function compareFeatured(a, b) {
-    const aUndated = !a.parsedDate;
-    const bUndated = !b.parsedDate;
+function sortFeatured(list) {
+    const dated = [];
+    const undated = [];
 
-    if (aUndated && bUndated) {
-        return compareFolderNames(a.sortName, b.sortName);
-    }
+    list.forEach((item, index) => {
+        if (item.parsedDate) dated.push({ item, index });
+        else undated.push({ item, index });
+    });
 
-    if (aUndated) return -1;
-    if (bUndated) return 1;
+    dated.sort((a, b) => b.item.parsedDate - a.item.parsedDate);
+    undated.sort((a, b) => a.index - b.index);
 
-    return b.parsedDate - a.parsedDate;
+    return [...dated.map(d => d.item), ...undated.map(u => u.item)];
 }
 
 async function fetchEntryFiles(library, slugPath) {
@@ -101,9 +102,7 @@ async function collectFeatured(libraries) {
             try {
                 const res = await fetch(url, { cache: "no-store" });
                 if (!res.ok) {
-                    console.error(
-                        `Featured: manifest for "${library.path}" returned HTTP ${res.status} (${url}).`
-                    );
+                    console.error(`Featured: manifest for "${library.path}" returned HTTP ${res.status} (${url}).`);
                     return [];
                 }
                 manifest = await res.json();
@@ -118,9 +117,8 @@ async function collectFeatured(libraries) {
             }
             if (manifest.length === 0) {
                 console.warn(
-                    `Featured: manifest for "${library.path}" is EMPTY. At depth ${library.depth}, ` +
-                    `each entry needs a config.json exactly ${library.depth} folder level(s) below ` +
-                    `public/libraries/${library.path}/ and must not have "block": true.`
+                    `Featured: manifest for "${library.path}" is EMPTY. Every blog needs a config.json ` +
+                    `in its own folder under public/libraries/${library.path}/ and must not have "block": true.`
                 );
                 return [];
             }
@@ -131,11 +129,9 @@ async function collectFeatured(libraries) {
             manifest.forEach((entry, manifestIndex) => {
                 if (!entry || entry.featured !== true) return;
 
-                if (!Array.isArray(entry.slugPath) || entry.slugPath.length !== library.depth) {
-                    console.warn(
-                        `Featured: skipping malformed entry in "${library.path}" — ` +
-                        `slugPath ${JSON.stringify(entry.slugPath)} doesn't match depth ${library.depth}.`
-                    );
+                const slugPath = getEntrySegments(entry);
+                if (!slugPath.length) {
+                    console.warn(`Featured: skipping malformed entry in "${library.path}" — empty slugPath.`);
                     return;
                 }
 
@@ -144,7 +140,7 @@ async function collectFeatured(libraries) {
 
                 if (usesDates && rawEnd && !parsedDate) {
                     console.warn(
-                        `Featured: "${library.path}/${entry.slugPath.join("/")}" has an unparseable ` +
+                        `Featured: "${library.path}/${slugPath.join("/")}" has an unparseable ` +
                         `date "${rawEnd}" — expected YYYY/MM/DD or YYYY-MM-DD. Treating as undated.`
                     );
                 }
@@ -153,15 +149,13 @@ async function collectFeatured(libraries) {
                     library,
                     libraryIndex,
                     manifestIndex,
-                    slugPath: entry.slugPath,
+                    slugPath,
                     parsedDate,
-                    sortName: entry.slugPath[entry.slugPath.length - 1] || "",
                 });
             });
 
             console.log(
-                `Featured: "${library.path}" (depth ${library.depth}, ` +
-                `${usesDates ? "date mode" : "title mode"}) — ` +
+                `Featured: "${library.path}" (${usesDates ? "date mode" : "goAfter mode"}) — ` +
                 `${manifest.length} entr${manifest.length === 1 ? "y" : "ies"}, ${featured.length} featured.`
             );
 
@@ -198,9 +192,7 @@ async function loadFeatured() {
         libraries,
         featured: allFeatured.map(f => ({
             library: f.library.path,
-            depth: f.library.depth,
             slugPath: f.slugPath,
-            sortName: f.sortName,
             parsedDate: f.parsedDate,
             id: entryElementId(f.library, f.slugPath),
         })),
@@ -214,7 +206,7 @@ async function loadFeatured() {
         return;
     }
 
-    const sorted = [...allFeatured].sort(compareFeatured);
+    const sorted = sortFeatured(allFeatured);
 
     console.log(
         "Featured: render order →",

@@ -91,9 +91,9 @@ async function loadLibrariesDropdown(container, title) {
             return;
         }
 
-        const visibleLibraries = allLibraries.filter(lib => !lib.hidden);
+        const visibleLibraries = allLibraries.filter(lib => lib && lib.private !== true);
         if (visibleLibraries.length === 0) {
-            console.warn("Topbar: all libraries are hidden — dropdown skipped.");
+            console.warn("Topbar: all libraries are private — dropdown skipped.");
             return;
         }
 

@@ -7,6 +7,7 @@ const { handleRoutes } = require("./lib/routes");
 const { serveStaticFile } = require("./lib/staticFile");
 const { loadExtensions, runExtensions } = require("./lib/extensions");
 const { ensureMasterConfig, ensureThemeConfig } = require("./lib/siteConfig");
+const { ensureBlogStructure } = require("./lib/blogConfig");
 const { ensureFavicon } = require("./lib/favicon");
 const { ensureAboutMe } = require("./lib/aboutMe");
 const { startBackupScheduler, startTerminalCommands } = require("./lib/backup");
@@ -18,6 +19,8 @@ ensureMasterConfig();
 ensureThemeConfig();
 
 async function boot() {
+    ensureBlogStructure();
+
     await ensureFavicon();
 
     ensureAboutMe();

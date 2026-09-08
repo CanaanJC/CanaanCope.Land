@@ -103,18 +103,18 @@
         "media/favicon/favicon.png": {
             "hash": "5d9c17887c8905e5b60cd3266522b391c4c5326ebd0bb360053f3a0ebac33824",
             "size": 1131,
-            "mtimeMs": 1788838382099.103,
+            "mtimeMs": 1788850172357.1726,
             "variant": "media/favicon/cmpsd/favicon.avif",
             "variantSize": 594,
-            "builtAt": "2026-09-08T03:33:07.484Z"
+            "builtAt": "2026-09-08T06:49:37.768Z"
         },
         "media/favicon/apple-touch-icon.png": {
             "hash": "2c4fd7173e5fd0c28b5411dcf6a6eafb49b767cfc57680d062f9f1393449ac30",
             "size": 5480,
-            "mtimeMs": 1788838382103.103,
+            "mtimeMs": 1788850172361.1726,
             "variant": "media/favicon/cmpsd/apple-touch-icon.avif",
             "variantSize": 820,
-            "builtAt": "2026-09-08T03:33:07.490Z"
+            "builtAt": "2026-09-08T06:49:37.771Z"
         },
         "media/libraries/template.png": {
             "hash": "176ac763677f358a1862a1283ce772bf540c99888e8af20ae5a3c126d3de7028",
@@ -123,6 +123,41 @@
             "variant": "media/libraries/cmpsd/template.avif",
             "variantSize": 58041,
             "builtAt": "2026-09-08T03:32:41.744Z"
+        },
+        "libraries/resources/0_canaancope.land/0_installation/media/folder1/fig2.png": {
+            "hash": "1fa81e906b01238681712d94d40e23bd7e2377fae6a5e07b914d97b3d4ad0be3",
+            "size": 25989,
+            "mtimeMs": 1788845888658.4749,
+            "variant": "libraries/resources/0_canaancope.land/0_installation/media/folder1/cmpsd/fig2.avif",
+            "variantSize": 11626,
+            "builtAt": "2026-09-08T05:54:01.799Z",
+            "adopted": true
+        },
+        "libraries/resources/0_canaancope.land/0_installation/media/folder1/fig3.png": {
+            "hash": "2db32b69d3148d20da4acc5c6838379b4c0305b592627f93329750f0d65f6c81",
+            "size": 92444,
+            "mtimeMs": 1788845889090.9766,
+            "variant": "libraries/resources/0_canaancope.land/0_installation/media/folder1/cmpsd/fig3.avif",
+            "variantSize": 12061,
+            "builtAt": "2026-09-08T05:54:01.801Z",
+            "adopted": true
+        },
+        "libraries/resources/0_canaancope.land/0_installation/media/folder1/thumb.png": {
+            "hash": "3c3600556969e852f0a6fea38d62de046eced389ba00aadebb1c03ae7cf290dc",
+            "size": 97570,
+            "mtimeMs": 1788845889516.5264,
+            "variant": "libraries/resources/0_canaancope.land/0_installation/media/folder1/cmpsd/thumb.avif",
+            "variantSize": 41678,
+            "builtAt": "2026-09-08T05:54:01.802Z",
+            "adopted": true
+        },
+        "libraries/resources/test depth/media/404.png": {
+            "hash": "0030cec4b03273d732dc313a881c022a8ef95e9b11d177c7fa9e0557966b1f13",
+            "size": 1298205,
+            "mtimeMs": 1788849503314.4243,
+            "variant": "libraries/resources/test depth/media/cmpsd/404.avif",
+            "variantSize": 38692,
+            "builtAt": "2026-09-08T06:38:26.113Z"
         }
     }
 }

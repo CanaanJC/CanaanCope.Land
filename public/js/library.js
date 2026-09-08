@@ -11,7 +11,8 @@ import {
     buildNavItems,
     navTriggerLabel,
     folderLabel,
-    compareFolderNames,
+    entryParentMeta,
+    getEntrySegments,
 } from "./lib-nav.js";
 
 console.log("Library module loaded");
@@ -72,16 +73,16 @@ async function fetchManifest(libraryPath) {
     return manifest;
 }
 
-function currentPathParts() {
-    return window.location.pathname.split("/").filter(Boolean).map(decodeSegment);
-}
-
 function decodeSegment(seg) {
     try {
         return decodeURIComponent(seg);
     } catch {
         return seg;
     }
+}
+
+function currentPathParts() {
+    return window.location.pathname.split("/").filter(Boolean).map(decodeSegment);
 }
 
 async function resolveLibrary() {
@@ -104,45 +105,30 @@ function blogUrlPath(library, targetId) {
     return `/${library.path}/${slugPath}`;
 }
 
-function firstEntryUnderFolder(manifest, folderParts) {
-    if (!Array.isArray(manifest) || !folderParts.length) return null;
-    const match = manifest.find(entry =>
-        Array.isArray(entry.slugPath) &&
-        entry.slugPath.length >= folderParts.length &&
-        folderParts.every((seg, i) => entry.slugPath[i] === seg)
-    );
-    return match ? entryId(match.slugPath) : null;
-}
-
-function compareSlugToFolder(slugPath, folderParts) {
-    const a = Array.isArray(slugPath) ? slugPath : [];
-    const b = Array.isArray(folderParts) ? folderParts : [];
-    const len = Math.max(a.length, b.length);
-    for (let i = 0; i < len; i++) {
-        if (a[i] === undefined) return -1;
-        if (b[i] === undefined) return 1;
-        const c = compareFolderNames(a[i], b[i]);
-        if (c !== 0) return c;
-    }
-    return 0;
+function manifestHasTarget(manifest, targetId) {
+    return manifest.some(e => entryId(getEntrySegments(e)) === targetId);
 }
 
 function resolveFolderTarget(manifest, folderParts) {
     if (!Array.isArray(manifest) || !manifest.length) return null;
     if (!Array.isArray(folderParts) || !folderParts.length) return null;
 
-    const direct = firstEntryUnderFolder(manifest, folderParts);
-    if (direct) return direct;
+    const match = manifest.find(entry => {
+        const segs = getEntrySegments(entry);
+        return segs.length >= folderParts.length &&
+            folderParts.every((seg, i) => segs[i] === seg);
+    });
+    if (match) return entryId(getEntrySegments(match));
 
-    let preceding = null;
-    for (const entry of manifest) {
-        if (!Array.isArray(entry.slugPath)) continue;
-        if (compareSlugToFolder(entry.slugPath, folderParts) < 0) preceding = entry;
-    }
-    if (preceding) return entryId(preceding.slugPath);
+    const first = manifest.find(e => getEntrySegments(e).length > 0);
+    return first ? entryId(getEntrySegments(first)) : null;
+}
 
-    const first = manifest.find(e => Array.isArray(e.slugPath) && e.slugPath.length > 0);
-    return first ? entryId(first.slugPath) : null;
+function resolveRestToTarget(manifest, rest) {
+    if (!rest.length) return null;
+    const direct = entryId(rest);
+    if (manifestHasTarget(manifest, direct)) return direct;
+    return resolveFolderTarget(manifest, rest);
 }
 
 async function fetchEntryFiles(library, slugPath) {
@@ -189,12 +175,15 @@ function buildFolderDivider(title) {
 }
 
 function folderDividerLabel(prev, cur) {
-    const a = Array.isArray(prev.slugPath) ? prev.slugPath : [];
-    const b = Array.isArray(cur.slugPath)  ? cur.slugPath  : [];
+    const a = getEntrySegments(prev);
+    const b = getEntrySegments(cur);
     const parentLen = b.length - 1;
 
     for (let i = 0; i < parentLen; i++) {
-        if (a[i] !== b[i]) return folderLabel(b[i]);
+        if (a[i] !== b[i]) {
+            const meta = entryParentMeta(cur, i);
+            return folderLabel(b[i], meta && meta.name);
+        }
     }
     return null;
 }
@@ -350,15 +339,7 @@ function resolveTargetIdFromLocation(library, manifest) {
     const parts = currentPathParts();
     const rest  = parts.slice(1);
 
-    if (rest.length >= library.depth) {
-        return rest.slice(0, library.depth).join("--");
-    }
-
-    if (rest.length > 0) {
-        return resolveFolderTarget(manifest, rest);
-    }
-
-    return null;
+    return resolveRestToTarget(manifest, rest);
 }
 
 async function loadLibrary(library, explicitTargetId = null) {
@@ -381,7 +362,7 @@ async function loadLibrary(library, explicitTargetId = null) {
     const targetId = explicitTargetId || resolveTargetIdFromLocation(library, manifest);
 
     const targetIndex = targetId
-        ? Math.max(manifest.findIndex(e => entryId(e.slugPath) === targetId), 0)
+        ? Math.max(manifest.findIndex(e => entryId(getEntrySegments(e)) === targetId), 0)
         : 0;
 
     const eagerCutoff = targetIndex + PRELOAD_AHEAD;
@@ -390,12 +371,13 @@ async function loadLibrary(library, explicitTargetId = null) {
 
     const eagerResults = await Promise.all(
         eagerList.map(async entry => {
-            const id = entryId(entry.slugPath);
+            const segs = getEntrySegments(entry);
+            const id = entryId(segs);
             try {
-                const { config, rawMd } = await fetchEntryFiles(library, entry.slugPath);
-                return { id, dom: buildEntryBlock(library, entry.slugPath, config, rawMd) };
+                const { config, rawMd } = await fetchEntryFiles(library, segs);
+                return { id, dom: buildEntryBlock(library, segs, config, rawMd) };
             } catch {
-                console.error(`Library: eager load failed for "${library.path}/${entry.slugPath.join("/")}"`);
+                console.error(`Library: eager load failed for "${library.path}/${segs.join("/")}"`);
                 return { id, dom: createPlaceholder(id) };
             }
         })
@@ -403,7 +385,7 @@ async function loadLibrary(library, explicitTargetId = null) {
 
     for (let i = 0; i < manifest.length; i++) {
         const entry = manifest[i];
-        const id    = entryId(entry.slugPath);
+        const id    = entryId(getEntrySegments(entry));
 
         if (i > 0) {
             appendDivider(container, manifest[i - 1], entry);
@@ -419,10 +401,10 @@ async function loadLibrary(library, explicitTargetId = null) {
         if (target) setTimeout(() => target.scrollIntoView({ behavior: "instant", block: "start" }), 50);
     }
 
-    setupScrollTracking(library, eagerList.map(e => e.slugPath));
+    setupScrollTracking(library, eagerList.map(e => getEntrySegments(e)));
 
     if (lazyList.length > 0) {
-        const lazyIds = lazyList.map(e => entryId(e.slugPath));
+        const lazyIds = lazyList.map(e => entryId(getEntrySegments(e)));
         const observer = setupLazyLoading(lazyIds, makeEntryLoader(library), PRELOAD_AHEAD);
         if (observer) _observers.push(observer);
     }
@@ -440,22 +422,25 @@ function parseTargetFromUrl(url) {
 
     const rest = segs.slice(1);
 
-    if (rest.length >= library.depth) {
-        return { library, targetId: rest.slice(0, library.depth).join("--"), folderParts: null };
-    }
-
     if (rest.length === 0) {
         const hash = (url.hash || "").replace(/^#/, "");
-        return { library, targetId: hash ? decodeSegment(hash) : null, folderParts: null };
+        return { library, rest: [], targetId: hash ? decodeSegment(hash) : null };
     }
 
-    return { library, targetId: null, folderParts: rest };
+    return { library, rest, targetId: null };
+}
+
+async function resolveParsedTarget(parsed) {
+    if (parsed.targetId) return parsed.targetId;
+    if (!parsed.rest || !parsed.rest.length) return null;
+    const manifest = sortManifestEntries(parsed.library, await fetchManifest(parsed.library.path));
+    return resolveRestToTarget(manifest, parsed.rest);
 }
 
 async function targetExists(library, targetId) {
     if (!targetId) return true;
     const manifest = await fetchManifest(library.path);
-    return manifest.some(e => Array.isArray(e.slugPath) && entryId(e.slugPath) === targetId);
+    return manifestHasTarget(manifest, targetId);
 }
 
 async function switchLibrary(library, targetId, pushHistory) {
@@ -485,13 +470,8 @@ async function switchLibrary(library, targetId, pushHistory) {
 }
 
 async function handleResolvedNav(parsed, url, pushHistory = true) {
-    const { library, folderParts } = parsed;
-    let { targetId } = parsed;
-
-    if (!targetId && Array.isArray(folderParts) && folderParts.length) {
-        const manifest = sortManifestEntries(library, await fetchManifest(library.path));
-        targetId = resolveFolderTarget(manifest, folderParts);
-    }
+    const { library } = parsed;
+    const targetId = await resolveParsedTarget(parsed);
 
     if (!(await targetExists(library, targetId))) {
         window.location.href = url ? url.href : blogUrlPath(library, targetId);
@@ -563,19 +543,15 @@ function onDocumentClick(e) {
 }
 
 function onPopState() {
-    const parsed = parseTargetFromUrl(new URL(window.location.href));
+    const url = new URL(window.location.href);
+    const parsed = parseTargetFromUrl(url);
 
     if (!parsed) {
         window.location.reload();
         return;
     }
 
-    if (_currentLibrary && _currentLibrary.path === parsed.library.path && parsed.targetId) {
-        scrollToId(parsed.targetId, "instant");
-        return;
-    }
-
-    handleResolvedNav(parsed, new URL(window.location.href), false)
+    handleResolvedNav(parsed, url, false)
         .catch(() => window.location.reload());
 }
 
@@ -587,7 +563,7 @@ function installSoftNavApi() {
             window.location.href = targetId ? `/${libraryPath}#${targetId}` : `/${libraryPath}`;
             return Promise.resolve(false);
         }
-        return handleResolvedNav({ library, targetId: targetId || null, folderParts: null }, null, true)
+        return handleResolvedNav({ library, rest: [], targetId: targetId || null }, null, true)
             .then(() => true)
             .catch(err => {
                 console.error("Library: soft nav API failed:", err);
