@@ -1,4 +1,3 @@
-
 const TOKEN_RE =
     /(\[\/?[A-Za-z]+\d*[a-z]?\])|(<[^<>\n]*>)|(https?:\/\/[^\s<>()\]|]+)/g;
 
@@ -26,9 +25,8 @@ function classifyInline(trimmed) {
     return { cls: null, kind: "plain" };
 }
 
-function renderLinkChip(url) {
-    const safeUrl = escapeHtml(url);
-    return `<span class="be-linkable" data-url="${safeUrl}">${safeUrl}</span>`;
+function renderUrlText(url) {
+    return `<span class="be-url">${escapeHtml(url)}</span>`;
 }
 
 function linkifyBareUrls(rawFragment) {
@@ -38,7 +36,7 @@ function linkifyBareUrls(rawFragment) {
     let m;
     while ((m = urlRe.exec(rawFragment))) {
         out += escapeHtml(rawFragment.slice(cursor, m.index));
-        out += renderLinkChip(m[0]);
+        out += renderUrlText(m[0]);
         cursor = m.index + m[0].length;
     }
     out += escapeHtml(rawFragment.slice(cursor));
@@ -98,7 +96,7 @@ export function renderMarkup(text) {
         } else if (m[2]) {
             out += renderInlineTag(m[2], m.index);
         } else if (m[3]) {
-            out += renderLinkChip(m[3]);
+            out += renderUrlText(m[3]);
         }
 
         lastIndex = m.index + m[0].length;
@@ -110,13 +108,6 @@ export function renderMarkup(text) {
 
 export function wireInteractions(highlightEl, textareaEl) {
     highlightEl.addEventListener("click", (e) => {
-        const link = e.target.closest(".be-linkable[data-url]");
-        if (link) {
-            e.preventDefault();
-            window.open(link.dataset.url, "_blank", "noopener,noreferrer");
-            return;
-        }
-
         const swatch = e.target.closest(".be-swatch[data-hex]");
         if (swatch) {
             e.preventDefault();

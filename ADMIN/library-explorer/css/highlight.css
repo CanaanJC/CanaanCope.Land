@@ -1,4 +1,3 @@
-
 .be-md-wrap {
     position: absolute;
     inset: 0;
@@ -69,12 +68,11 @@
 .be-md-highlight .tag-loop      { color: var(--tag-color-loop); font-weight: 700; }
 .be-md-highlight .tag-link      { color: var(--tag-color-link); }
 
-.be-md-highlight .tag-link .be-linkable {
+.be-md-highlight .be-url {
     color: var(--admin-text);
-}
-.be-linkable {
-    pointer-events: auto;
-    cursor: pointer;
+    pointer-events: none;
+    cursor: text;
+    text-decoration: none;
 }
 
 .be-swatch {
