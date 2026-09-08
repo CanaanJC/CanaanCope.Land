@@ -11,6 +11,7 @@ import {
     buildNavItems,
     navTriggerLabel,
     folderLabel,
+    compareFolderNames,
 } from "./lib-nav.js";
 
 console.log("Library module loaded");
@@ -101,6 +102,47 @@ function blogUrlPath(library, targetId) {
     if (!targetId) return `/${library.path}`;
     const slugPath = targetId.split("--").map(encodeURIComponent).join("/");
     return `/${library.path}/${slugPath}`;
+}
+
+function firstEntryUnderFolder(manifest, folderParts) {
+    if (!Array.isArray(manifest) || !folderParts.length) return null;
+    const match = manifest.find(entry =>
+        Array.isArray(entry.slugPath) &&
+        entry.slugPath.length >= folderParts.length &&
+        folderParts.every((seg, i) => entry.slugPath[i] === seg)
+    );
+    return match ? entryId(match.slugPath) : null;
+}
+
+function compareSlugToFolder(slugPath, folderParts) {
+    const a = Array.isArray(slugPath) ? slugPath : [];
+    const b = Array.isArray(folderParts) ? folderParts : [];
+    const len = Math.max(a.length, b.length);
+    for (let i = 0; i < len; i++) {
+        if (a[i] === undefined) return -1;
+        if (b[i] === undefined) return 1;
+        const c = compareFolderNames(a[i], b[i]);
+        if (c !== 0) return c;
+    }
+    return 0;
+}
+
+function resolveFolderTarget(manifest, folderParts) {
+    if (!Array.isArray(manifest) || !manifest.length) return null;
+    if (!Array.isArray(folderParts) || !folderParts.length) return null;
+
+    const direct = firstEntryUnderFolder(manifest, folderParts);
+    if (direct) return direct;
+
+    let preceding = null;
+    for (const entry of manifest) {
+        if (!Array.isArray(entry.slugPath)) continue;
+        if (compareSlugToFolder(entry.slugPath, folderParts) < 0) preceding = entry;
+    }
+    if (preceding) return entryId(preceding.slugPath);
+
+    const first = manifest.find(e => Array.isArray(e.slugPath) && e.slugPath.length > 0);
+    return first ? entryId(first.slugPath) : null;
 }
 
 async function fetchEntryFiles(library, slugPath) {
@@ -301,13 +343,21 @@ async function loadBlockedEntry(library) {
     }
 }
 
-function resolveTargetIdFromLocation(library) {
+function resolveTargetIdFromLocation(library, manifest) {
     const hash = window.location.hash.replace("#", "");
     if (hash) return decodeSegment(hash);
+
     const parts = currentPathParts();
-    if (parts.length >= 1 + library.depth) {
-        return parts.slice(1, 1 + library.depth).join("--");
+    const rest  = parts.slice(1);
+
+    if (rest.length >= library.depth) {
+        return rest.slice(0, library.depth).join("--");
     }
+
+    if (rest.length > 0) {
+        return resolveFolderTarget(manifest, rest);
+    }
+
     return null;
 }
 
@@ -328,7 +378,7 @@ async function loadLibrary(library, explicitTargetId = null) {
     manifest = sortManifestEntries(library, manifest);
     injectNav(library, manifest);
 
-    const targetId = explicitTargetId || resolveTargetIdFromLocation(library);
+    const targetId = explicitTargetId || resolveTargetIdFromLocation(library, manifest);
 
     const targetIndex = targetId
         ? Math.max(manifest.findIndex(e => entryId(e.slugPath) === targetId), 0)
@@ -364,6 +414,7 @@ async function loadLibrary(library, explicitTargetId = null) {
     }
 
     if (targetId) {
+        history.replaceState(null, "", blogUrlPath(library, targetId));
         const target = document.getElementById(targetId) || document.getElementById(`placeholder-${targetId}`);
         if (target) setTimeout(() => target.scrollIntoView({ behavior: "instant", block: "start" }), 50);
     }
@@ -389,16 +440,16 @@ function parseTargetFromUrl(url) {
 
     const rest = segs.slice(1);
 
-    if (rest.length === library.depth) {
-        return { library, targetId: rest.join("--") };
+    if (rest.length >= library.depth) {
+        return { library, targetId: rest.slice(0, library.depth).join("--"), folderParts: null };
     }
 
     if (rest.length === 0) {
         const hash = (url.hash || "").replace(/^#/, "");
-        return { library, targetId: hash ? decodeSegment(hash) : null };
+        return { library, targetId: hash ? decodeSegment(hash) : null, folderParts: null };
     }
 
-    return null;
+    return { library, targetId: null, folderParts: rest };
 }
 
 async function targetExists(library, targetId) {
@@ -434,7 +485,13 @@ async function switchLibrary(library, targetId, pushHistory) {
 }
 
 async function handleResolvedNav(parsed, url, pushHistory = true) {
-    const { library, targetId } = parsed;
+    const { library, folderParts } = parsed;
+    let { targetId } = parsed;
+
+    if (!targetId && Array.isArray(folderParts) && folderParts.length) {
+        const manifest = sortManifestEntries(library, await fetchManifest(library.path));
+        targetId = resolveFolderTarget(manifest, folderParts);
+    }
 
     if (!(await targetExists(library, targetId))) {
         window.location.href = url ? url.href : blogUrlPath(library, targetId);
@@ -487,6 +544,7 @@ function onDocumentClick(e) {
     }
 
     if (url.protocol !== "http:" && url.protocol !== "https:") return;
+    if (url.searchParams.has("single")) return;
 
     const parsed = parseTargetFromUrl(url);
     if (!parsed) return;
@@ -512,12 +570,12 @@ function onPopState() {
         return;
     }
 
-    if (_currentLibrary && _currentLibrary.path === parsed.library.path) {
+    if (_currentLibrary && _currentLibrary.path === parsed.library.path && parsed.targetId) {
         scrollToId(parsed.targetId, "instant");
         return;
     }
 
-    switchLibrary(parsed.library, parsed.targetId, false)
+    handleResolvedNav(parsed, new URL(window.location.href), false)
         .catch(() => window.location.reload());
 }
 
@@ -529,7 +587,7 @@ function installSoftNavApi() {
             window.location.href = targetId ? `/${libraryPath}#${targetId}` : `/${libraryPath}`;
             return Promise.resolve(false);
         }
-        return handleResolvedNav({ library, targetId: targetId || null }, null, true)
+        return handleResolvedNav({ library, targetId: targetId || null, folderParts: null }, null, true)
             .then(() => true)
             .catch(err => {
                 console.error("Library: soft nav API failed:", err);

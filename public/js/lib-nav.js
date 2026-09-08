@@ -13,8 +13,12 @@ export function splitFolderName(folderName) {
     return { prefix: raw.slice(0, idx), label: raw.slice(idx + 1), raw };
 }
 
+export function prettifyLabel(label) {
+    return String(label === undefined || label === null ? "" : label).replace(/_/g, " ");
+}
+
 export function folderLabel(folderName) {
-    return splitFolderName(folderName).label;
+    return prettifyLabel(splitFolderName(folderName).label);
 }
 
 export function compareFolderNames(a, b) {
@@ -96,7 +100,7 @@ export function firstLeafSlugPath(node) {
 function nodeLabel(node) {
     if (node.entry) {
         const name = node.entry.name;
-        if (typeof name === "string" && name.trim() !== "") return name;
+        if (typeof name === "string" && name.trim() !== "") return prettifyLabel(name);
     }
     return folderLabel(node.slug);
 }
