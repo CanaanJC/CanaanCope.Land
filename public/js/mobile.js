@@ -245,6 +245,14 @@ function navigateOrScrollMobile(library, targetId) {
     }
 
     closeMenu();
+
+    if (typeof window.__LIBRARY_SOFT_NAV__ === "function") {
+        setTimeout(() => {
+            window.__LIBRARY_SOFT_NAV__(library.path, targetId);
+        }, 200);
+        return;
+    }
+
     window.location.href = `/${library.path}#${targetId}`;
 }
 
@@ -491,6 +499,15 @@ function toggleMenu() {
     else openMenu();
 }
 
+async function rebuildMenuForLibraryChange() {
+    _menuBuilt = false;
+    if (!_isMobile) return;
+    buildBurger();
+    buildMenuShell();
+    await populateMenu();
+    _menuBuilt = true;
+}
+
 async function activateMobile() {
     if (_isMobile) return;
     _isMobile = true;
@@ -532,6 +549,12 @@ function init() {
 
     document.addEventListener("keydown", (e) => {
         if (e.key === "Escape" && _menuOpen) closeMenu();
+    });
+
+    document.addEventListener("library:changed", () => {
+        rebuildMenuForLibraryChange().catch(err => {
+            console.error("Mobile: failed to rebuild menu after library change:", err);
+        });
     });
 }
 

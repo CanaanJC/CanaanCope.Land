@@ -18,11 +18,16 @@ console.log("Library module loaded");
 const PRELOAD_AHEAD = 2;
 const TOPBAR_DATA_URL = "/json/topbar.json";
 
-const _pathParts   = window.location.pathname.split("/").filter(Boolean);
-const IS_BLOCKED   = !!window.__LIBRARY_BLOCKED_PATH__;
+const IS_BLOCKED = !!window.__LIBRARY_BLOCKED_PATH__;
 
 let _librariesCache = null;
 let _contentsTitleCache = null;
+
+const _manifestCache = new Map();
+
+let _observers = [];
+let _currentLibrary = null;
+let _navBusy = false;
 
 async function fetchLibraries() {
     if (_librariesCache) return _librariesCache;
@@ -50,17 +55,52 @@ async function fetchContentsTitle() {
     return _contentsTitleCache;
 }
 
+async function fetchManifest(libraryPath) {
+    if (_manifestCache.has(libraryPath)) return _manifestCache.get(libraryPath);
+    let manifest = [];
+    try {
+        const res = await fetch(`/${libraryPath}/manifest.json?_=${Date.now()}`, { cache: "no-store" });
+        if (!res.ok) throw new Error(`manifest HTTP ${res.status}`);
+        const data = await res.json();
+        manifest = Array.isArray(data) ? data : [];
+    } catch (err) {
+        console.error(`Library: failed to load manifest for "${libraryPath}":`, err);
+        manifest = [];
+    }
+    _manifestCache.set(libraryPath, manifest);
+    return manifest;
+}
+
+function currentPathParts() {
+    return window.location.pathname.split("/").filter(Boolean).map(decodeSegment);
+}
+
+function decodeSegment(seg) {
+    try {
+        return decodeURIComponent(seg);
+    } catch {
+        return seg;
+    }
+}
+
 async function resolveLibrary() {
     const libraries = await fetchLibraries();
     if (IS_BLOCKED) {
         return libraries.find(l => l.path === window.__LIBRARY_BLOCKED_PATH__) || null;
     }
-    return libraries.find(l => l.path === _pathParts[0]) || null;
+    const parts = currentPathParts();
+    return libraries.find(l => l.path === parts[0]) || null;
 }
 
 function applyLibraryTitle(library) {
     if (!library) return;
     document.title = library.name || library.path || document.title;
+}
+
+function blogUrlPath(library, targetId) {
+    if (!targetId) return `/${library.path}`;
+    const slugPath = targetId.split("--").map(encodeURIComponent).join("/");
+    return `/${library.path}/${slugPath}`;
 }
 
 async function fetchEntryFiles(library, slugPath) {
@@ -134,7 +174,10 @@ function waitForTopbarReady(maxMs = 4000) {
 }
 
 function scrollToId(id, behavior = "smooth") {
-    if (!id) return;
+    if (!id) {
+        window.scrollTo({ top: 0, behavior });
+        return;
+    }
     const el = document.getElementById(id) || document.getElementById(`placeholder-${id}`);
     if (el) el.scrollIntoView({ behavior, block: "start" });
 }
@@ -160,6 +203,7 @@ function buildTopbarNav(library, sortedManifest, contentsTitle) {
         btn.addEventListener("click", (e) => {
             e.preventDefault();
             wrapper.classList.remove("open");
+            if (item.targetId) history.replaceState(null, "", blogUrlPath(library, item.targetId));
             scrollToId(item.targetId);
         });
         menu.appendChild(btn);
@@ -203,6 +247,7 @@ function setupScrollTracking(library, slugPaths) {
         (entries) => {
             for (const entry of entries) {
                 if (entry.isIntersecting) {
+                    if (!_currentLibrary || _currentLibrary.path !== library.path) return;
                     const id       = entry.target.id;
                     const slugPath = id.split("--");
                     const newUrl   = `/${library.path}/${slugPath.map(encodeURIComponent).join("/")}`;
@@ -218,6 +263,14 @@ function setupScrollTracking(library, slugPaths) {
         const el = document.getElementById(entryId(slugPath));
         if (el) observer.observe(el);
     }
+    _observers.push(observer);
+}
+
+function teardownObservers() {
+    for (const observer of _observers) {
+        try { observer.disconnect(); } catch {}
+    }
+    _observers = [];
 }
 
 function makeEntryLoader(library) {
@@ -248,21 +301,24 @@ async function loadBlockedEntry(library) {
     }
 }
 
-async function loadLibrary(library) {
+function resolveTargetIdFromLocation(library) {
+    const hash = window.location.hash.replace("#", "");
+    if (hash) return decodeSegment(hash);
+    const parts = currentPathParts();
+    if (parts.length >= 1 + library.depth) {
+        return parts.slice(1, 1 + library.depth).join("--");
+    }
+    return null;
+}
+
+async function loadLibrary(library, explicitTargetId = null) {
     const container = document.getElementById("projects-container");
     if (!container) return;
 
     await loadMarked();
 
-    let manifest;
-    try {
-        const res = await fetch(`/${library.path}/manifest.json?_=${Date.now()}`, { cache: "no-store" });
-        if (!res.ok) throw new Error(`manifest HTTP ${res.status}`);
-        manifest = await res.json();
-    } catch (err) {
-        console.error(`Library: failed to load manifest for "${library.path}":`, err);
-        return;
-    }
+    _manifestCache.delete(library.path);
+    let manifest = await fetchManifest(library.path);
 
     if (!manifest.length) {
         container.innerHTML = `<p style="color:var(--muted);padding:48px;">No entries yet.</p>`;
@@ -272,14 +328,7 @@ async function loadLibrary(library) {
     manifest = sortManifestEntries(library, manifest);
     injectNav(library, manifest);
 
-    const targetId = (() => {
-        const hash = window.location.hash.replace("#", "");
-        if (hash) return hash;
-        if (_pathParts.length >= 1 + library.depth) {
-            return _pathParts.slice(1, 1 + library.depth).join("--");
-        }
-        return null;
-    })();
+    const targetId = explicitTargetId || resolveTargetIdFromLocation(library);
 
     const targetIndex = targetId
         ? Math.max(manifest.findIndex(e => entryId(e.slugPath) === targetId), 0)
@@ -315,7 +364,7 @@ async function loadLibrary(library) {
     }
 
     if (targetId) {
-        const target = document.getElementById(targetId);
+        const target = document.getElementById(targetId) || document.getElementById(`placeholder-${targetId}`);
         if (target) setTimeout(() => target.scrollIntoView({ behavior: "instant", block: "start" }), 50);
     }
 
@@ -323,8 +372,171 @@ async function loadLibrary(library) {
 
     if (lazyList.length > 0) {
         const lazyIds = lazyList.map(e => entryId(e.slugPath));
-        setupLazyLoading(lazyIds, makeEntryLoader(library), PRELOAD_AHEAD);
+        const observer = setupLazyLoading(lazyIds, makeEntryLoader(library), PRELOAD_AHEAD);
+        if (observer) _observers.push(observer);
     }
+}
+
+function parseTargetFromUrl(url) {
+    const libraries = _librariesCache || [];
+    if (!libraries.length) return null;
+
+    const segs = url.pathname.split("/").filter(Boolean).map(decodeSegment);
+    if (!segs.length) return null;
+
+    const library = libraries.find(l => l.path === segs[0]);
+    if (!library) return null;
+
+    const rest = segs.slice(1);
+
+    if (rest.length === library.depth) {
+        return { library, targetId: rest.join("--") };
+    }
+
+    if (rest.length === 0) {
+        const hash = (url.hash || "").replace(/^#/, "");
+        return { library, targetId: hash ? decodeSegment(hash) : null };
+    }
+
+    return null;
+}
+
+async function targetExists(library, targetId) {
+    if (!targetId) return true;
+    const manifest = await fetchManifest(library.path);
+    return manifest.some(e => Array.isArray(e.slugPath) && entryId(e.slugPath) === targetId);
+}
+
+async function switchLibrary(library, targetId, pushHistory) {
+    teardownObservers();
+
+    const container = document.getElementById("projects-container");
+    if (container) container.innerHTML = "";
+
+    const existingNav = document.getElementById("library-nav-dropdown");
+    if (existingNav) existingNav.remove();
+
+    const url = blogUrlPath(library, targetId);
+    if (pushHistory) history.pushState(null, "", url);
+    else history.replaceState(null, "", url);
+
+    _currentLibrary = library;
+    window.__CURRENT_LIBRARY_PATH__ = library.path;
+    window.__LIBRARY_BLOCKED_PATH__ = undefined;
+    window.__LIBRARY_BLOCKED_SLUG__ = undefined;
+
+    applyLibraryTitle(library);
+    window.scrollTo(0, 0);
+
+    await loadLibrary(library, targetId);
+
+    document.dispatchEvent(new CustomEvent("library:changed", { detail: { path: library.path } }));
+}
+
+async function handleResolvedNav(parsed, url, pushHistory = true) {
+    const { library, targetId } = parsed;
+
+    if (!(await targetExists(library, targetId))) {
+        window.location.href = url ? url.href : blogUrlPath(library, targetId);
+        return;
+    }
+
+    if (_currentLibrary && _currentLibrary.path === library.path) {
+        const clean = blogUrlPath(library, targetId);
+        if (pushHistory) history.pushState(null, "", clean);
+        else history.replaceState(null, "", clean);
+        scrollToId(targetId, "smooth");
+        return;
+    }
+
+    await switchLibrary(library, targetId, pushHistory);
+}
+
+function shouldIgnoreAnchor(anchor) {
+    if (anchor.hasAttribute("download")) return true;
+
+    const targetAttr = (anchor.getAttribute("target") || "").toLowerCase();
+    if (targetAttr && targetAttr !== "_self") return true;
+
+    if (anchor.closest(".blog-date")) return true;
+    if (anchor.classList.contains("blog-link-static-anchor")) return true;
+    if (anchor.classList.contains("blog-link-open-btn")) return true;
+    if (anchor.classList.contains("blog-link-error__link")) return true;
+
+    return false;
+}
+
+function onDocumentClick(e) {
+    if (e.defaultPrevented) return;
+    if (e.button !== 0) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+    const node = e.target;
+    const anchor = node && node.closest ? node.closest("a[href]") : null;
+    if (!anchor) return;
+    if (shouldIgnoreAnchor(anchor)) return;
+
+    const raw = anchor.getAttribute("href");
+    if (!raw || raw.trim() === "" || raw.startsWith("#")) return;
+
+    let url;
+    try {
+        url = new URL(raw, window.location.href);
+    } catch {
+        return;
+    }
+
+    if (url.protocol !== "http:" && url.protocol !== "https:") return;
+
+    const parsed = parseTargetFromUrl(url);
+    if (!parsed) return;
+
+    e.preventDefault();
+
+    if (_navBusy) return;
+    _navBusy = true;
+
+    handleResolvedNav(parsed, url, true)
+        .catch(err => {
+            console.error("Library: soft navigation failed, falling back to full load:", err);
+            window.location.href = url.href;
+        })
+        .finally(() => { _navBusy = false; });
+}
+
+function onPopState() {
+    const parsed = parseTargetFromUrl(new URL(window.location.href));
+
+    if (!parsed) {
+        window.location.reload();
+        return;
+    }
+
+    if (_currentLibrary && _currentLibrary.path === parsed.library.path) {
+        scrollToId(parsed.targetId, "instant");
+        return;
+    }
+
+    switchLibrary(parsed.library, parsed.targetId, false)
+        .catch(() => window.location.reload());
+}
+
+function installSoftNavApi() {
+    window.__LIBRARY_SOFT_NAV__ = (libraryPath, targetId) => {
+        const libraries = _librariesCache || [];
+        const library = libraries.find(l => l.path === libraryPath);
+        if (!library) {
+            window.location.href = targetId ? `/${libraryPath}#${targetId}` : `/${libraryPath}`;
+            return Promise.resolve(false);
+        }
+        return handleResolvedNav({ library, targetId: targetId || null }, null, true)
+            .then(() => true)
+            .catch(err => {
+                console.error("Library: soft nav API failed:", err);
+                window.location.href = blogUrlPath(library, targetId);
+                return false;
+            });
+    };
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -334,10 +546,18 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
     }
     applyLibraryTitle(library);
+
     if (IS_BLOCKED) {
         loadBlockedEntry(library);
-    } else {
-        window.__CURRENT_LIBRARY_PATH__ = library.path;
-        loadLibrary(library);
+        return;
     }
+
+    _currentLibrary = library;
+    window.__CURRENT_LIBRARY_PATH__ = library.path;
+
+    installSoftNavApi();
+    document.addEventListener("click", onDocumentClick);
+    window.addEventListener("popstate", onPopState);
+
+    loadLibrary(library);
 });
