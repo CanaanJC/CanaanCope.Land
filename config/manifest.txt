@@ -132,7 +132,6 @@ public/css/mobile.css
 public/css/sidebar.css
 public/css/topbar.css
 public/index.html
-public/installer.sh
 public/js/about-me.js
 public/js/bottom-page.js
 public/js/featured.js
@@ -151,6 +150,7 @@ README.md
 scripts/git.sh
 scripts/helpers/26.9.0.sh
 scripts/helpers/26.9.1.sh
+scripts/installer.sh
 scripts/run.sh
 scripts/.service-name
 scripts/service.sh
