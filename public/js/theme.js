@@ -35,15 +35,66 @@ function setFavicon(href) {
 }
 
 const FONT_VAR_MAP = {
-    body:           { varName: "--page-font-family",         stack: SYSTEM_FONT_STACK },
-    topbar:         { varName: "--topbar-font-family",        stack: SYSTEM_FONT_STACK },
-    slogan:         { varName: "--slogan-font-family",        stack: SYSTEM_FONT_STACK },
-    sidebar:        { varName: "--sidebar-font-family",       stack: SYSTEM_FONT_STACK },
-    bottomText:     { varName: "--bottom-text-font-family",   stack: SYSTEM_FONT_STACK },
-    code:           { varName: "--md-code-font-family",       stack: MONO_FONT_STACK },
-    dropdownFolder: { varName: "--dropdown-folder-font-family", stack: SYSTEM_FONT_STACK },
-    dropdownBlog:   { varName: "--dropdown-blog-font-family",   stack: MONO_FONT_STACK },
+    body: {
+        varName:   "--page-font-family",
+        weightVar: "--page-font-weight",
+        styleVar:  "--page-font-style",
+        axesVar:   "--page-font-variation-settings",
+        stack:     SYSTEM_FONT_STACK,
+    },
+    topbar: {
+        varName:   "--topbar-font-family",
+        weightVar: "--topbar-font-weight",
+        styleVar:  "--topbar-font-style",
+        axesVar:   "--topbar-font-variation-settings",
+        stack:     SYSTEM_FONT_STACK,
+    },
+    slogan: {
+        varName:   "--slogan-font-family",
+        weightVar: "--slogan-font-weight",
+        styleVar:  "--slogan-font-style",
+        axesVar:   "--slogan-font-variation-settings",
+        stack:     SYSTEM_FONT_STACK,
+    },
+    sidebar: {
+        varName:   "--sidebar-font-family",
+        weightVar: "--sidebar-font-weight",
+        styleVar:  "--sidebar-font-style",
+        axesVar:   "--sidebar-font-variation-settings",
+        stack:     SYSTEM_FONT_STACK,
+    },
+    bottomText: {
+        varName:   "--bottom-text-font-family",
+        weightVar: "--bottom-text-font-weight",
+        styleVar:  "--bottom-text-font-style",
+        axesVar:   "--bottom-text-font-variation-settings",
+        stack:     SYSTEM_FONT_STACK,
+    },
+    code: {
+        varName:   "--md-code-font-family",
+        weightVar: "--md-code-font-weight",
+        styleVar:  "--md-code-font-style",
+        axesVar:   "--md-code-font-variation-settings",
+        stack:     MONO_FONT_STACK,
+    },
+    dropdownFolder: {
+        varName:   "--dropdown-folder-font-family",
+        weightVar: "--dropdown-folder-font-weight",
+        styleVar:  "--dropdown-folder-font-style",
+        axesVar:   "--dropdown-folder-font-variation-settings",
+        stack:     SYSTEM_FONT_STACK,
+    },
+    dropdownBlog: {
+        varName:   "--dropdown-blog-font-family",
+        weightVar: "--dropdown-blog-font-weight",
+        styleVar:  "--dropdown-blog-font-style",
+        axesVar:   "--dropdown-blog-font-variation-settings",
+        stack:     MONO_FONT_STACK,
+    },
 };
+
+const GOOGLE_LINK_ATTR   = "data-theme-google-font";
+const GOOGLE_PRECONNECT  = "theme-google-fonts-preconnect";
 
 let _fontStyleEl = null;
 
@@ -55,23 +106,117 @@ function getFontStyleEl() {
     return _fontStyleEl;
 }
 
+function cssFamilyName(name) {
+    return String(name).replace(/[\\"]/g, "");
+}
+
 function fontFaceRule(font) {
-    return `@font-face { font-family: "${font.family}"; src: url("${font.url}") format("${font.format}"); font-display: swap; }`;
+    return `@font-face { font-family: "${cssFamilyName(font.family)}"; src: url("${font.url}") format("${font.format}"); font-display: swap; }`;
+}
+
+function safeGoogleStylesheet(href) {
+    try {
+        const url = new URL(String(href), window.location.href);
+        if (url.protocol !== "https:") return null;
+        if (url.hostname !== "fonts.googleapis.com") return null;
+        return url.href;
+    } catch {
+        return null;
+    }
+}
+
+function ensureGooglePreconnect() {
+    if (document.getElementById(GOOGLE_PRECONNECT)) return;
+
+    const api = document.createElement("link");
+    api.id = GOOGLE_PRECONNECT;
+    api.rel = "preconnect";
+    api.href = "https://fonts.googleapis.com";
+
+    const statics = document.createElement("link");
+    statics.rel = "preconnect";
+    statics.href = "https://fonts.gstatic.com";
+    statics.crossOrigin = "anonymous";
+
+    document.head.appendChild(api);
+    document.head.appendChild(statics);
+}
+
+function syncGoogleFontLinks(hrefs) {
+    const wanted = [];
+    for (const href of hrefs) {
+        if (href && !wanted.includes(href)) wanted.push(href);
+    }
+
+    const present = new Set();
+    for (const link of document.querySelectorAll(`link[${GOOGLE_LINK_ATTR}]`)) {
+        const href = link.getAttribute(GOOGLE_LINK_ATTR);
+        if (wanted.includes(href) && !present.has(href)) {
+            present.add(href);
+        } else {
+            link.remove();
+        }
+    }
+
+    if (!wanted.length) return;
+    ensureGooglePreconnect();
+
+    for (const href of wanted) {
+        if (present.has(href)) continue;
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = href;
+        link.crossOrigin = "anonymous";
+        link.setAttribute(GOOGLE_LINK_ATTR, href);
+        document.head.appendChild(link);
+    }
+}
+
+function fontKind(font) {
+    if (!font || typeof font !== "object") return null;
+    if (font.kind === "google" || font.kind === "local") return font.kind;
+    if (font.url && font.format) return "local";
+    if (font.stylesheet) return "google";
+    return null;
 }
 
 function applyThemeFonts(fonts) {
-    const root  = document.documentElement.style;
-    const rules = new Set();
+    const root   = document.documentElement.style;
+    const rules  = new Set();
+    const sheets = [];
 
     for (const [key, cfg] of Object.entries(FONT_VAR_MAP)) {
         const font = fonts && fonts[key];
-        if (font && font.family && font.url) {
+        const kind = fontKind(font);
+
+        if (kind === "local" && font.family && font.url && font.format) {
             rules.add(fontFaceRule(font));
-            root.setProperty(cfg.varName, `"${font.family}", ${cfg.stack}`);
-        } else {
-            root.removeProperty(cfg.varName);
+            root.setProperty(cfg.varName, `"${cssFamilyName(font.family)}", ${cfg.stack}`);
+            root.removeProperty(cfg.weightVar);
+            root.removeProperty(cfg.styleVar);
+            root.removeProperty(cfg.axesVar);
+            continue;
         }
+
+        if (kind === "google" && font.family) {
+            const href = safeGoogleStylesheet(font.stylesheet);
+            if (href) {
+                sheets.push(href);
+                root.setProperty(cfg.varName, `"${cssFamilyName(font.family)}", ${cfg.stack}`);
+                setOrClear(root, cfg.weightVar, font.weight);
+                setOrClear(root, cfg.styleVar,  font.style);
+                setOrClear(root, cfg.axesVar,   font.variationSettings);
+                continue;
+            }
+        }
+
+        root.removeProperty(cfg.varName);
+        root.removeProperty(cfg.weightVar);
+        root.removeProperty(cfg.styleVar);
+        root.removeProperty(cfg.axesVar);
     }
+
+    syncGoogleFontLinks(sheets);
 
     const styleEl  = getFontStyleEl();
     const combined = [...rules].join("\n");

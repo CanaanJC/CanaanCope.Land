@@ -1,0 +1,667 @@
+.admin-font-upload-btn,
+.admin-google-font-btn {
+    flex: 0 0 32px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #2a2a2a;
+    border: 1px solid #3a3a3a;
+    border-radius: 6px;
+    color: var(--admin-text, #eaeaea);
+    cursor: pointer;
+    font-size: 0.95rem;
+    line-height: 1;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.admin-font-upload-btn:hover,
+.admin-google-font-btn:hover {
+    background: #353535;
+}
+
+.admin-font-upload-btn:disabled,
+.admin-google-font-btn:disabled {
+    opacity: 0.5;
+    cursor: wait;
+}
+
+.admin-font-tools {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    align-self: flex-start;
+    gap: 6px;
+}
+
+.admin-google-font-btn img {
+    display: block;
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+}
+
+.admin-google-font-fallback {
+    color: #8ab4f8;
+    font-family: Arial, sans-serif;
+    font-size: 19px;
+    font-weight: 700;
+}
+
+.admin-field-row--font > .admin-field-value-wrap {
+    flex-basis: 140px;
+}
+
+.admin-gf-dialog {
+    width: min(1440px, 94vw);
+    max-width: 94vw;
+    height: 92vh;
+    height: 92dvh;
+    max-height: 92vh;
+    max-height: 92dvh;
+    margin: auto;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid #444;
+    border-radius: 18px;
+    background: #191919;
+    color: #eaeaea;
+    box-shadow: 0 30px 100px rgba(0, 0, 0, 0.65);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color-scheme: dark;
+    box-sizing: border-box;
+}
+
+.admin-gf-dialog[open] {
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+}
+
+.admin-gf-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.78);
+    backdrop-filter: blur(5px);
+}
+
+.admin-gf-dialog *,
+.admin-gf-dialog *::before,
+.admin-gf-dialog *::after {
+    box-sizing: border-box;
+}
+
+.admin-gf-dialog [hidden] {
+    display: none !important;
+}
+
+.admin-gf-dialog button,
+.admin-gf-dialog input,
+.admin-gf-dialog select,
+.admin-gf-dialog textarea {
+    font-family: inherit;
+}
+
+.admin-gf-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 18px 22px 12px;
+}
+
+.admin-gf-heading {
+    min-width: 0;
+}
+
+.admin-gf-heading h2 {
+    margin: 0;
+    font-size: 1.3rem;
+    line-height: 1.25;
+}
+
+.admin-gf-heading p {
+    margin: 5px 0 0;
+}
+
+.admin-gf-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 36px;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 1px solid #3d3d3d;
+    border-radius: 8px;
+    background: #272727;
+    color: #eaeaea;
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.admin-gf-close:hover {
+    background: #383838;
+}
+
+.admin-gf-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 22px 16px;
+    border-bottom: 1px solid #333;
+}
+
+.admin-gf-input {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    padding: 9px 11px;
+    border: 1px solid #414141;
+    border-radius: 8px;
+    background: #111;
+    color: #eaeaea;
+    font-size: 0.88rem;
+    line-height: 1.4;
+}
+
+.admin-gf-input::placeholder {
+    color: #8a8a8a;
+    opacity: 1;
+}
+
+.admin-gf-toolbar > input {
+    flex: 1 1 auto;
+}
+
+.admin-gf-sort {
+    flex: 0 1 230px;
+    width: 230px;
+}
+
+.admin-gf-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 350px;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.admin-gf-results-panel {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.admin-gf-count {
+    flex: 0 0 auto;
+    padding: 12px 20px;
+    color: #aaa;
+    font-size: 0.78rem;
+    border-bottom: 1px solid #292929;
+}
+
+.admin-gf-results {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: 14px;
+    scrollbar-width: thin;
+    scrollbar-color: #555 transparent;
+}
+
+.admin-gf-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.admin-gf-card {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    padding: 17px 18px;
+    border: 1px solid #353535;
+    border-radius: 12px;
+    background: #202020;
+    color: #eaeaea;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.admin-gf-card:hover {
+    background: #262626;
+    border-color: #606060;
+}
+
+.admin-gf-card--selected,
+.admin-gf-card--selected:hover {
+    background: #1b2a3a;
+    border-color: #8ab4f8;
+    box-shadow: inset 0 0 0 1px #8ab4f8;
+}
+
+.admin-gf-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    margin-bottom: 12px;
+}
+
+.admin-gf-card-family {
+    font-size: 0.96rem;
+    overflow-wrap: anywhere;
+}
+
+.admin-gf-card-preview {
+    min-height: 1.6em;
+    max-height: 8em;
+    overflow: hidden;
+    font-family: sans-serif;
+    font-size: 36px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-synthesis: none;
+}
+
+.admin-gf-preview-status {
+    display: block;
+    min-height: 1.3em;
+    margin-top: 8px;
+    font-size: 0.7rem;
+    color: #aaa;
+}
+
+.admin-gf-more {
+    display: block;
+    width: 100%;
+    margin-top: 12px;
+    padding: 12px;
+    border: 1px solid #444;
+    border-radius: 10px;
+    background: #292929;
+    color: #ddd;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.admin-gf-more:hover {
+    background: #363636;
+}
+
+.admin-gf-empty {
+    margin: 0;
+    padding: 36px 18px;
+    text-align: center;
+    color: #aaa;
+    font-size: 0.9rem;
+}
+
+.admin-gf-sidebar {
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: 18px;
+    border-left: 1px solid #333;
+    background: #202020;
+    scrollbar-width: thin;
+    scrollbar-color: #555 transparent;
+}
+
+.admin-gf-control {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    margin: 0 0 16px;
+    min-width: 0;
+}
+
+.admin-gf-control-label {
+    color: #ddd;
+    font-size: 0.8rem;
+    font-weight: 650;
+}
+
+.admin-gf-sample-input {
+    min-height: 96px;
+    max-height: 240px;
+    resize: vertical;
+    white-space: pre-wrap;
+}
+
+.admin-gf-range {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    margin: 2px 0;
+    accent-color: #8ab4f8;
+    cursor: pointer;
+}
+
+.admin-gf-muted {
+    margin: 0;
+    color: #aaa;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.admin-gf-filter-note {
+    margin-bottom: 16px;
+}
+
+.admin-gf-details {
+    padding-top: 18px;
+    margin-top: 6px;
+    border-top: 1px solid #3a3a3a;
+}
+
+.admin-gf-family-title {
+    margin: 0 0 8px;
+    color: #f0f0f0;
+    font-size: 1.1rem;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.admin-gf-dialog a {
+    color: #9ac2ff;
+    text-decoration: none;
+}
+
+.admin-gf-dialog a:hover {
+    text-decoration: underline;
+}
+
+.admin-gf-specimen {
+    display: inline-block;
+    margin-bottom: 14px;
+    font-size: 0.77rem;
+}
+
+.admin-gf-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    margin: 0 0 18px;
+}
+
+.admin-gf-stat {
+    display: grid;
+    grid-template-columns: 78px minmax(0, 1fr);
+    gap: 10px;
+    font-size: 0.75rem;
+    line-height: 1.45;
+}
+
+.admin-gf-stat dt {
+    color: #999;
+}
+
+.admin-gf-stat dd {
+    margin: 0;
+    color: #d0d0d0;
+    overflow-wrap: anywhere;
+}
+
+.admin-gf-selected-preview {
+    min-height: 110px;
+    max-height: 280px;
+    overflow: auto;
+    margin-bottom: 8px;
+    padding: 14px;
+    border: 1px solid #3b3b3b;
+    border-radius: 10px;
+    background: #141414;
+    color: #eee;
+    font-family: sans-serif;
+    font-size: 36px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-synthesis: none;
+}
+
+.admin-gf-selected-preview + .admin-gf-muted {
+    min-height: 1.5em;
+    margin-bottom: 16px;
+}
+
+.admin-gf-axis-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.admin-gf-axis-controls > .admin-gf-range {
+    flex: 1 1 auto;
+}
+
+.admin-gf-axis-number {
+    flex: 0 0 98px;
+    width: 98px;
+    padding: 7px 8px;
+    font-variant-numeric: tabular-nums;
+}
+
+.admin-gf-details > .admin-gf-muted {
+    margin-bottom: 16px;
+}
+
+.admin-gf-secondary {
+    padding: 7px 11px;
+    margin: 0 0 16px;
+    border: 1px solid #444;
+    border-radius: 7px;
+    background: #2a2a2a;
+    color: #ddd;
+    font-size: 0.78rem;
+    cursor: pointer;
+}
+
+.admin-gf-secondary:hover {
+    background: #363636;
+}
+
+.admin-gf-inline-button {
+    display: inline;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #9ac2ff;
+    font-size: inherit;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.admin-gf-descriptor {
+    display: block;
+    padding: 10px;
+    border: 1px solid #3a3a3a;
+    border-radius: 8px;
+    background: #131313;
+    color: #b8d3fa;
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    font-size: 0.72rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    user-select: text;
+}
+
+.admin-gf-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 14px 22px;
+    border-top: 1px solid #333;
+    background: #1d1d1d;
+}
+
+.admin-gf-footer-text {
+    min-width: 0;
+}
+
+.admin-gf-footer-text p + p {
+    margin-top: 4px;
+}
+
+.admin-gf-message {
+    margin: 0;
+    color: #aecbf4;
+    font-size: 0.78rem;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.admin-gf-message:empty {
+    display: none;
+}
+
+.admin-gf-message--error {
+    color: #ffabab;
+}
+
+.admin-gf-details > .admin-gf-message {
+    margin-bottom: 14px;
+}
+
+.admin-gf-use {
+    flex: 0 0 auto;
+    min-width: 118px;
+    padding: 11px 20px;
+    border: 1px solid #8ab4f8;
+    border-radius: 9px;
+    background: #8ab4f8;
+    color: #101d30;
+    font-size: 0.88rem;
+    font-weight: 750;
+    cursor: pointer;
+}
+
+.admin-gf-use:hover {
+    background: #accbfb;
+}
+
+.admin-gf-dialog button:disabled,
+.admin-gf-dialog select:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.admin-gf-dialog [inert] {
+    opacity: 0.7;
+}
+
+.admin-gf-dialog :is(button, input, textarea, select, a):focus-visible,
+.admin-google-font-btn:focus-visible,
+.admin-font-upload-btn:focus-visible {
+    outline: 2px solid #a5c8ff;
+    outline-offset: 3px;
+}
+
+@media (max-width: 1000px) {
+    .admin-gf-body {
+        grid-template-columns: minmax(0, 1fr) 300px;
+    }
+
+    .admin-gf-sidebar {
+        padding: 14px;
+    }
+}
+
+@media (max-width: 700px) {
+    .admin-gf-dialog {
+        width: 96vw;
+        max-width: 96vw;
+        height: 96vh;
+        height: 96dvh;
+        max-height: 96vh;
+        max-height: 96dvh;
+        border-radius: 12px;
+    }
+
+    .admin-gf-header {
+        padding: 13px 14px 10px;
+        gap: 10px;
+    }
+
+    .admin-gf-heading h2 {
+        font-size: 1.12rem;
+    }
+
+    .admin-gf-toolbar {
+        flex-wrap: wrap;
+        padding: 0 14px 12px;
+        gap: 8px;
+    }
+
+    .admin-gf-toolbar > input {
+        flex-basis: calc(100% - 46px);
+        order: 0;
+    }
+
+    .admin-gf-toolbar > .admin-gf-close {
+        order: 1;
+    }
+
+    .admin-gf-sort {
+        flex: 1 1 100%;
+        width: 100%;
+        order: 2;
+    }
+
+    .admin-gf-body {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr) minmax(0, 0.85fr);
+    }
+
+    .admin-gf-sidebar {
+        border-left: 0;
+        border-top: 1px solid #3b3b3b;
+    }
+
+    .admin-gf-results {
+        padding: 10px;
+    }
+
+    .admin-gf-count {
+        padding: 8px 14px;
+    }
+
+    .admin-gf-card {
+        padding: 12px;
+    }
+
+    .admin-gf-footer {
+        gap: 10px;
+        padding: 10px 14px;
+    }
+
+    .admin-gf-footer .admin-gf-muted {
+        font-size: 0.67rem;
+    }
+
+    .admin-gf-use {
+        min-width: 98px;
+        padding: 10px 13px;
+        font-size: 0.8rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .admin-gf-card {
+        transition: none;
+    }
+}

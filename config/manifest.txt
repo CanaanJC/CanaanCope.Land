@@ -3,7 +3,9 @@ ADMIN/css/admin.css
 ADMIN/elements/archive/element.css
 ADMIN/elements/archive/element.html
 ADMIN/elements/archive/element.js
+ADMIN/elements/lib/css/font-picker.css
 ADMIN/elements/lib/css/json.css
+ADMIN/elements/lib/js/font-picker.js
 ADMIN/elements/lib/js/json.js
 ADMIN/elements/Libraries/config.json
 ADMIN/elements/Libraries/element.html
@@ -103,6 +105,7 @@ lib/constants.js
 lib/embed.js
 lib/extensions.js
 lib/favicon.js
+lib/fonts.js
 lib/fsCache.js
 lib/manifest.js
 lib/routes.js

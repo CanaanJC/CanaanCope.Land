@@ -13,6 +13,9 @@
             "notFound": "",
             "backup": ""
         },
+        "apiKeys": {
+            "googleFonts": ""
+        },
         "backup": {
             "path": "",
             "interval": "monthly",
