@@ -3,6 +3,10 @@ console.log("lib-blog module loaded");
 const MARKED_CDN = "https://cdn.jsdelivr.net/npm/marked@12/marked.min.js";
 const BLOG_ROWS_WRAPPER_CLASS = "blog-rows-wrapper";
 
+const CREDITABLE_TYPES = new Set(["image", "video", "folder", "stl"]);
+const CREDIT_TAG_REGEX = /^<([^<>\n]+)>/;
+const STRAY_TAG_REGEX = /^(\s*)<([^<>\n]+)>/;
+
 export async function loadMarked() {
     if (window.marked) return;
     await new Promise((resolve, reject) => {
@@ -153,25 +157,83 @@ export function parseInlineToken(raw) {
     return null;
 }
 
+function isAutolinkLike(inner) {
+    const v = String(inner).trim();
+    return /^[a-z][a-z0-9+.\-]*:\/\//i.test(v) ||
+        /^mailto:/i.test(v) ||
+        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+}
+
+function isIndentedCodeWhitespace(ws) {
+    if (!ws.includes("\n")) return false;
+    const lastLine = ws.slice(ws.lastIndexOf("\n") + 1);
+    return /\t/.test(lastLine) || lastLine.length >= 4;
+}
+
+// Text that follows a media tag: any <...> tags at the start of it that did not
+// qualify as a credit (not directly touching the media, or a second credit) are
+// escaped so they render visibly as body text, while still going through markdown.
+function escapeStrayTagsAfterMedia(text) {
+    let out = "";
+    let rest = text;
+    let m;
+
+    while ((m = rest.match(STRAY_TAG_REGEX)) !== null) {
+        const ws = m[1];
+        const inner = m[2];
+
+        if (isIndentedCodeWhitespace(ws)) break;
+        if (!inner.trim() || isAutolinkLike(inner) || parseInlineToken(inner)) break;
+
+        out += `${ws}&lt;${inner}&gt;`;
+        rest = rest.slice(m[0].length);
+    }
+
+    return out + rest;
+}
+
 export function extractInlineSegments(text) {
+    const source = String(text);
     const regex = inlineTokenRegex();
     const segments = [];
     let lastIndex = 0;
+    let afterMedia = false;
     let m;
 
-    while ((m = regex.exec(text)) !== null) {
-        const token = parseInlineToken(m[1]);
+    const pushText = (value) => {
+        if (!value) return;
+        segments.push({
+            type: "text",
+            value: afterMedia ? escapeStrayTagsAfterMedia(value) : value,
+        });
+    };
+
+    while ((m = regex.exec(source)) !== null) {
+        let token = parseInlineToken(m[1]);
         if (!token) continue;
 
         if (m.index > lastIndex) {
-            segments.push({ type: "text", value: text.substring(lastIndex, m.index) });
+            pushText(source.substring(lastIndex, m.index));
         }
+
+        let end = regex.lastIndex;
+
+        if (CREDITABLE_TYPES.has(token.type)) {
+            const cm = source.slice(end).match(CREDIT_TAG_REGEX);
+            if (cm && cm[1].trim() && !parseInlineToken(cm[1])) {
+                token = { ...token, credit: cm[1].trim() };
+                end += cm[0].length;
+            }
+        }
+
         segments.push({ type: "token", token });
-        lastIndex = regex.lastIndex;
+        afterMedia = true;
+        lastIndex = end;
+        regex.lastIndex = end;
     }
 
-    if (lastIndex < text.length) {
-        segments.push({ type: "text", value: text.substring(lastIndex) });
+    if (lastIndex < source.length) {
+        pushText(source.substring(lastIndex));
     }
 
     return segments;
@@ -179,9 +241,12 @@ export function extractInlineSegments(text) {
 
 export function isSoleToken(content) {
     const trimmed = String(content).trim();
-    const m = trimmed.match(/^<([^<>]+)>$/);
-    if (!m) return null;
-    return parseInlineToken(m[1]);
+    if (!/^<[^<>]+>(<[^<>\n]+>)?$/.test(trimmed)) return null;
+
+    const segments = extractInlineSegments(trimmed);
+    if (segments.length !== 1 || segments[0].type !== "token") return null;
+
+    return segments[0].token;
 }
 
 export function parseMultiMediaBlock(content) {
@@ -194,6 +259,30 @@ export function parseMultiMediaBlock(content) {
 
 export function isMediaOnlyBlock(content) {
     return !!isSoleToken(content) || !!parseMultiMediaBlock(content);
+}
+
+function buildMediaCredit(credit) {
+    const caption = document.createElement("figcaption");
+    caption.className = "blog-media-credit";
+
+    if (window.marked && typeof window.marked.parseInline === "function") {
+        caption.innerHTML = window.marked.parseInline(credit);
+    } else {
+        caption.textContent = credit;
+    }
+
+    return caption;
+}
+
+function wrapWithCredit(el, credit, extraClass = "") {
+    if (!credit) return el;
+
+    const figure = document.createElement("figure");
+    figure.className = "blog-media-figure" + (extraClass ? ` ${extraClass}` : "");
+    figure.appendChild(el);
+    figure.appendChild(buildMediaCredit(credit));
+
+    return figure;
 }
 
 function buildLoopVideoEl(src, file, isGif, className) {
@@ -644,7 +733,7 @@ export function openGalleryModal(files, mediaBaseUrl, trigger = null) {
     closeBtn.focus({ preventScroll: true });
 }
 
-export function renderFolderCell(folderName, mediaBaseUrl, listingUrl) {
+export function renderFolderCell(folderName, mediaBaseUrl, listingUrl, credit = "") {
     const cell = document.createElement("div");
     cell.className = "blog-cell blog-cell--image-left";
 
@@ -655,7 +744,7 @@ export function renderFolderCell(folderName, mediaBaseUrl, listingUrl) {
     wrap.className = "blog-image-wrap";
 
     outer.appendChild(wrap);
-    cell.appendChild(outer);
+    cell.appendChild(wrapWithCredit(outer, credit, "blog-media-figure--folder"));
 
     fetch(`${listingUrl}?_=${Date.now()}`, { cache: "no-store" })
         .then(r => r.json())
@@ -744,20 +833,25 @@ export function renderFolderCell(folderName, mediaBaseUrl, listingUrl) {
 }
 
 export function renderMediaToken(token, mediaBaseUrl, listingBaseUrl) {
+    const credit = token && token.credit ? token.credit : "";
+
     switch (token.type) {
         case "folder":
-            return renderFolderCell(token.folder, mediaBaseUrl, `${listingBaseUrl}/${token.folder}`);
+            return renderFolderCell(token.folder, mediaBaseUrl, `${listingBaseUrl}/${token.folder}`, credit);
 
         case "link":
             return renderLinkEmbed(token.url, !!token.interactive);
 
         case "stl":
-            return renderStlViewer(`${mediaBaseUrl}/${token.file}`, token.bgColor, token.modelColor);
+            return wrapWithCredit(
+                renderStlViewer(`${mediaBaseUrl}/${token.file}`, token.bgColor, token.modelColor),
+                credit
+            );
 
         case "image": {
             if (isGifFile(token.file)) {
                 const wrap = makeLoopWrap(`${mediaBaseUrl}/${token.file}`, token.file, true);
-                return makeImageZoomable(wrap, token.file, mediaBaseUrl);
+                return wrapWithCredit(makeImageZoomable(wrap, token.file, mediaBaseUrl), credit);
             }
 
             const wrap = document.createElement("span");
@@ -771,12 +865,15 @@ export function renderMediaToken(token, mediaBaseUrl, listingBaseUrl) {
 
             wrap.appendChild(img);
 
-            return makeImageZoomable(wrap, token.file, mediaBaseUrl);
+            return wrapWithCredit(makeImageZoomable(wrap, token.file, mediaBaseUrl), credit);
         }
 
         case "video": {
             if (token.loop) {
-                return makeLoopWrap(`${mediaBaseUrl}/${token.file}`, token.file, false);
+                return wrapWithCredit(
+                    makeLoopWrap(`${mediaBaseUrl}/${token.file}`, token.file, false),
+                    credit
+                );
             }
 
             const wrap = document.createElement("span");
@@ -795,7 +892,7 @@ export function renderMediaToken(token, mediaBaseUrl, listingBaseUrl) {
             video.appendChild(source);
             wrap.appendChild(video);
 
-            return wrap;
+            return wrapWithCredit(wrap, credit);
         }
 
         case "audio": {
@@ -845,7 +942,7 @@ export function renderCell(content, mediaBaseUrl, listingBaseUrl) {
 
     if (sole) {
         if (sole.type === "folder") {
-            return renderFolderCell(sole.folder, mediaBaseUrl, `${listingBaseUrl}/${sole.folder}`);
+            return renderFolderCell(sole.folder, mediaBaseUrl, `${listingBaseUrl}/${sole.folder}`, sole.credit || "");
         }
 
         cell.classList.add("blog-cell--image-left");

@@ -1,20 +1,10 @@
 [
     {
-        "id": "test2",
-        "name": "test2",
-        "path": "test2",
-        "depth": 1,
-        "useDates": true,
-        "hidden": false,
-        "icon": ""
-    },
-    {
-        "id": "resources",
-        "name": "resources",
-        "path": "resources",
-        "depth": 3,
+        "id": "test",
+        "name": "test",
+        "path": "test",
         "useDates": false,
-        "hidden": false,
+        "private": false,
         "icon": ""
     }
 ]

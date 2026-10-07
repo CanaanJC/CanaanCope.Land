@@ -391,6 +391,23 @@ body.mobile .blog-media-stack-item {
     width: 100% !important;
 }
 
+/* Credited media: the figure takes the 95% width so the media and its
+   caption shrink together and the caption never gets wider than the media. */
+body.mobile .blog-media-figure {
+    width: 95% !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+body.mobile .blog-media-figure .blog-image-wrap,
+body.mobile .blog-media-figure .blog-folder-outer,
+body.mobile .blog-media-figure .blog-video-wrap,
+body.mobile .blog-media-figure .blog-stl-wrap {
+    width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+}
+
 body.mobile .blog-cell {
     width: 100% !important;
 }

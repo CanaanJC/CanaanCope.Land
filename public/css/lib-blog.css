@@ -12,6 +12,7 @@ body.blog-gallery-open {
     --blog-media-overlay: color-mix(in srgb, var(--bg) 80%, transparent);
     --blog-date-dim: 60%;
     --blog-date-color: color-mix(in srgb, var(--page-text-color, var(--text)) var(--blog-date-dim), var(--bg));
+    --blog-credit-font-size: 0.8rem;
 }
 
 #about-me-content,
@@ -553,6 +554,69 @@ body.blog-gallery-open {
     padding: 0;
 }
 
+/* ── Media credits ─────────────────────────────────────────────
+   <media><credit> renders the credit as a centred caption that is
+   exactly as wide as the media and wraps instead of overflowing.
+   Colour matches the date range / copy-link icon. Size is rem-based
+   so it does not follow the blog body font-size control. */
+
+.blog-media-figure {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.blog-media-figure > .blog-image-wrap,
+.blog-media-figure > .blog-folder-outer,
+.blog-media-figure > .blog-stl-wrap {
+    width: 100%;
+}
+
+.blog-media-credit {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    margin: 8px 0 0 0;
+    padding: 0 4px;
+    box-sizing: border-box;
+    text-align: center;
+    color: var(--blog-date-color);
+    font-family: var(--page-font-family, inherit);
+    font-size: var(--blog-credit-font-size, 0.8rem);
+    font-style: normal;
+    font-weight: 400;
+    line-height: 1.5;
+    letter-spacing: 0.02em;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.blog-media-figure .blog-media-credit a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    transition: color 140ms ease;
+}
+
+.blog-media-figure .blog-media-credit a:hover,
+.blog-media-figure .blog-media-credit a:focus-visible {
+    color: var(--page-text-color, var(--text));
+}
+
+.blog-media-figure .blog-media-credit code {
+    font-size: 0.9em;
+    padding: 0 4px;
+    color: inherit;
+}
+
 .blog-gallery-overlay {
     position: fixed;
     inset: 0;
@@ -697,7 +761,8 @@ body.mobile .blog-gallery-card--single .blog-gallery-media {
 
     .blog-image-wrap--zoomable,
     .blog-gallery-close,
-    .blog-date__link {
+    .blog-date__link,
+    .blog-media-figure .blog-media-credit a {
         transition: none;
     }
 }
